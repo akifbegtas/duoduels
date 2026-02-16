@@ -420,6 +420,11 @@ io.on("connection", (socket) => {
       tabuGuesserId: null,
       tabuClues: [],
       tabuDescriberToggle: 0,
+      // Sayı Tahmin specific
+      sayiTahminSecrets: {},
+      sayiTahminGuesses: {},
+      sayiTahminCurrentTurn: null, // p1 or p2
+      sayiTahminRound: 1,
     };
 
     console.log(
@@ -606,6 +611,22 @@ io.on("connection", (socket) => {
 
       setTimeout(() => {
         startTabuTurn(roomId);
+      }, 2000);
+    } else if (room.gameType === "sayiTahmin") {
+      // Sayı Tahmin
+      room.sayiTahminSecrets = {};
+      room.sayiTahminGuesses = {};
+      room.sayiTahminCurrentTurn = null;
+      room.sayiTahminRound = 1;
+
+      io.to(roomId).emit("sayiTahminStart", {
+        roundCount: room.roundCount,
+        roundTime: room.roundTime,
+        pairs: validPairs,
+      });
+
+      setTimeout(() => {
+        startSayiTahminSecretPhase(roomId);
       }, 2000);
     } else {
       // Telepati
@@ -1053,6 +1074,143 @@ io.on("connection", (socket) => {
     if (Object.keys(room.imposterVotes).length >= room.players.length) {
       endImposterVoting(roomId);
     }
+  });
+
+  // --- SAYI TAHMİN: GİZLİ SAYI GÖNDERME ---
+  socket.on("submitSecretNumber", ({ roomId, number }) => {
+    const room = rooms[roomId];
+    if (!room || room.gameStatus !== "playing" || room.gameType !== "sayiTahmin") return;
+
+    const currentPair = room.pairs[room.currentPairIndex];
+    if (!currentPair) return;
+    if (socket.id !== currentPair.p1.id && socket.id !== currentPair.p2.id) return;
+
+    // Validate: 4 digits
+    const str = String(number);
+    if (str.length !== 4 || !/^\d{4}$/.test(str)) {
+      socket.emit("sayiTahminError", "4 haneli bir sayı girin!");
+      return;
+    }
+
+    const pairKey = currentPair.id;
+    if (!room.sayiTahminSecrets[pairKey]) room.sayiTahminSecrets[pairKey] = {};
+    room.sayiTahminSecrets[pairKey][socket.id] = str;
+
+    const partnerId = socket.id === currentPair.p1.id ? currentPair.p2.id : currentPair.p1.id;
+    io.to(partnerId).emit("partnerSecretSubmitted");
+    socket.emit("secretSubmitted");
+
+    // Both submitted?
+    const s1 = room.sayiTahminSecrets[pairKey][currentPair.p1.id];
+    const s2 = room.sayiTahminSecrets[pairKey][currentPair.p2.id];
+    if (s1 && s2) {
+      // Start guessing phase - p1 goes first
+      room.sayiTahminCurrentTurn = "p1";
+      room.sayiTahminGuesses[pairKey] = { p1: [], p2: [] };
+      setTimeout(() => {
+        startSayiTahminGuessPhase(roomId);
+      }, 1000);
+    }
+  });
+
+  // --- SAYI TAHMİN: TAHMİN GÖNDERME ---
+  socket.on("submitNumberGuess", ({ roomId, guess }) => {
+    const room = rooms[roomId];
+    if (!room || room.gameStatus !== "playing" || room.gameType !== "sayiTahmin") return;
+
+    const currentPair = room.pairs[room.currentPairIndex];
+    if (!currentPair) return;
+
+    const isP1 = socket.id === currentPair.p1.id;
+    const isP2 = socket.id === currentPair.p2.id;
+    if (!isP1 && !isP2) return;
+
+    // Check if it's this player's turn
+    const expectedTurn = room.sayiTahminCurrentTurn;
+    if ((expectedTurn === "p1" && !isP1) || (expectedTurn === "p2" && !isP2)) return;
+
+    // Validate guess
+    const str = String(guess);
+    if (str.length !== 4 || !/^\d{4}$/.test(str)) {
+      socket.emit("sayiTahminError", "4 haneli bir sayı girin!");
+      return;
+    }
+
+    const pairKey = currentPair.id;
+    const targetSecret = isP1
+      ? room.sayiTahminSecrets[pairKey][currentPair.p2.id]
+      : room.sayiTahminSecrets[pairKey][currentPair.p1.id];
+
+    // Calculate greens and yellows
+    let greens = 0;
+    let yellows = 0;
+    const targetDigits = targetSecret.split("");
+    const guessDigits = str.split("");
+
+    for (let i = 0; i < 4; i++) {
+      if (guessDigits[i] === targetDigits[i]) {
+        greens++;
+      } else if (targetDigits.includes(guessDigits[i])) {
+        yellows++;
+      }
+    }
+
+    const who = isP1 ? "p1" : "p2";
+    const guesserName = isP1 ? currentPair.p1.username : currentPair.p2.username;
+    room.sayiTahminGuesses[pairKey][who].push({ guess: str, greens, yellows });
+
+    // Broadcast result to both players
+    io.to(currentPair.p1.id).to(currentPair.p2.id).emit("sayiTahminGuessResult", {
+      who: who,
+      guesserName: guesserName,
+      guess: str,
+      greens: greens,
+      yellows: yellows,
+      guessCount: room.sayiTahminGuesses[pairKey][who].length,
+    });
+
+    // Broadcast to spectators too
+    room.spectators.forEach(s => {
+      io.to(s.id).emit("sayiTahminGuessResult", {
+        who: who,
+        guesserName: guesserName,
+        guess: str,
+        greens: greens,
+        yellows: yellows,
+        guessCount: room.sayiTahminGuesses[pairKey][who].length,
+      });
+    });
+
+    // Check if correct (4 greens)
+    if (greens === 4) {
+      const winnerName = guesserName;
+      const loserName = isP1 ? currentPair.p2.username : currentPair.p1.username;
+      const winnerSecret = isP1
+        ? room.sayiTahminSecrets[pairKey][currentPair.p1.id]
+        : room.sayiTahminSecrets[pairKey][currentPair.p2.id];
+
+      io.to(roomId).emit("sayiTahminWin", {
+        winnerName: winnerName,
+        winnerId: socket.id,
+        loserName: loserName,
+        guess: str,
+        targetSecret: targetSecret,
+        winnerSecret: winnerSecret,
+        guessCount: room.sayiTahminGuesses[pairKey][who].length,
+        pairId: pairKey,
+        teamName: currentPair.teamName,
+      });
+
+      // Next pair or next round
+      setTimeout(() => {
+        nextSayiTahminStep(roomId);
+      }, 5000);
+      return;
+    }
+
+    // Switch turn
+    room.sayiTahminCurrentTurn = room.sayiTahminCurrentTurn === "p1" ? "p2" : "p1";
+    startSayiTahminGuessPhase(roomId);
   });
 
   // --- ODA AYARLARINI GÜNCELLE (oyun bitince tekrar seçim) ---
@@ -1951,6 +2109,85 @@ function endImposterVoting(roomId) {
   }, 8000);
 }
 
+// ============ SAYI TAHMİN FONKSİYONLARI ============
+
+function startSayiTahminSecretPhase(roomId) {
+  const room = rooms[roomId];
+  if (!room) return;
+
+  const pair = room.pairs[room.currentPairIndex];
+  if (!pair) return;
+
+  const pairKey = pair.id;
+  room.sayiTahminSecrets[pairKey] = {};
+  room.sayiTahminGuesses[pairKey] = { p1: [], p2: [] };
+
+  io.to(roomId).emit("sayiTahminSecretPhase", {
+    p1: pair.p1,
+    p2: pair.p2,
+    currentRound: room.currentRound,
+    totalRounds: room.roundCount,
+    teamName: pair.teamName,
+  });
+}
+
+function startSayiTahminGuessPhase(roomId) {
+  const room = rooms[roomId];
+  if (!room) return;
+
+  const pair = room.pairs[room.currentPairIndex];
+  if (!pair) return;
+
+  const turn = room.sayiTahminCurrentTurn;
+  const guesser = turn === "p1" ? pair.p1 : pair.p2;
+  const target = turn === "p1" ? pair.p2 : pair.p1;
+
+  io.to(roomId).emit("sayiTahminGuessTurn", {
+    turn: turn,
+    guesserId: guesser.id,
+    guesserName: guesser.username,
+    targetName: target.username,
+    p1: pair.p1,
+    p2: pair.p2,
+    roundTime: room.roundTime,
+  });
+}
+
+function nextSayiTahminStep(roomId) {
+  const room = rooms[roomId];
+  if (!room) return;
+
+  room.currentPairIndex++;
+
+  if (room.currentPairIndex < room.pairs.length) {
+    // Next pair
+    setTimeout(() => {
+      startSayiTahminSecretPhase(roomId);
+    }, 1500);
+    return;
+  }
+
+  // All pairs done, next round
+  room.currentPairIndex = 0;
+  room.currentRound++;
+
+  if (room.currentRound > room.roundCount) {
+    // Game over
+    io.to(roomId).emit("sayiTahminGameOver", "Oyun bitti! 🏆");
+    room.gameStatus = "finished";
+    setTimeout(() => {
+      room.gameStatus = "waiting";
+      emitBackToSelect(roomId);
+    }, 5000);
+    return;
+  }
+
+  io.to(roomId).emit("roundChanged", room.currentRound);
+  setTimeout(() => {
+    startSayiTahminSecretPhase(roomId);
+  }, 2000);
+}
+
 function emitBackToSelect(roomId) {
   const room = rooms[roomId];
   if (!room) return;
@@ -1973,6 +2210,9 @@ function emitBackToSelect(roomId) {
   room.tabuClues = [];
   room.tabuCurrentWord = null;
   room.imposterUsedWords = [];
+  room.sayiTahminSecrets = {};
+  room.sayiTahminGuesses = {};
+  room.sayiTahminCurrentTurn = null;
 
   // Mevcut oyuncu listesini oluştur
   let playerList = [];

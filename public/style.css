@@ -1924,6 +1924,30 @@ button:active {
     padding: 10px;
   }
 
+  /* Sayı Tahmin */
+  .st-secret-area {
+    padding: 14px;
+    margin: 8px 0;
+  }
+  .st-big-input {
+    width: 120px !important;
+    font-size: 1.2rem !important;
+    letter-spacing: 4px;
+  }
+  .st-history {
+    padding: 10px;
+    margin: 8px 0;
+    max-height: 220px;
+  }
+  .st-history-item {
+    padding: 6px 8px;
+    font-size: 0.8rem;
+  }
+  .st-history-guess {
+    font-size: 1rem;
+    letter-spacing: 2px;
+  }
+
   /* Imposter */
   .imposter-card {
     padding: 18px;
@@ -1963,6 +1987,136 @@ button:active {
     font-size: 0.6rem;
     top: -34px;
   }
+}
+
+/* ======= SAYI TAHMİN ======= */
+.st-phase-label {
+  text-align: center;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #f39c12;
+  margin: 8px 0;
+  letter-spacing: 1px;
+}
+.st-secret-area {
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 16px;
+  padding: 20px;
+  text-align: center;
+  margin: 10px 0;
+}
+.st-input-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+  margin: 10px 0;
+}
+.st-big-input {
+  width: 140px !important;
+  font-size: 1.4rem !important;
+  text-align: center;
+  letter-spacing: 6px;
+  margin-bottom: 0 !important;
+}
+.st-input-row button {
+  background: linear-gradient(135deg, #27ae60, #2ecc71);
+  box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
+}
+.st-guess-area {
+  text-align: center;
+  margin: 10px 0;
+}
+.st-target-label {
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.st-history {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 16px;
+  padding: 12px;
+  margin: 10px 0;
+  max-height: 280px;
+  overflow-y: auto;
+}
+.st-history h4 {
+  margin: 0 0 8px 0;
+  text-align: center;
+}
+.st-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.st-history-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 0.9rem;
+}
+.st-history-who {
+  font-weight: 600;
+  font-size: 0.8rem;
+  color: rgba(255, 255, 255, 0.7);
+  min-width: 60px;
+}
+.st-history-guess {
+  font-weight: 800;
+  font-size: 1.1rem;
+  letter-spacing: 3px;
+  color: #fff;
+}
+.st-history-result {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.st-green-badge {
+  background: rgba(39, 174, 96, 0.3);
+  border: 1px solid rgba(39, 174, 96, 0.5);
+  color: #6dd5a0;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.st-yellow-badge {
+  background: rgba(241, 196, 15, 0.3);
+  border: 1px solid rgba(241, 196, 15, 0.5);
+  color: #f1c40f;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.st-gray-badge {
+  background: rgba(149, 165, 166, 0.3);
+  border: 1px solid rgba(149, 165, 166, 0.5);
+  color: #bdc3c7;
+  padding: 3px 8px;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+.st-wait-area {
+  text-align: center;
+  padding: 30px 20px;
+}
+.st-wait-text {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 1.1rem;
+  font-weight: 600;
 }
 
 /* ======= CAPACITOR / MOBİL SAFE AREA ======= */

@@ -278,6 +278,15 @@
             </div>
             <div
               class="game-card"
+              id="card-sayiTahmin"
+              onclick="selectGame('sayiTahmin')"
+            >
+              <div class="game-card-icon">🔢</div>
+              <h3>Sayı Tahmin</h3>
+              <p>4 haneli sayıyı tahmin et!</p>
+            </div>
+            <div
+              class="game-card"
               id="card-imposter"
               onclick="selectGame('imposter')"
               style="display:none"
@@ -708,6 +717,51 @@
             style="font-size: 1.2rem; margin-bottom: 5px"
           ></div>
           <div id="game-log" class="log-container"></div>
+        </div>
+      </div>
+
+      <!-- SAYI TAHMİN EKRANI -->
+      <div id="sayiTahmin-screen" class="screen">
+        <div id="st-turn-info" class="turn-info">Sayı Tahmin Başlıyor...</div>
+
+        <div id="st-phase-label" class="st-phase-label hidden"></div>
+
+        <!-- Sayı Giriş Alanı (başlangıçta gizli sayı girmek için) -->
+        <div id="st-secret-area" class="st-secret-area hidden">
+          <h3 style="color:#fff; margin-bottom:12px;">4 Haneli Gizli Sayını Gir</h3>
+          <p style="color:rgba(255,255,255,0.6); font-size:0.85rem; margin-bottom:10px;">0-9 arası rakamlarla 4 haneli bir sayı seç</p>
+          <div class="st-input-row">
+            <input type="tel" id="st-secret-input" placeholder="Örn: 3821" maxlength="4" autocomplete="off" class="st-big-input" />
+            <button id="st-secret-btn" onclick="sendSecretNumber()">ONAYLA</button>
+          </div>
+          <div id="st-secret-status" class="status-text"></div>
+        </div>
+
+        <!-- Tahmin Alanı -->
+        <div id="st-guess-area" class="st-guess-area hidden">
+          <div id="st-target-label" class="st-target-label"></div>
+          <div class="st-input-row">
+            <input type="tel" id="st-guess-input" placeholder="4 haneli tahmin..." maxlength="4" autocomplete="off" class="st-big-input" />
+            <button id="st-guess-btn" onclick="sendNumberGuess()">TAHMİN</button>
+          </div>
+        </div>
+
+        <!-- Tahmin Geçmişi -->
+        <div id="st-history" class="st-history hidden">
+          <h4 style="color:#fff; margin-bottom:8px;">Tahmin Geçmişi</h4>
+          <div id="st-history-list" class="st-history-list"></div>
+        </div>
+
+        <!-- Bekleme Alanı (seyirci / karşı taraf bekliyor) -->
+        <div id="st-wait-area" class="st-wait-area hidden">
+          <div class="st-wait-text">Rakip tahmin ediyor...</div>
+        </div>
+
+        <div id="st-timer" class="timer-countdown"></div>
+
+        <div class="game-footer">
+          <div id="st-round-display" style="font-size: 1.2rem; margin-bottom: 5px"></div>
+          <div id="st-game-log" class="log-container"></div>
         </div>
       </div>
 

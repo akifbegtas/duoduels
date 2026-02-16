@@ -89,6 +89,7 @@ function selectMode(mode) {
   const tabu = document.getElementById("card-tabu");
   const imposter = document.getElementById("card-imposter");
   const pictionary = document.getElementById("card-pictionary");
+  const sayiTahmin = document.getElementById("card-sayiTahmin");
   const tekCount = document.getElementById("tek-count");
   const duoCount = document.getElementById("duo-count");
 
@@ -97,6 +98,7 @@ function selectMode(mode) {
   isimSehir.style.display = "none";
   tabu.style.display = "none";
   pictionary.style.display = "none";
+  if (sayiTahmin) sayiTahmin.style.display = "none";
   if (imposter) imposter.style.display = "none";
   ciftCount.style.display = "none";
   duoCount.style.display = "none";
@@ -108,12 +110,14 @@ function selectMode(mode) {
     isimSehir.style.display = "";
     tabu.style.display = "";
     pictionary.style.display = "";
+    if (sayiTahmin) sayiTahmin.style.display = "";
     ciftCount.style.display = "";
   } else if (mode === "duo") {
     // Başbaşa modu: tek çift kendi aralarında
     telepati.style.display = "";
     isimSehir.style.display = "";
     pictionary.style.display = "";
+    if (sayiTahmin) sayiTahmin.style.display = "";
     duoCount.style.display = "";
   } else if (mode === "tek") {
     // Tek modu: herkes bireysel
@@ -181,6 +185,7 @@ function selectGame(type) {
     pictionary: "Resim Çiz",
     tabu: "Tabu",
     imposter: "Imposter",
+    sayiTahmin: "Sayı Tahmin",
   };
   document.getElementById("settings-game-title").innerText =
     names[type] + " - Ayarlar";
@@ -200,6 +205,9 @@ function selectGame(type) {
   } else if (type === "isimSehir") {
     timeLabel.style.display = "";
     timeInput.value = 20;
+  } else if (type === "sayiTahmin") {
+    timeLabel.style.display = "none";
+    timeInput.value = 60;
   } else {
     timeLabel.style.display = "";
     timeInput.value = 10;
@@ -1747,12 +1755,13 @@ const screens = {
   pictionary: document.getElementById("pictionary-screen"),
   tabu: document.getElementById("tabu-screen"),
   imposter: document.getElementById("imposter-screen"),
+  sayiTahmin: document.getElementById("sayiTahmin-screen"),
 };
 function showScreen(name) {
   Object.values(screens).forEach((s) => s.classList.remove("active"));
   screens[name].classList.add("active");
   // Oyun ekranlarında header'ı gizle (mobil yer kazanımı)
-  const gameScreens = ["game", "isimSehir", "pictionary", "tabu", "imposter"];
+  const gameScreens = ["game", "isimSehir", "pictionary", "tabu", "imposter", "sayiTahmin"];
   if (gameScreens.includes(name)) {
     document.body.classList.add("game-active");
   } else {
@@ -2022,5 +2031,222 @@ socket.on("imposterVoteResult", (data) => {
 });
 
 socket.on("imposterGameOver", (msg) => {
+  Swal.fire({ title: "BİTTİ", text: msg });
+});
+
+// --- SAYI TAHMİN ---
+let _stSecretSubmitted = false;
+
+function sendSecretNumber() {
+  if (_stSecretSubmitted) return;
+  const inp = document.getElementById("st-secret-input");
+  const val = inp.value.trim();
+  if (!val || val.length !== 4) {
+    document.getElementById("st-secret-status").innerText = "4 haneli bir sayı gir!";
+    return;
+  }
+  if (!/^\d{4}$/.test(val)) {
+    document.getElementById("st-secret-status").innerText = "Sadece rakam gir!";
+    return;
+  }
+  _stSecretSubmitted = true;
+  socket.emit("submitSecretNumber", { roomId: currentRoom, number: val });
+  inp.disabled = true;
+  document.getElementById("st-secret-btn").disabled = true;
+  document.getElementById("st-secret-status").innerText = "Gönderildi! Partner bekleniyor...";
+}
+
+function sendNumberGuess() {
+  const inp = document.getElementById("st-guess-input");
+  const val = inp.value.trim();
+  if (!val || val.length !== 4) return;
+  if (!/^\d{4}$/.test(val)) return;
+  socket.emit("submitNumberGuess", { roomId: currentRoom, guess: val });
+  inp.value = "";
+}
+
+socket.on("sayiTahminError", (msg) => {
+  Swal.fire({
+    title: "Hata",
+    text: msg,
+    icon: "error",
+    timer: 2000,
+    showConfirmButton: false,
+  });
+});
+
+socket.on("sayiTahminStart", (data) => {
+  window._currentGameType = "sayiTahmin";
+  showScreen("sayiTahmin");
+  window._totalRounds = data.roundCount || 5;
+  document.getElementById("scoreboard-panel").style.display = "none";
+  document.getElementById("st-round-display").innerText = `Tur: 1 / ${window._totalRounds}`;
+  document.getElementById("st-game-log").innerHTML = "";
+
+  Swal.fire({ title: "Sayı Tahmin Başlıyor!", timer: 1500, showConfirmButton: false });
+
+  if (!_listenersAttached.stSecretInput) {
+    document.getElementById("st-secret-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendSecretNumber();
+    });
+    document.getElementById("st-guess-input").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") sendNumberGuess();
+    });
+    _listenersAttached.stSecretInput = true;
+  }
+});
+
+socket.on("sayiTahminSecretPhase", (data) => {
+  _stSecretSubmitted = false;
+  const iamP1 = myPlayerId === data.p1.id;
+  const iamP2 = myPlayerId === data.p2.id;
+  amIPlaying = iamP1 || iamP2;
+
+  document.getElementById("st-round-display").innerText = `Tur: ${data.currentRound} / ${data.totalRounds}`;
+
+  const infoBar = document.getElementById("st-turn-info");
+  const secretArea = document.getElementById("st-secret-area");
+  const guessArea = document.getElementById("st-guess-area");
+  const historyArea = document.getElementById("st-history");
+  const waitArea = document.getElementById("st-wait-area");
+  const phaseLabel = document.getElementById("st-phase-label");
+
+  guessArea.classList.add("hidden");
+  historyArea.classList.add("hidden");
+  waitArea.classList.add("hidden");
+  document.getElementById("st-history-list").innerHTML = "";
+  document.getElementById("st-game-log").innerHTML = "";
+
+  if (amIPlaying) {
+    infoBar.innerText = "GİZLİ SAYINI GİR! 🔒";
+    infoBar.style.backgroundColor = "#8e44ad";
+    secretArea.classList.remove("hidden");
+    phaseLabel.classList.remove("hidden");
+    phaseLabel.innerText = `${data.p1.username} vs ${data.p2.username}`;
+
+    const inp = document.getElementById("st-secret-input");
+    inp.value = "";
+    inp.disabled = false;
+    document.getElementById("st-secret-btn").disabled = false;
+    document.getElementById("st-secret-status").innerText = "";
+    inp.focus();
+  } else {
+    infoBar.innerText = `${data.p1.username} & ${data.p2.username} sayı seçiyor...`;
+    infoBar.style.backgroundColor = "#34495e";
+    secretArea.classList.add("hidden");
+    phaseLabel.classList.remove("hidden");
+    phaseLabel.innerText = `${data.teamName}`;
+    waitArea.classList.remove("hidden");
+    document.querySelector("#st-wait-area .st-wait-text").innerText = "Oyuncular gizli sayılarını seçiyor...";
+  }
+});
+
+socket.on("secretSubmitted", () => {
+  // Own secret submitted confirmation
+});
+
+socket.on("partnerSecretSubmitted", () => {
+  if (amIPlaying) {
+    document.getElementById("st-secret-status").innerText = "Partneriniz sayısını girdi!";
+  }
+});
+
+socket.on("sayiTahminGuessTurn", (data) => {
+  const iamP1 = myPlayerId === data.p1.id;
+  const iamP2 = myPlayerId === data.p2.id;
+  amIPlaying = iamP1 || iamP2;
+
+  const infoBar = document.getElementById("st-turn-info");
+  const secretArea = document.getElementById("st-secret-area");
+  const guessArea = document.getElementById("st-guess-area");
+  const historyArea = document.getElementById("st-history");
+  const waitArea = document.getElementById("st-wait-area");
+
+  secretArea.classList.add("hidden");
+  historyArea.classList.remove("hidden");
+
+  const isMyTurn = myPlayerId === data.guesserId;
+
+  if (isMyTurn) {
+    infoBar.innerText = `SIRA SENDE! ${data.targetName}'in sayısını tahmin et 🎯`;
+    infoBar.style.backgroundColor = "#27ae60";
+    guessArea.classList.remove("hidden");
+    waitArea.classList.add("hidden");
+
+    document.getElementById("st-target-label").innerText = `${data.targetName}'in sayısını tahmin et`;
+    const inp = document.getElementById("st-guess-input");
+    inp.value = "";
+    inp.disabled = false;
+    document.getElementById("st-guess-btn").disabled = false;
+    inp.focus();
+  } else if (amIPlaying) {
+    infoBar.innerText = `${data.guesserName} senin sayını tahmin ediyor... 🤔`;
+    infoBar.style.backgroundColor = "#e67e22";
+    guessArea.classList.add("hidden");
+    waitArea.classList.remove("hidden");
+    document.querySelector("#st-wait-area .st-wait-text").innerText = `${data.guesserName} tahmin ediyor...`;
+  } else {
+    infoBar.innerText = `${data.guesserName} tahmin ediyor...`;
+    infoBar.style.backgroundColor = "#34495e";
+    guessArea.classList.add("hidden");
+    waitArea.classList.remove("hidden");
+    document.querySelector("#st-wait-area .st-wait-text").innerText = `${data.guesserName}, ${data.targetName}'in sayısını tahmin ediyor...`;
+  }
+});
+
+socket.on("sayiTahminGuessResult", (data) => {
+  const historyList = document.getElementById("st-history-list");
+  const div = document.createElement("div");
+  div.className = "st-history-item";
+
+  let resultText = "";
+  if (data.greens > 0) resultText += `${data.greens} yeşil `;
+  if (data.yellows > 0) resultText += `${data.yellows} sarı`;
+  if (data.greens === 0 && data.yellows === 0) resultText = "Hiç yok!";
+
+  div.innerHTML = `
+    <span class="st-history-who">${escapeHtml(data.guesserName)}</span>
+    <span class="st-history-guess">${escapeHtml(data.guess)}</span>
+    <span class="st-history-result">
+      ${data.greens > 0 ? `<span class="st-green-badge">${data.greens} 🟢</span>` : ''}
+      ${data.yellows > 0 ? `<span class="st-yellow-badge">${data.yellows} 🟡</span>` : ''}
+      ${data.greens === 0 && data.yellows === 0 ? '<span class="st-gray-badge">0 ⚪</span>' : ''}
+    </span>
+  `;
+  historyList.prepend(div);
+
+  // Log
+  const logDiv = document.createElement("div");
+  logDiv.className = data.greens === 4 ? "log-item log-success" : "log-item log-fail";
+  logDiv.innerHTML = `${escapeHtml(data.guesserName)}: ${escapeHtml(data.guess)} → ${resultText.trim()}`;
+  document.getElementById("st-game-log").prepend(logDiv);
+});
+
+socket.on("sayiTahminWin", (data) => {
+  clearInterval(timerInterval);
+  const iWon = data.winnerId === myPlayerId;
+
+  if (iWon) {
+    confetti({ particleCount: 100, spread: 80, origin: { y: 0.6 } });
+  }
+
+  Swal.fire({
+    title: iWon ? "BİLDİN! 🎉" : `${data.winnerName} BİLDİ!`,
+    html: `<div style="font-size:1rem;margin:10px 0">
+      <strong>${escapeHtml(data.winnerName)}</strong> ${data.guessCount} tahminde bildi!
+    </div>
+    <div style="font-size:0.9rem;color:rgba(255,255,255,0.7)">
+      Gizli sayı: <strong>${data.targetSecret}</strong>
+    </div>`,
+    background: "linear-gradient(135deg, #1a1a2e, #16213e)",
+    color: "#fff",
+    confirmButtonColor: iWon ? "#27ae60" : "#e74c3c",
+    confirmButtonText: iWon ? "Harika! 💪" : "Tamam",
+    timer: 4500,
+    timerProgressBar: true,
+  });
+});
+
+socket.on("sayiTahminGameOver", (msg) => {
   Swal.fire({ title: "BİTTİ", text: msg });
 });
