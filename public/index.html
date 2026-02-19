@@ -24,9 +24,9 @@
 
     <link rel="stylesheet" href="style.css" />
   </head>
-  <body style="background-color:#fff;">
+  <body style="background-color:#dd2476;">
     <!-- Animasyonlu Splash Screen (inline style: CSS yüklenmeden önce beyaz arka plan) -->
-    <div id="app-splash" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;">
+    <div id="app-splash" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:linear-gradient(135deg,#ff512f,#dd2476 45%,#24c6dc);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;">
       <img src="apple-touch-icon.png" alt="DuoDuels" class="splash-logo" />
       <div class="splash-title">DuoDuels</div>
       <div class="splash-dots"><span></span><span></span><span></span></div>
@@ -819,7 +819,7 @@
           try {
             const { StatusBar } = window.Capacitor.Plugins;
             await StatusBar.setStyle({ style: 'DARK' });
-            await StatusBar.setBackgroundColor({ color: '#1a1a2e' });
+            await StatusBar.setBackgroundColor({ color: '#dd2476' });
           } catch (e) {}
 
           try {
@@ -838,7 +838,7 @@
             const splash = document.getElementById('app-splash');
             if (splash) {
               splash.classList.add('splash-hide');
-              setTimeout(() => { splash.remove(); document.body.style.backgroundColor = '#1a1a2e'; }, 600);
+              setTimeout(() => { splash.remove(); document.body.style.backgroundColor = '#dd2476'; }, 600);
             }
           }, 2500);
         });
@@ -849,7 +849,7 @@
             const splash = document.getElementById('app-splash');
             if (splash) {
               splash.classList.add('splash-hide');
-              setTimeout(() => { splash.remove(); document.body.style.backgroundColor = '#1a1a2e'; }, 600);
+              setTimeout(() => { splash.remove(); document.body.style.backgroundColor = '#dd2476'; }, 600);
             }
           }, 2000);
         });

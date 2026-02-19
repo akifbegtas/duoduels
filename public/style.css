@@ -6,7 +6,7 @@
 
 body {
   font-family: "Poppins", sans-serif;
-  background-color: #1a1a2e;
+  background: linear-gradient(135deg, #ff512f, #dd2476 45%, #24c6dc);
   min-height: 100vh;
   overflow: hidden;
   overscroll-behavior: none;
@@ -20,7 +20,7 @@ body {
   right: 0;
   bottom: 0;
   z-index: 99999;
-  background: #ffffff;
+  background: linear-gradient(135deg, #ff512f, #dd2476 45%, #24c6dc);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -91,8 +91,7 @@ body::before {
   left: 0;
   right: 0;
   bottom: 0;
-  background: url("photos/arkaplan2.jpg") no-repeat center center;
-  background-size: cover;
+  background: linear-gradient(135deg, #ff512f, #dd2476 45%, #24c6dc);
   z-index: -2;
 }
 body::after {
