@@ -146,6 +146,8 @@ body, html, .main-container {
 /* ======= KREM + GEOMETRİK SVG ARKAPLAN (inline HTML #bg-pattern) ======= */
 
 .main-container {
+  position: relative;
+  z-index: 1;
   max-width: 600px;
   margin: 0 auto;
   padding: 20px 15px;
