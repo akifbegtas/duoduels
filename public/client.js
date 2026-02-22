@@ -2228,7 +2228,10 @@ function sendNumberGuess() {
   const regex = new RegExp(`^\\d{${dc}}$`);
   if (!regex.test(val)) return;
   socket.emit("submitNumberGuess", { roomId: currentRoom, guess: val });
+  // Tahmin gönderildi, input'u kapat - rakip bekleniyor
   inp.value = "";
+  inp.disabled = true;
+  document.getElementById("st-guess-btn").disabled = true;
 }
 
 socket.on("sayiTahminError", (msg) => {
@@ -2387,15 +2390,43 @@ socket.on("sayiTahminGuessStart", (data) => {
   }
 });
 
-socket.on("sayiTahminGuessResult", (data) => {
+// Tahmin gönderildi, rakip bekleniyor
+socket.on("sayiTahminGuessWaiting", () => {
+  if (!amIPlaying) return;
+  const infoBar = document.getElementById("st-turn-info");
+  infoBar.innerText = "⏳ Tahminin gönderildi! Rakip bekleniyor...";
+  infoBar.style.backgroundColor = "#f39c12";
+});
+
+// Partner tahminini gönderdi bilgisi
+socket.on("sayiTahminPartnerGuessed", () => {
+  if (!amIPlaying) return;
+  const inp = document.getElementById("st-guess-input");
+  // Eğer henüz tahmin göndermediyse (input aktifse) bilgilendir
+  if (!inp.disabled) {
+    const infoBar = document.getElementById("st-turn-info");
+    infoBar.innerText = "⚡ Rakip tahminini gönderdi! Seni bekliyor...";
+    infoBar.style.backgroundColor = "#e67e22";
+  }
+});
+
+// İkisi de tahmin gönderdi - sonuçlar birlikte açılıyor
+socket.on("sayiTahminBothResults", (data) => {
+  const dc = data.p1Result.digitCount || _stDigitCount;
+
+  // P1 sonucu
+  _addGuessToHistory(data.p1Result, dc);
+  // P2 sonucu
+  _addGuessToHistory(data.p2Result, dc);
+});
+
+function _addGuessToHistory(result, dc) {
   const div = document.createElement("div");
   div.className = "st-history-item";
 
-  const dc = data.digitCount || _stDigitCount;
-  const digits = data.guess.split("");
-  const results = data.digitResults || [];
+  const digits = result.guess.split("");
+  const results = result.digitResults || [];
 
-  // Her basamak için renkli kutu oluştur
   let digitBoxes = "";
   for (let i = 0; i < digits.length; i++) {
     const isGreen = results[i] === true;
@@ -2404,31 +2435,43 @@ socket.on("sayiTahminGuessResult", (data) => {
 
   div.innerHTML = `
     <span class="st-history-digits">${digitBoxes}</span>
-    <span class="st-history-count">#${data.guessCount}</span>
+    <span class="st-history-count">#${result.guessCount}</span>
   `;
 
-  // Doğru sütuna ekle (sol=ben/p1, sağ=rakip/p2)
+  // Doğru sütuna ekle
   let targetList;
   if (window._stMyId) {
-    // Oyuncuyum: sol=benim tahminlerim, sağ=rakibin tahminleri
-    const isMyGuess = data.guesserId === window._stMyId;
+    const isMyGuess = result.guesserId === window._stMyId;
     targetList = isMyGuess
       ? document.getElementById("st-history-left")
       : document.getElementById("st-history-right");
   } else {
-    // Seyirciyim: sol=p1, sağ=p2
-    targetList = data.who === "p1"
+    targetList = result.who === "p1"
       ? document.getElementById("st-history-left")
       : document.getElementById("st-history-right");
   }
   targetList.prepend(div);
 
   // Log
-  const allCorrect = data.greens === dc;
+  const allCorrect = result.greens === dc;
   const logDiv = document.createElement("div");
   logDiv.className = allCorrect ? "log-item log-success" : "log-item log-fail";
-  logDiv.innerHTML = `${escapeHtml(data.guesserName)}: ${escapeHtml(data.guess)} → ${data.greens}/${dc} doğru`;
+  logDiv.innerHTML = `${escapeHtml(result.guesserName)}: ${escapeHtml(result.guess)} → ${result.greens}/${dc} doğru`;
   document.getElementById("st-game-log").prepend(logDiv);
+}
+
+// Yeni round: input tekrar açılıyor
+socket.on("sayiTahminNextRoundReady", () => {
+  if (!amIPlaying) return;
+  const inp = document.getElementById("st-guess-input");
+  inp.disabled = false;
+  inp.value = "";
+  inp.focus();
+  document.getElementById("st-guess-btn").disabled = false;
+
+  const infoBar = document.getElementById("st-turn-info");
+  infoBar.innerText = "🎯 Yeni tahmin gir!";
+  infoBar.style.backgroundColor = "#27ae60";
 });
 
 socket.on("sayiTahminWin", (data) => {
