@@ -104,12 +104,11 @@ function selectMode(mode) {
   tekCount.style.display = "none";
 
   if (mode === "cift") {
-    // Çiftler modu: takımlar arası yarış
+    // Çiftler modu: takımlar arası yarış (Sayı Tahmin hariç - o sadece duo)
     telepati.style.display = "";
     isimSehir.style.display = "";
     tabu.style.display = "";
     pictionary.style.display = "";
-    if (sayiTahmin) sayiTahmin.style.display = "";
     ciftCount.style.display = "";
   } else if (mode === "duo") {
     // Başbaşa modu: tek çift kendi aralarında
