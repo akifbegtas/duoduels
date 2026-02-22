@@ -144,7 +144,7 @@ function selectGame(type) {
         html: `<div style="font-size:3.5rem;margin-bottom:10px">👆</div>
                <div style="font-size:1.3rem;font-weight:700;color:#fff;margin-bottom:6px">Dur bir dakika!</div>
                <div style="font-size:0.95rem;color:rgba(255,255,255,0.7)">Önce kaç çift oynayacak onu seç 💑</div>`,
-        background: 'linear-gradient(135deg, #1a1a2e, #16213e)',
+        background: 'linear-gradient(135deg, #0f0c29, #16213e)',
         color: '#fff',
         showConfirmButton: true,
         confirmButtonText: 'Anladım! 👍',
@@ -165,7 +165,7 @@ function selectGame(type) {
         html: `<div style="font-size:3.5rem;margin-bottom:10px">👆</div>
                <div style="font-size:1.3rem;font-weight:700;color:#fff;margin-bottom:6px">Dur bir dakika!</div>
                <div style="font-size:0.95rem;color:rgba(255,255,255,0.7)">Önce kaç kişi oynayacak onu seç 🧑‍🤝‍🧑</div>`,
-        background: 'linear-gradient(135deg, #1a1a2e, #16213e)',
+        background: 'linear-gradient(135deg, #0f0c29, #16213e)',
         color: '#fff',
         showConfirmButton: true,
         confirmButtonText: 'Anladım! 👍',
@@ -197,6 +197,8 @@ function selectGame(type) {
   // Resim Çiz için süre sabit 45sn, gizle
   const timeInput = document.getElementById("roundTimeInput");
   const timeLabel = timeInput.parentElement;
+  // Basamak sayısı default gizle (sadece sayiTahmin'de göster)
+  document.getElementById("digitCountRow").style.display = "none";
   if (type === "pictionary") {
     timeLabel.style.display = "none";
     timeInput.value = 45;
@@ -212,6 +214,8 @@ function selectGame(type) {
   } else if (type === "sayiTahmin") {
     timeLabel.style.display = "none";
     timeInput.value = 60;
+    // Basamak sayısı seçicisini göster
+    document.getElementById("digitCountRow").style.display = "";
   } else {
     timeLabel.style.display = "";
     timeInput.value = 10;
@@ -228,6 +232,7 @@ function confirmGameSettings() {
   if (!pendingRoomData) return;
   pendingRoomData.roundCount = document.getElementById("roundCountInput").value;
   pendingRoomData.roundTime = document.getElementById("roundTimeInput").value;
+  pendingRoomData.digitCount = document.getElementById("digitCountInput").value;
 
   if (currentRoom) {
     // Oda zaten var, ayarları güncelle
@@ -237,6 +242,7 @@ function confirmGameSettings() {
       gameMode: pendingRoomData.gameMode,
       roundCount: pendingRoomData.roundCount,
       roundTime: pendingRoomData.roundTime,
+      digitCount: pendingRoomData.digitCount,
     });
     pendingRoomData = null;
   } else {
@@ -456,6 +462,84 @@ function hideConnectionStatus() {
   const el = document.getElementById("connection-status");
   if (el) el.style.display = "none";
 }
+
+// --- KLAVYE YÖNETİMİ (iOS / Android) ---
+(function initKeyboardHandling() {
+  let keyboardVisible = false;
+
+  function onKeyboardShow(keyboardHeight) {
+    keyboardVisible = true;
+    document.body.classList.add("keyboard-open");
+    document.documentElement.classList.add("keyboard-open");
+    document.documentElement.style.setProperty("--keyboard-height", keyboardHeight + "px");
+    scrollToActiveInput();
+  }
+
+  function onKeyboardHide() {
+    keyboardVisible = false;
+    document.body.classList.remove("keyboard-open");
+    document.documentElement.classList.remove("keyboard-open");
+    document.documentElement.style.removeProperty("--keyboard-height");
+    // iOS'ta blur sonrası viewport fix
+    window.scrollTo(0, 0);
+  }
+
+  // Capacitor Keyboard plugin (native iOS/Android)
+  if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Keyboard) {
+    const Keyboard = window.Capacitor.Plugins.Keyboard;
+    Keyboard.addListener("keyboardWillShow", (info) => onKeyboardShow(info.keyboardHeight));
+    Keyboard.addListener("keyboardWillHide", () => onKeyboardHide());
+  }
+
+  // visualViewport fallback (Web/PWA - Capacitor olmadığında)
+  if (!isNative && window.visualViewport) {
+    let initialHeight = window.visualViewport.height;
+
+    window.visualViewport.addEventListener("resize", () => {
+      const diff = initialHeight - window.visualViewport.height;
+      if (diff > 100 && !keyboardVisible) {
+        onKeyboardShow(diff);
+      } else if (diff <= 100 && keyboardVisible) {
+        onKeyboardHide();
+      }
+    });
+
+    window.addEventListener("orientationchange", () => {
+      setTimeout(() => { initialHeight = window.visualViewport.height; }, 300);
+    });
+  }
+
+  function scrollToActiveInput() {
+    setTimeout(() => {
+      const el = document.activeElement;
+      if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA")) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+      }
+    }, 150);
+  }
+
+  // Focus olduğunda input'u görünür alana kaydır
+  document.addEventListener("focusin", (e) => {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") {
+      // Keyboard event'inden sonra ikinci bir deneme
+      setTimeout(() => {
+        e.target.scrollIntoView({ behavior: "smooth", block: "center" });
+      }, 350);
+    }
+  });
+
+  // Blur olduğunda scroll reset
+  document.addEventListener("focusout", (e) => {
+    if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA") {
+      setTimeout(() => {
+        const active = document.activeElement;
+        if (!active || (active.tagName !== "INPUT" && active.tagName !== "TEXTAREA")) {
+          window.scrollTo(0, 0);
+        }
+      }, 100);
+    }
+  });
+})();
 
 // --- SOCKET ---
 socket.on("connect", () => {
@@ -835,7 +919,7 @@ socket.on("telepatiGameOver", (data) => {
       </div>
       <div style="font-size:2.5rem;margin:10px 0">🎉🥳🎊</div>
       <div style="color:#27ae60;font-weight:bold">${data.lastStanding ? "Son hayatta kalan takım!" : "En az hatayla bitirdiniz!"}</div>`,
-      background: "linear-gradient(135deg, #1a1a2e, #16213e)",
+      background: "linear-gradient(135deg, #0f0c29, #16213e)",
       color: "#fff",
       confirmButtonColor: "#27ae60",
       confirmButtonText: "Harikayız! 💪",
@@ -850,7 +934,7 @@ socket.on("telepatiGameOver", (data) => {
       <div style="font-size:1rem">${escapeHtml(data.winnerP1)} & ${escapeHtml(data.winnerP2)} kazandı!</div>
       <div style="font-size:2rem;margin:10px 0">😤</div>
       <div style="color:#e67e22;font-weight:bold">Bir dahaki sefere! 💪</div>`,
-      background: "linear-gradient(135deg, #1a1a2e, #2d1b1b)",
+      background: "linear-gradient(135deg, #0f0c29, #2d1b1b)",
       color: "#fff",
       confirmButtonColor: "#e74c3c",
       confirmButtonText: "Tekrar Dene",
@@ -2102,16 +2186,19 @@ socket.on("imposterGameOver", (msg) => {
 
 // --- SAYI TAHMİN ---
 let _stSecretSubmitted = false;
+let _stDigitCount = 4;
 
 function sendSecretNumber() {
   if (_stSecretSubmitted) return;
+  const dc = _stDigitCount;
   const inp = document.getElementById("st-secret-input");
   const val = inp.value.trim();
-  if (!val || val.length !== 4) {
-    document.getElementById("st-secret-status").innerText = "4 haneli bir sayı gir!";
+  if (!val || val.length !== dc) {
+    document.getElementById("st-secret-status").innerText = `${dc} haneli bir sayı gir!`;
     return;
   }
-  if (!/^\d{4}$/.test(val)) {
+  const regex = new RegExp(`^\\d{${dc}}$`);
+  if (!regex.test(val)) {
     document.getElementById("st-secret-status").innerText = "Sadece rakam gir!";
     return;
   }
@@ -2123,10 +2210,12 @@ function sendSecretNumber() {
 }
 
 function sendNumberGuess() {
+  const dc = _stDigitCount;
   const inp = document.getElementById("st-guess-input");
   const val = inp.value.trim();
-  if (!val || val.length !== 4) return;
-  if (!/^\d{4}$/.test(val)) return;
+  if (!val || val.length !== dc) return;
+  const regex = new RegExp(`^\\d{${dc}}$`);
+  if (!regex.test(val)) return;
   socket.emit("submitNumberGuess", { roomId: currentRoom, guess: val });
   inp.value = "";
 }
@@ -2143,13 +2232,14 @@ socket.on("sayiTahminError", (msg) => {
 
 socket.on("sayiTahminStart", (data) => {
   window._currentGameType = "sayiTahmin";
+  _stDigitCount = data.digitCount || 4;
   showScreen("sayiTahmin");
   window._totalRounds = data.roundCount || 5;
   document.getElementById("scoreboard-panel").style.display = "none";
   document.getElementById("st-round-display").innerText = `Tur: 1 / ${window._totalRounds}`;
   document.getElementById("st-game-log").innerHTML = "";
 
-  Swal.fire({ title: "Sayı Tahmin Başlıyor!", timer: 1500, showConfirmButton: false });
+  Swal.fire({ title: `Sayı Tahmin (${_stDigitCount} basamak)`, timer: 1500, showConfirmButton: false });
 
   if (!_listenersAttached.stSecretInput) {
     document.getElementById("st-secret-input").addEventListener("keydown", (e) => {
@@ -2164,6 +2254,8 @@ socket.on("sayiTahminStart", (data) => {
 
 socket.on("sayiTahminSecretPhase", (data) => {
   _stSecretSubmitted = false;
+  const dc = data.digitCount || _stDigitCount;
+  _stDigitCount = dc;
   const iamP1 = myPlayerId === data.p1.id;
   const iamP2 = myPlayerId === data.p2.id;
   amIPlaying = iamP1 || iamP2;
@@ -2183,6 +2275,12 @@ socket.on("sayiTahminSecretPhase", (data) => {
   document.getElementById("st-history-list").innerHTML = "";
   document.getElementById("st-game-log").innerHTML = "";
 
+  // Secret area başlığını güncelle
+  const secretTitle = secretArea.querySelector("h3");
+  if (secretTitle) secretTitle.innerText = `${dc} Haneli Gizli Sayını Gir`;
+  const secretDesc = secretArea.querySelector("p");
+  if (secretDesc) secretDesc.innerText = `0-9 arası rakamlarla ${dc} haneli bir sayı seç`;
+
   if (amIPlaying) {
     infoBar.innerText = "GİZLİ SAYINI GİR! 🔒";
     infoBar.style.backgroundColor = "#8e44ad";
@@ -2193,6 +2291,8 @@ socket.on("sayiTahminSecretPhase", (data) => {
     const inp = document.getElementById("st-secret-input");
     inp.value = "";
     inp.disabled = false;
+    inp.maxLength = dc;
+    inp.placeholder = `Örn: ${"0123456789".slice(0, dc)}`;
     document.getElementById("st-secret-btn").disabled = false;
     document.getElementById("st-secret-status").innerText = "";
     inp.focus();
@@ -2239,10 +2339,13 @@ socket.on("sayiTahminGuessTurn", (data) => {
     guessArea.classList.remove("hidden");
     waitArea.classList.add("hidden");
 
-    document.getElementById("st-target-label").innerText = `${data.targetName}'in sayısını tahmin et`;
+    const dc = _stDigitCount;
+    document.getElementById("st-target-label").innerText = `${data.targetName}'in ${dc} haneli sayısını tahmin et`;
     const inp = document.getElementById("st-guess-input");
     inp.value = "";
     inp.disabled = false;
+    inp.maxLength = dc;
+    inp.placeholder = `${dc} haneli tahmin...`;
     document.getElementById("st-guess-btn").disabled = false;
     inp.focus();
   } else if (amIPlaying) {
@@ -2265,26 +2368,29 @@ socket.on("sayiTahminGuessResult", (data) => {
   const div = document.createElement("div");
   div.className = "st-history-item";
 
-  let resultText = "";
-  if (data.greens > 0) resultText += `${data.greens} yeşil `;
-  if (data.yellows > 0) resultText += `${data.yellows} sarı`;
-  if (data.greens === 0 && data.yellows === 0) resultText = "Hiç yok!";
+  const dc = data.digitCount || _stDigitCount;
+  const digits = data.guess.split("");
+  const results = data.digitResults || [];
+
+  // Her basamak için renkli kutu oluştur
+  let digitBoxes = "";
+  for (let i = 0; i < digits.length; i++) {
+    const isGreen = results[i] === true;
+    digitBoxes += `<span class="st-digit-box ${isGreen ? 'st-digit-green' : 'st-digit-gray'}">${escapeHtml(digits[i])}</span>`;
+  }
 
   div.innerHTML = `
     <span class="st-history-who">${escapeHtml(data.guesserName)}</span>
-    <span class="st-history-guess">${escapeHtml(data.guess)}</span>
-    <span class="st-history-result">
-      ${data.greens > 0 ? `<span class="st-green-badge">${data.greens} 🟢</span>` : ''}
-      ${data.yellows > 0 ? `<span class="st-yellow-badge">${data.yellows} 🟡</span>` : ''}
-      ${data.greens === 0 && data.yellows === 0 ? '<span class="st-gray-badge">0 ⚪</span>' : ''}
-    </span>
+    <span class="st-history-digits">${digitBoxes}</span>
+    <span class="st-history-count">#${data.guessCount}</span>
   `;
   historyList.prepend(div);
 
   // Log
+  const allCorrect = data.greens === dc;
   const logDiv = document.createElement("div");
-  logDiv.className = data.greens === 4 ? "log-item log-success" : "log-item log-fail";
-  logDiv.innerHTML = `${escapeHtml(data.guesserName)}: ${escapeHtml(data.guess)} → ${resultText.trim()}`;
+  logDiv.className = allCorrect ? "log-item log-success" : "log-item log-fail";
+  logDiv.innerHTML = `${escapeHtml(data.guesserName)}: ${escapeHtml(data.guess)} → ${data.greens}/${dc} doğru`;
   document.getElementById("st-game-log").prepend(logDiv);
 });
 
@@ -2304,7 +2410,7 @@ socket.on("sayiTahminWin", (data) => {
     <div style="font-size:0.9rem;color:rgba(255,255,255,0.7)">
       Gizli sayı: <strong>${data.targetSecret}</strong>
     </div>`,
-    background: "linear-gradient(135deg, #1a1a2e, #16213e)",
+    background: "linear-gradient(135deg, #0f0c29, #16213e)",
     color: "#fff",
     confirmButtonColor: iWon ? "#27ae60" : "#e74c3c",
     confirmButtonText: iWon ? "Harika! 💪" : "Tamam",

@@ -528,6 +528,7 @@ io.on("connection", (socket) => {
       sayiTahminGuesses: {},
       sayiTahminCurrentTurn: null, // p1 or p2
       sayiTahminRound: 1,
+      sayiTahminDigitCount: Math.min(Math.max(parseInt(data.digitCount) || 4, 3), 6),
     };
 
     console.log(
@@ -731,6 +732,7 @@ io.on("connection", (socket) => {
         roundCount: room.roundCount,
         roundTime: room.roundTime,
         pairs: validPairs,
+        digitCount: room.sayiTahminDigitCount,
       });
 
       setTimeout(() => {
@@ -1202,10 +1204,12 @@ io.on("connection", (socket) => {
     const pid = playerId || socket.id;
     if (pid !== currentPair.p1.id && pid !== currentPair.p2.id) return;
 
-    // Validate: 4 digits
+    // Validate: N digits (dynamic)
+    const dc = room.sayiTahminDigitCount || 4;
     const str = String(number);
-    if (str.length !== 4 || !/^\d{4}$/.test(str)) {
-      socket.emit("sayiTahminError", "4 haneli bir sayı girin!");
+    const digitRegex = new RegExp(`^\\d{${dc}}$`);
+    if (str.length !== dc || !digitRegex.test(str)) {
+      socket.emit("sayiTahminError", `${dc} haneli bir sayı girin!`);
       return;
     }
 
@@ -1247,10 +1251,12 @@ io.on("connection", (socket) => {
     const expectedTurn = room.sayiTahminCurrentTurn;
     if ((expectedTurn === "p1" && !isP1) || (expectedTurn === "p2" && !isP2)) return;
 
-    // Validate guess
+    // Validate guess (dynamic digit count)
+    const dc = room.sayiTahminDigitCount || 4;
     const str = String(guess);
-    if (str.length !== 4 || !/^\d{4}$/.test(str)) {
-      socket.emit("sayiTahminError", "4 haneli bir sayı girin!");
+    const digitRegex = new RegExp(`^\\d{${dc}}$`);
+    if (str.length !== dc || !digitRegex.test(str)) {
+      socket.emit("sayiTahminError", `${dc} haneli bir sayı girin!`);
       return;
     }
 
@@ -1259,48 +1265,42 @@ io.on("connection", (socket) => {
       ? room.sayiTahminSecrets[pairKey][currentPair.p2.id]
       : room.sayiTahminSecrets[pairKey][currentPair.p1.id];
 
-    // Calculate greens and yellows
-    let greens = 0;
-    let yellows = 0;
+    // Calculate per-digit result: true = correct position (green), false = wrong
     const targetDigits = targetSecret.split("");
     const guessDigits = str.split("");
+    const digitResults = []; // array of booleans: true = green (doğru basamak)
+    let greens = 0;
 
-    for (let i = 0; i < 4; i++) {
-      if (guessDigits[i] === targetDigits[i]) {
-        greens++;
-      } else if (targetDigits.includes(guessDigits[i])) {
-        yellows++;
-      }
+    for (let i = 0; i < dc; i++) {
+      const isGreen = guessDigits[i] === targetDigits[i];
+      digitResults.push(isGreen);
+      if (isGreen) greens++;
     }
 
     const who = isP1 ? "p1" : "p2";
     const guesserName = isP1 ? currentPair.p1.username : currentPair.p2.username;
-    room.sayiTahminGuesses[pairKey][who].push({ guess: str, greens, yellows });
+    room.sayiTahminGuesses[pairKey][who].push({ guess: str, greens, digitResults });
 
     // Broadcast result to both players
-    io.to(getSocketId(currentPair.p1.id)).to(getSocketId(currentPair.p2.id)).emit("sayiTahminGuessResult", {
+    const resultPayload = {
       who: who,
       guesserName: guesserName,
       guess: str,
       greens: greens,
-      yellows: yellows,
+      digitResults: digitResults,
+      digitCount: dc,
       guessCount: room.sayiTahminGuesses[pairKey][who].length,
-    });
+    };
+
+    io.to(getSocketId(currentPair.p1.id)).to(getSocketId(currentPair.p2.id)).emit("sayiTahminGuessResult", resultPayload);
 
     // Broadcast to spectators too
     room.spectators.forEach(s => {
-      io.to(getSocketId(s.id)).emit("sayiTahminGuessResult", {
-        who: who,
-        guesserName: guesserName,
-        guess: str,
-        greens: greens,
-        yellows: yellows,
-        guessCount: room.sayiTahminGuesses[pairKey][who].length,
-      });
+      io.to(getSocketId(s.id)).emit("sayiTahminGuessResult", resultPayload);
     });
 
-    // Check if correct (4 greens)
-    if (greens === 4) {
+    // Check if correct (all greens)
+    if (greens === dc) {
       const winnerName = guesserName;
       const loserName = isP1 ? currentPair.p2.username : currentPair.p1.username;
       const winnerSecret = isP1
@@ -1339,6 +1339,7 @@ io.on("connection", (socket) => {
     room.gameType = VALID_GAME_TYPES.includes(data.gameType) ? data.gameType : "telepati";
     room.roundCount = Math.min(Math.max(parseInt(data.roundCount) || 5, 1), 20);
     room.roundTime = Math.min(Math.max(parseInt(data.roundTime) || 10, 5), 120);
+    if (data.digitCount) room.sayiTahminDigitCount = Math.min(Math.max(parseInt(data.digitCount) || 4, 3), 6);
 
     io.to(data.roomId).emit("joinedRoom", data.roomId);
     emitLobbyUpdate(data.roomId);
@@ -2330,6 +2331,7 @@ function startSayiTahminSecretPhase(roomId) {
     currentRound: room.currentRound,
     totalRounds: room.roundCount,
     teamName: pair.teamName,
+    digitCount: room.sayiTahminDigitCount || 4,
   });
 }
 
