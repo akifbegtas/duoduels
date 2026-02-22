@@ -5,18 +5,105 @@ const path = require("path");
 
 const app = express();
 const server = http.createServer(app);
+
+// --- CORS Allowlist ---
+const ALLOWED_ORIGINS = [
+  'https://duoduels.com',
+  'https://www.duoduels.com',
+  'https://duoduels.onrender.com',
+  'capacitor://localhost',
+  'http://localhost',
+  'http://localhost:3000',
+  'http://127.0.0.1:3000',
+];
+
 const io = new Server(server, {
   cors: {
-    origin: "*",
+    origin: function (origin, callback) {
+      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     methods: ["GET", "POST"],
   },
   transports: ["websocket", "polling"],
   allowEIO3: true,
 });
 
+// --- Security Headers ---
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('X-XSS-Protection', '1; mode=block');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('Content-Security-Policy',
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "font-src https://fonts.gstatic.com; " +
+    "img-src 'self' data:; " +
+    "connect-src 'self' wss://duoduels.onrender.com wss://duoduels.com wss://www.duoduels.com ws://localhost:3000 ws://127.0.0.1:3000;"
+  );
+  next();
+});
+
 app.use(express.static(path.join(__dirname, "public")));
 
+// --- Input Validation Helpers ---
+const VALID_GAME_TYPES = ['telepati', 'isimSehir', 'pictionary', 'tabu', 'sayiTahmin', 'imposter'];
+const VALID_GENDERS = ['male', 'female'];
+const VALID_GAME_MODES = ['cift', 'duo', 'tek'];
+
+function sanitizeString(str, maxLength = 50) {
+  if (typeof str !== 'string') return '';
+  return str.trim().substring(0, maxLength);
+}
+
+function isValidRoomId(id) {
+  return typeof id === 'string' && /^[A-Z0-9]{5,6}$/.test(id);
+}
+
+function generateRoomId() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let id;
+  do {
+    id = '';
+    for (let i = 0; i < 6; i++) {
+      id += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+  } while (rooms[id]);
+  return id;
+}
+
+// --- Rate Limiting ---
+io.use((socket, next) => {
+  const limits = { count: 0, resetAt: Date.now() + 1000 };
+  socket.use(([event], next) => {
+    if (event === 'drawData') return next(); // exempt drawing
+    const now = Date.now();
+    if (now > limits.resetAt) {
+      limits.count = 0;
+      limits.resetAt = now + 1000;
+    }
+    limits.count++;
+    if (limits.count > 30) {
+      return next(new Error('Rate limit exceeded'));
+    }
+    next();
+  });
+  next();
+});
+
 const rooms = {};
+
+// --- Player Identity ---
+const playerSockets = {}; // playerId -> socketId
+
+function getSocketId(playerId) {
+  return playerSockets[playerId] || playerId;
+}
 const TURKISH_LETTERS = [
   "A",
   "B",
@@ -341,12 +428,23 @@ const IMPOSTER_WORDS = [
 ];
 
 io.on("connection", (socket) => {
+  let playerId = null;
+
+  socket.on("registerPlayer", (pid) => {
+    if (typeof pid === 'string' && pid.length > 0 && pid.length <= 30) {
+      playerId = pid;
+      playerSockets[pid] = socket.id;
+    }
+  });
+
   // --- ODA OLUŞTURMA ---
   socket.on("createRoom", (data) => {
-    const roomId = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const roomId = generateRoomId();
 
-    const gameType = data.gameType || "telepati";
-    const gameMode = data.gameMode || "cift";
+    const gameType = VALID_GAME_TYPES.includes(data.gameType) ? data.gameType : "telepati";
+    const gameMode = VALID_GAME_MODES.includes(data.gameMode) ? data.gameMode : "cift";
+    const username = sanitizeString(data.username, 12) || "Oyuncu";
+    const gender = VALID_GENDERS.includes(data.gender) ? data.gender : "male";
 
     let count = parseInt(data.coupleCount);
     if (gameMode === "duo") {
@@ -354,17 +452,22 @@ io.on("connection", (socket) => {
     } else {
       if (!count || count < 2) count = 2;
     }
+    if (count > 5) count = 5;
 
     let rounds = parseInt(data.roundCount);
     if (!rounds || rounds < 1) rounds = 5;
+    if (rounds > 20) rounds = 20;
 
     let time = parseInt(data.roundTime);
     if (!time || time < 5) time = 10;
+    if (time > 120) time = 120;
 
+    const pid = playerId || socket.id;
     const hostPlayer = {
-      id: socket.id,
-      username: data.username,
-      gender: data.gender,
+      id: pid,
+      socketId: socket.id,
+      username: username,
+      gender: gender,
       isHost: true,
     };
 
@@ -438,9 +541,13 @@ io.on("connection", (socket) => {
 
   // --- ODAYA KATILMA ---
   socket.on("joinRoom", ({ roomId, username, gender }) => {
-    const room = rooms[roomId];
+    const cleanRoomId = typeof roomId === 'string' ? roomId.toUpperCase().trim() : '';
+    const cleanUsername = sanitizeString(username, 12) || "Oyuncu";
+    const cleanGender = VALID_GENDERS.includes(gender) ? gender : "male";
+    const room = rooms[cleanRoomId];
     if (room && room.gameStatus === "waiting") {
-      const newPlayer = { id: socket.id, username, gender, isHost: false };
+      const pid = playerId || socket.id;
+      const newPlayer = { id: pid, socketId: socket.id, username: cleanUsername, gender: cleanGender, isHost: false };
       if (room.gameMode === "tek") {
         if (room.maxPlayers > 0 && room.players.length >= room.maxPlayers) {
           socket.emit("gameError", "Oda dolu!");
@@ -450,9 +557,9 @@ io.on("connection", (socket) => {
       } else {
         room.spectators.push(newPlayer);
       }
-      socket.join(roomId);
-      socket.emit("joinedRoom", roomId);
-      emitLobbyUpdate(roomId);
+      socket.join(cleanRoomId);
+      socket.emit("joinedRoom", cleanRoomId);
+      emitLobbyUpdate(cleanRoomId);
     } else {
       socket.emit("gameError", "Oda bulunamadı!");
     }
@@ -462,7 +569,8 @@ io.on("connection", (socket) => {
   socket.on("selectTeam", ({ roomId, teamIndex, slot }) => {
     const room = rooms[roomId];
     if (!room) return;
-    const playerIndex = room.spectators.findIndex((p) => p.id === socket.id);
+    const pid = playerId || socket.id;
+    const playerIndex = room.spectators.findIndex((p) => p.id === pid);
     if (playerIndex !== -1) {
       const player = room.spectators[playerIndex];
       const targetTeam = room.teams[teamIndex];
@@ -646,25 +754,26 @@ io.on("connection", (socket) => {
   // --- TELEPATİ: KELİME GÖNDERME ---
   socket.on("submitWord", ({ roomId, word }) => {
     const room = rooms[roomId];
-    if (!room || room.gameStatus !== "playing") return;
+    if (!room || room.gameStatus !== "playing") return socket.emit("gameError", "Oda bulunamadı!");
+    const pid = playerId || socket.id;
 
     const currentPair = room.pairs[room.currentPairIndex];
     if (!currentPair) return;
 
-    if (socket.id !== currentPair.p1.id && socket.id !== currentPair.p2.id)
+    if (pid !== currentPair.p1.id && pid !== currentPair.p2.id)
       return;
     if (!room.moves[currentPair.id]) room.moves[currentPair.id] = {};
 
-    let cleanWord = word ? word.trim().toLocaleUpperCase("tr-TR") : "⏰";
+    let cleanWord = sanitizeString(word, 30).toLocaleUpperCase("tr-TR") || "⏰";
     if (cleanWord === "") cleanWord = "⏰";
 
-    room.moves[currentPair.id][socket.id] = cleanWord;
+    room.moves[currentPair.id][pid] = cleanWord;
 
     const partnerId =
-      socket.id === currentPair.p1.id ? currentPair.p2.id : currentPair.p1.id;
-    io.to(partnerId).emit("partnerSubmitted");
+      pid === currentPair.p1.id ? currentPair.p2.id : currentPair.p1.id;
+    io.to(getSocketId(partnerId)).emit("partnerSubmitted");
 
-    const who = socket.id === currentPair.p1.id ? "p1" : "p2";
+    const who = pid === currentPair.p1.id ? "p1" : "p2";
     io.to(roomId).emit("revealOneMove", { slot: who, word: cleanWord });
 
     const w1 = room.moves[currentPair.id][currentPair.p1.id];
@@ -700,8 +809,8 @@ io.on("connection", (socket) => {
         room.moves[currentPair.id] = {};
 
         if (isMatch) {
-          io.to(currentPair.p1.id)
-            .to(currentPair.p2.id)
+          io.to(getSocketId(currentPair.p1.id))
+            .to(getSocketId(currentPair.p2.id))
             .emit("levelFinished", { success: true });
           nextTurn(roomId);
         }
@@ -723,12 +832,13 @@ io.on("connection", (socket) => {
       return;
     }
 
-    if (socket.id !== currentPair.p1.id && socket.id !== currentPair.p2.id) {
-      console.log("[IS] REJECTED: socket not in pair", socket.id, "p1:", currentPair.p1.id, "p2:", currentPair.p2.id);
+    const pid = playerId || socket.id;
+    if (pid !== currentPair.p1.id && pid !== currentPair.p2.id) {
+      console.log("[IS] REJECTED: player not in pair", pid, "p1:", currentPair.p1.id, "p2:", currentPair.p2.id);
       return;
     }
 
-    const who = socket.id === currentPair.p1.id ? "P1" : "P2";
+    const who = pid === currentPair.p1.id ? "P1" : "P2";
     console.log(`[IS] ${who} submitted:`, answers);
 
     // Her kategori için cevabı kaydet
@@ -737,12 +847,12 @@ io.on("connection", (socket) => {
       if (!room.moves[moveKey]) room.moves[moveKey] = {};
       let cleanWord = answers[cat] ? answers[cat].trim().toLocaleUpperCase("tr-TR") : "⏰";
       if (cleanWord === "") cleanWord = "⏰";
-      room.moves[moveKey][socket.id] = cleanWord;
+      room.moves[moveKey][pid] = cleanWord;
     });
 
     const partnerId =
-      socket.id === currentPair.p1.id ? currentPair.p2.id : currentPair.p1.id;
-    io.to(partnerId).emit("partnerSubmitted");
+      pid === currentPair.p1.id ? currentPair.p2.id : currentPair.p1.id;
+    io.to(getSocketId(partnerId)).emit("partnerSubmitted");
 
     // İki oyuncu da gönderdiyse karşılaştır
     const firstCatKey = currentPair.id + "_" + CATEGORIES[0];
@@ -785,8 +895,8 @@ io.on("connection", (socket) => {
       updateIsimSehirLeaderboard(roomId);
 
       if (matchCount > 0) {
-        io.to(currentPair.p1.id)
-          .to(currentPair.p2.id)
+        io.to(getSocketId(currentPair.p1.id))
+          .to(getSocketId(currentPair.p2.id))
           .emit("levelFinished", { success: true });
       }
 
@@ -833,30 +943,31 @@ io.on("connection", (socket) => {
 
     if (room.gameMode === "tek") {
       // TEK MOD: bireysel tahmin
-      const player = room.soloPlayers.find((p) => p.id === socket.id);
+      const pid = playerId || socket.id;
+      const player = room.soloPlayers.find((p) => p.id === pid);
       if (!player) return;
 
       const drawerIndex = room.currentDrawerIndex % room.soloPlayers.length;
       const drawer = room.soloPlayers[drawerIndex];
-      if (socket.id === drawer.id) return;
+      if (pid === drawer.id) return;
 
-      if (room.pictionaryGuessOrder.includes(socket.id)) return;
+      if (room.pictionaryGuessOrder.includes(pid)) return;
 
       if (cleanGuess === word) {
-        room.pictionaryGuessOrder.push(socket.id);
+        room.pictionaryGuessOrder.push(pid);
         const order = room.pictionaryGuessOrder.length;
         const guesserCount = room.soloPlayers.length - 1;
         const points = guesserCount - order + 1;
 
-        room.pictionaryScores[socket.id] =
-          (room.pictionaryScores[socket.id] || 0) + points;
+        room.pictionaryScores[pid] =
+          (room.pictionaryScores[pid] || 0) + points;
         room.pictionaryScores[drawer.id] =
           (room.pictionaryScores[drawer.id] || 0) + 1;
         updatePictionaryLeaderboard(roomId);
 
         io.to(roomId).emit("pictionaryCorrect", {
           teamName: player.username,
-          guesserId: socket.id,
+          guesserId: pid,
           points: points,
           order: order,
           word: word,
@@ -875,7 +986,7 @@ io.on("connection", (socket) => {
     } else {
       // ÇİFT MOD
       const pair = room.pairs.find(
-        (p) => p.p1.id === socket.id || p.p2.id === socket.id,
+        (p) => p.p1.id === pid || p.p2.id === pid,
       );
       if (!pair) return;
 
@@ -883,7 +994,7 @@ io.on("connection", (socket) => {
 
       const drawerIsP1 = room.pictionaryDrawerToggle % 2 === 0;
       const drawerId = drawerIsP1 ? pair.p1.id : pair.p2.id;
-      if (socket.id === drawerId) return;
+      if (pid === drawerId) return;
 
       if (cleanGuess === word) {
         room.pictionaryGuessOrder.push(pair.id);
@@ -907,7 +1018,7 @@ io.on("connection", (socket) => {
         }
       } else {
         const guesserName =
-          socket.id === pair.p1.id ? pair.p1.username : pair.p2.username;
+          pid === pair.p1.id ? pair.p1.username : pair.p2.username;
         io.to(roomId).emit("pictionaryWrongGuess", {
           guess: cleanGuess,
           guesserName,
@@ -921,12 +1032,13 @@ io.on("connection", (socket) => {
     const room = rooms[roomId];
     if (!room || room.gameStatus !== "playing" || room.gameType !== "tabu")
       return;
-    if (socket.id !== room.tabuDescriberId) return;
+    const pid = playerId || socket.id;
+    if (pid !== room.tabuDescriberId) return;
 
     const currentWord = room.tabuCurrentWord;
     if (!currentWord) return;
 
-    const cleanClue = clue.trim();
+    const cleanClue = sanitizeString(clue, 100);
     if (!cleanClue) return;
 
     // Check forbidden words
@@ -950,7 +1062,7 @@ io.on("connection", (socket) => {
       io.to(roomId).emit("tabuForbidden", {
         clue: cleanClue,
         forbiddenWord: usedForbidden,
-        describerName: getPlayerName(room, socket.id),
+        describerName: getPlayerName(room, pid),
       });
       // Skip to next word
       nextTabuWord(roomId);
@@ -961,7 +1073,7 @@ io.on("connection", (socket) => {
     room.tabuClues.push({ text: cleanClue, type: "clue" });
     io.to(roomId).emit("tabuClue", {
       clue: cleanClue,
-      describerName: getPlayerName(room, socket.id),
+      describerName: getPlayerName(room, pid),
     });
   });
 
@@ -970,12 +1082,13 @@ io.on("connection", (socket) => {
     const room = rooms[roomId];
     if (!room || room.gameStatus !== "playing" || room.gameType !== "tabu")
       return;
-    if (socket.id !== room.tabuGuesserId) return;
+    const pid = playerId || socket.id;
+    if (pid !== room.tabuGuesserId) return;
 
     const currentWord = room.tabuCurrentWord;
     if (!currentWord) return;
 
-    const cleanGuess = guess.trim();
+    const cleanGuess = sanitizeString(guess, 50);
     if (!cleanGuess) return;
 
     const guessUpper = cleanGuess.toLocaleUpperCase("tr-TR");
@@ -985,7 +1098,7 @@ io.on("connection", (socket) => {
     room.tabuClues.push({ text: cleanGuess, type: "guess" });
     io.to(roomId).emit("tabuGuessMsg", {
       guess: cleanGuess,
-      guesserName: getPlayerName(room, socket.id),
+      guesserName: getPlayerName(room, pid),
     });
 
     if (guessUpper === wordUpper) {
@@ -1010,7 +1123,8 @@ io.on("connection", (socket) => {
     const room = rooms[roomId];
     if (!room || room.gameStatus !== "playing" || room.gameType !== "tabu")
       return;
-    if (socket.id !== room.tabuDescriberId) return;
+    const pid = playerId || socket.id;
+    if (pid !== room.tabuDescriberId) return;
 
     io.to(roomId).emit("tabuPassed", {
       word: room.tabuCurrentWord ? room.tabuCurrentWord.word : "",
@@ -1027,23 +1141,24 @@ io.on("connection", (socket) => {
     if (room.imposterPhase !== "write1" && room.imposterPhase !== "write2")
       return;
 
-    const player = room.players.find((p) => p.id === socket.id);
+    const pid = playerId || socket.id;
+    const player = room.players.find((p) => p.id === pid);
     if (!player) return;
 
     const subs =
       room.imposterPhase === "write1"
         ? room.imposterSubmissions1
         : room.imposterSubmissions2;
-    if (subs[socket.id]) return;
+    if (subs[pid]) return;
 
-    let cleanWord = word ? word.trim().toLocaleUpperCase("tr-TR") : "⏰";
+    let cleanWord = sanitizeString(word, 30).toLocaleUpperCase("tr-TR") || "⏰";
     if (cleanWord === "") cleanWord = "⏰";
 
-    subs[socket.id] = cleanWord;
+    subs[pid] = cleanWord;
 
     io.to(roomId).emit("imposterPlayerSubmitted", {
       username: player.username,
-      playerId: socket.id,
+      playerId: pid,
       phase: room.imposterPhase,
     });
 
@@ -1059,16 +1174,17 @@ io.on("connection", (socket) => {
       return;
     if (room.imposterPhase !== "vote") return;
 
-    const player = room.players.find((p) => p.id === socket.id);
+    const pid = playerId || socket.id;
+    const player = room.players.find((p) => p.id === pid);
     if (!player) return;
-    if (room.imposterVotes[socket.id]) return;
-    if (socket.id === votedPlayerId) return;
+    if (room.imposterVotes[pid]) return;
+    if (pid === votedPlayerId) return;
 
-    room.imposterVotes[socket.id] = votedPlayerId;
+    room.imposterVotes[pid] = votedPlayerId;
 
     io.to(roomId).emit("imposterPlayerVoted", {
       username: player.username,
-      playerId: socket.id,
+      playerId: pid,
     });
 
     if (Object.keys(room.imposterVotes).length >= room.players.length) {
@@ -1083,7 +1199,8 @@ io.on("connection", (socket) => {
 
     const currentPair = room.pairs[room.currentPairIndex];
     if (!currentPair) return;
-    if (socket.id !== currentPair.p1.id && socket.id !== currentPair.p2.id) return;
+    const pid = playerId || socket.id;
+    if (pid !== currentPair.p1.id && pid !== currentPair.p2.id) return;
 
     // Validate: 4 digits
     const str = String(number);
@@ -1094,10 +1211,10 @@ io.on("connection", (socket) => {
 
     const pairKey = currentPair.id;
     if (!room.sayiTahminSecrets[pairKey]) room.sayiTahminSecrets[pairKey] = {};
-    room.sayiTahminSecrets[pairKey][socket.id] = str;
+    room.sayiTahminSecrets[pairKey][pid] = str;
 
-    const partnerId = socket.id === currentPair.p1.id ? currentPair.p2.id : currentPair.p1.id;
-    io.to(partnerId).emit("partnerSecretSubmitted");
+    const partnerId = pid === currentPair.p1.id ? currentPair.p2.id : currentPair.p1.id;
+    io.to(getSocketId(partnerId)).emit("partnerSecretSubmitted");
     socket.emit("secretSubmitted");
 
     // Both submitted?
@@ -1121,8 +1238,9 @@ io.on("connection", (socket) => {
     const currentPair = room.pairs[room.currentPairIndex];
     if (!currentPair) return;
 
-    const isP1 = socket.id === currentPair.p1.id;
-    const isP2 = socket.id === currentPair.p2.id;
+    const pid = playerId || socket.id;
+    const isP1 = pid === currentPair.p1.id;
+    const isP2 = pid === currentPair.p2.id;
     if (!isP1 && !isP2) return;
 
     // Check if it's this player's turn
@@ -1160,7 +1278,7 @@ io.on("connection", (socket) => {
     room.sayiTahminGuesses[pairKey][who].push({ guess: str, greens, yellows });
 
     // Broadcast result to both players
-    io.to(currentPair.p1.id).to(currentPair.p2.id).emit("sayiTahminGuessResult", {
+    io.to(getSocketId(currentPair.p1.id)).to(getSocketId(currentPair.p2.id)).emit("sayiTahminGuessResult", {
       who: who,
       guesserName: guesserName,
       guess: str,
@@ -1171,7 +1289,7 @@ io.on("connection", (socket) => {
 
     // Broadcast to spectators too
     room.spectators.forEach(s => {
-      io.to(s.id).emit("sayiTahminGuessResult", {
+      io.to(getSocketId(s.id)).emit("sayiTahminGuessResult", {
         who: who,
         guesserName: guesserName,
         guess: str,
@@ -1191,7 +1309,7 @@ io.on("connection", (socket) => {
 
       io.to(roomId).emit("sayiTahminWin", {
         winnerName: winnerName,
-        winnerId: socket.id,
+        winnerId: pid,
         loserName: loserName,
         guess: str,
         targetSecret: targetSecret,
@@ -1216,82 +1334,166 @@ io.on("connection", (socket) => {
   // --- ODA AYARLARINI GÜNCELLE (oyun bitince tekrar seçim) ---
   socket.on("updateRoom", (data) => {
     const room = rooms[data.roomId];
-    if (!room || room.gameStatus !== "waiting") return;
+    if (!room || room.gameStatus !== "waiting") return socket.emit("gameError", "Oda bulunamadı!");
 
-    room.gameType = data.gameType || "telepati";
-    room.roundCount = parseInt(data.roundCount) || 5;
-    room.roundTime = parseInt(data.roundTime) || 10;
+    room.gameType = VALID_GAME_TYPES.includes(data.gameType) ? data.gameType : "telepati";
+    room.roundCount = Math.min(Math.max(parseInt(data.roundCount) || 5, 1), 20);
+    room.roundTime = Math.min(Math.max(parseInt(data.roundTime) || 10, 5), 120);
 
-    // Herkesi lobiye yolla
     io.to(data.roomId).emit("joinedRoom", data.roomId);
     emitLobbyUpdate(data.roomId);
   });
 
+  // --- REJOIN (reconnection) ---
+  socket.on("rejoinRoom", ({ roomId, playerId: pid }) => {
+    const room = rooms[roomId];
+    if (!room) {
+      socket.emit("rejoinFailed");
+      return;
+    }
+    const player = findPlayerInRoom(room, pid);
+    if (!player) {
+      socket.emit("rejoinFailed");
+      return;
+    }
+    // Reconnect
+    player.disconnected = false;
+    player.disconnectedAt = null;
+    player.socketId = socket.id;
+    playerSockets[pid] = socket.id;
+    playerId = pid;
+
+    socket.join(roomId);
+    socket.emit("rejoinSuccess", { roomId, gameStatus: room.gameStatus, gameType: room.gameType });
+    io.to(roomId).emit("playerReconnected", { playerId: pid, username: player.username });
+    emitLobbyUpdate(roomId);
+  });
+
+  // --- DISCONNECT ---
   socket.on("disconnect", () => {
+    const pid = playerId || socket.id;
     for (const roomId of Object.keys(rooms)) {
       const room = rooms[roomId];
+      const player = findPlayerInRoom(room, pid);
+      if (!player) continue;
 
-      // Kurucu (host) kontrolü - kurucu çıktıysa odayı komple kapat
-      let isHost = false;
-      if (room.gameMode === "tek") {
-        isHost = room.players.some((p) => p.id === socket.id && p.isHost);
-      } else {
-        room.teams.forEach((t) => {
-          if (t.p1 && t.p1.id === socket.id && t.p1.isHost) isHost = true;
-          if (t.p2 && t.p2.id === socket.id && t.p2.isHost) isHost = true;
-        });
-      }
+      // Grace period: 30sn içinde geri bağlanabilir
+      player.disconnected = true;
+      player.disconnectedAt = Date.now();
+      io.to(roomId).emit("playerDisconnected", { playerId: pid, username: player.username });
 
-      if (isHost) {
-        console.log(`Kurucu ayrıldı, oda kapatılıyor: ${roomId}`);
-        io.to(roomId).emit("hostLeft");
-        // Tüm timerları temizle
-        if (room.pictionaryTimer) clearTimeout(room.pictionaryTimer);
-        if (room.tabuTimer) clearTimeout(room.tabuTimer);
-        if (room.imposterTimer) clearTimeout(room.imposterTimer);
-        // Odadaki tüm socketleri odadan çıkar
-        const socketsInRoom = io.sockets.adapter.rooms.get(roomId);
-        if (socketsInRoom) {
-          for (const sid of socketsInRoom) {
-            const s = io.sockets.sockets.get(sid);
-            if (s) s.leave(roomId);
-          }
+      setTimeout(() => {
+        const r = rooms[roomId];
+        if (!r) return;
+        const p = findPlayerInRoom(r, pid);
+        if (p && p.disconnected) {
+          removePlayerFromRoom(roomId, pid);
         }
-        delete rooms[roomId];
-        continue;
-      }
-
-      room.teams.forEach((t) => {
-        if (t.p1 && t.p1.id === socket.id) t.p1 = null;
-        if (t.p2 && t.p2.id === socket.id) t.p2 = null;
-      });
-
-      if (room.gameMode === "tek") {
-        room.players = room.players.filter((p) => p.id !== socket.id);
-        if (room.soloPlayers) {
-          room.soloPlayers = room.soloPlayers.filter((p) => p.id !== socket.id);
-        }
-      }
-
-      room.spectators = room.spectators.filter((p) => p.id !== socket.id);
-
-      // Boş oda kontrolü - tüm timerları temizle ve odayı sil
-      const hasTeamPlayers = room.teams.some((t) => t.p1 || t.p2);
-      const hasSoloPlayers = room.players && room.players.length > 0;
-      const hasSpectators = room.spectators.length > 0;
-
-      if (!hasTeamPlayers && !hasSoloPlayers && !hasSpectators) {
-        if (room.pictionaryTimer) clearTimeout(room.pictionaryTimer);
-        if (room.tabuTimer) clearTimeout(room.tabuTimer);
-        if (room.imposterTimer) clearTimeout(room.imposterTimer);
-        delete rooms[roomId];
-        console.log(`Oda silindi (boş): ${roomId}`);
-      } else {
-        emitLobbyUpdate(roomId);
-      }
+      }, 30000);
     }
+    if (playerId) delete playerSockets[playerId];
   });
 });
+
+// ============ HELPER FONKSİYONLARI ============
+
+function findPlayerInRoom(room, pid) {
+  if (!room) return null;
+  if (room.gameMode === 'tek') {
+    return room.players.find(p => p.id === pid) || room.spectators.find(p => p.id === pid) || null;
+  }
+  for (const t of room.teams) {
+    if (t.p1 && t.p1.id === pid) return t.p1;
+    if (t.p2 && t.p2.id === pid) return t.p2;
+  }
+  return room.spectators.find(p => p.id === pid) || null;
+}
+
+function clearAllRoomTimers(room) {
+  if (room.pictionaryTimer) { clearTimeout(room.pictionaryTimer); room.pictionaryTimer = null; }
+  if (room.tabuTimer) { clearTimeout(room.tabuTimer); room.tabuTimer = null; }
+  if (room.imposterTimer) { clearTimeout(room.imposterTimer); room.imposterTimer = null; }
+}
+
+function isRoomEmpty(room) {
+  const hasTeamPlayers = room.teams && room.teams.some(t => t.p1 || t.p2);
+  const hasSoloPlayers = room.players && room.players.length > 0;
+  const hasSpectators = room.spectators && room.spectators.length > 0;
+  return !hasTeamPlayers && !hasSoloPlayers && !hasSpectators;
+}
+
+function findNextHost(room) {
+  if (room.gameMode === 'tek') {
+    return room.players.find(p => !p.disconnected) || null;
+  }
+  for (const t of room.teams) {
+    if (t.p1 && !t.p1.disconnected) return t.p1;
+    if (t.p2 && !t.p2.disconnected) return t.p2;
+  }
+  return room.spectators.find(p => !p.disconnected) || null;
+}
+
+function isPlayerHost(room, pid) {
+  if (room.gameMode === 'tek') {
+    return room.players.some(p => p.id === pid && p.isHost);
+  }
+  for (const t of room.teams) {
+    if (t.p1 && t.p1.id === pid && t.p1.isHost) return true;
+    if (t.p2 && t.p2.id === pid && t.p2.isHost) return true;
+  }
+  return false;
+}
+
+function removePlayerFromRoom(roomId, pid) {
+  const room = rooms[roomId];
+  if (!room) return;
+
+  const wasHost = isPlayerHost(room, pid);
+
+  // Remove from wherever they are
+  if (room.gameMode === 'tek') {
+    room.players = room.players.filter(p => p.id !== pid);
+    if (room.soloPlayers) {
+      room.soloPlayers = room.soloPlayers.filter(p => p.id !== pid);
+    }
+  } else {
+    room.teams.forEach(t => {
+      if (t.p1 && t.p1.id === pid) t.p1 = null;
+      if (t.p2 && t.p2.id === pid) t.p2 = null;
+    });
+  }
+  room.spectators = room.spectators.filter(p => p.id !== pid);
+
+  // Check if room is empty
+  if (isRoomEmpty(room)) {
+    clearAllRoomTimers(room);
+    delete rooms[roomId];
+    console.log(`Oda silindi (boş): ${roomId}`);
+    return;
+  }
+
+  // Host left -> transfer host
+  if (wasHost) {
+    const newHost = findNextHost(room);
+    if (newHost) {
+      newHost.isHost = true;
+      io.to(roomId).emit("hostChanged", {
+        newHostId: newHost.id,
+        newHostName: newHost.username,
+      });
+      console.log(`Host transfer: ${roomId} -> ${newHost.username}`);
+    } else {
+      // No eligible host, destroy room
+      clearAllRoomTimers(room);
+      io.to(roomId).emit("hostLeft");
+      delete rooms[roomId];
+      console.log(`Oda silindi (host yok): ${roomId}`);
+      return;
+    }
+  }
+
+  emitLobbyUpdate(roomId);
+}
 
 // ============ TELEPATİ FONKSİYONLARI ============
 
@@ -1571,11 +1773,11 @@ function startPictionaryRound(roomId) {
       gameMode: "tek",
     };
 
-    io.to(drawer.id).emit("pictionaryRound", { ...baseData, word: word });
+    io.to(getSocketId(drawer.id)).emit("pictionaryRound", { ...baseData, word: word });
 
     room.soloPlayers.forEach((p) => {
       if (p.id !== drawer.id) {
-        io.to(p.id).emit("pictionaryRound", {
+        io.to(getSocketId(p.id)).emit("pictionaryRound", {
           ...baseData,
           guesserId: p.id,
           guesserName: p.username,
@@ -1584,7 +1786,7 @@ function startPictionaryRound(roomId) {
     });
 
     room.spectators.forEach((s) => {
-      io.to(s.id).emit("pictionaryRound", { ...baseData });
+      io.to(getSocketId(s.id)).emit("pictionaryRound", { ...baseData });
     });
   } else {
     // ÇİFT MOD
@@ -1603,15 +1805,15 @@ function startPictionaryRound(roomId) {
         guesserName: guesser.username,
       };
 
-      io.to(drawer.id).emit("pictionaryRound", { ...baseData, word: word });
-      io.to(guesser.id).emit("pictionaryRound", { ...baseData });
+      io.to(getSocketId(drawer.id)).emit("pictionaryRound", { ...baseData, word: word });
+      io.to(getSocketId(guesser.id)).emit("pictionaryRound", { ...baseData });
     });
 
     const firstPair = room.pairs[0];
     const drawer0 = drawerIsP1 ? firstPair.p1 : firstPair.p2;
     const guesser0 = drawerIsP1 ? firstPair.p2 : firstPair.p1;
     room.spectators.forEach((s) => {
-      io.to(s.id).emit("pictionaryRound", {
+      io.to(getSocketId(s.id)).emit("pictionaryRound", {
         round: room.currentRound,
         totalRounds: room.roundCount,
         drawerId: drawer0.id,
@@ -1805,7 +2007,7 @@ function pickAndSendTabuWord(roomId) {
   const allInRoom = io.sockets.adapter.rooms.get(roomId);
   if (allInRoom) {
     for (const sid of allInRoom) {
-      if (sid !== room.tabuGuesserId) {
+      if (sid !== getSocketId(room.tabuGuesserId)) {
         io.to(sid).emit("tabuNewWord", {
           word: wordObj.word,
           forbidden: wordObj.forbidden,
@@ -1923,7 +2125,7 @@ function startImposterRound(roomId) {
   // Herkese gönder
   room.players.forEach((p) => {
     const isImp = p.id === room.imposterId;
-    io.to(p.id).emit("imposterRound", {
+    io.to(getSocketId(p.id)).emit("imposterRound", {
       currentRound: room.currentRound,
       totalRounds: room.roundCount,
       roundTime: room.roundTime,

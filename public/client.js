@@ -15,7 +15,11 @@ function escapeHtml(str) {
 }
 
 let currentRoom = null;
-let myPlayerId = null;
+let myPlayerId = localStorage.getItem('duoduels_playerId');
+if (!myPlayerId) {
+  myPlayerId = 'p_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
+  localStorage.setItem('duoduels_playerId', myPlayerId);
+}
 let amIPlaying = false;
 let timerInterval = null;
 let pendingRoomData = null;
@@ -307,6 +311,7 @@ function goToMainMenu() {
     socket.emit("leaveRoom", currentRoom);
   }
   currentRoom = null;
+  sessionStorage.removeItem("duoduels_room");
   pendingRoomData = null;
   showScreen("lobby");
 }
@@ -439,35 +444,96 @@ function updateCategoryTabs(activeCategory) {
   });
 }
 
+// --- CONNECTION STATUS ---
+function showConnectionStatus(status) {
+  let el = document.getElementById("connection-status");
+  if (!el) return;
+  el.className = "connection-status " + status;
+  el.innerText = status === "disconnected" ? "Bağlantı koptu! Yeniden bağlanılıyor..." : "Yeniden bağlanılıyor...";
+  el.style.display = "block";
+}
+function hideConnectionStatus() {
+  const el = document.getElementById("connection-status");
+  if (el) el.style.display = "none";
+}
+
 // --- SOCKET ---
 socket.on("connect", () => {
-  myPlayerId = socket.id;
+  socket.emit("registerPlayer", myPlayerId);
+  if (currentRoom) {
+    socket.emit("rejoinRoom", { roomId: currentRoom, playerId: myPlayerId });
+    showConnectionStatus("reconnecting");
+  } else {
+    hideConnectionStatus();
+  }
+});
+socket.on("disconnect", () => {
+  if (currentRoom) {
+    showConnectionStatus("disconnected");
+  }
+});
+socket.on("rejoinSuccess", (data) => {
+  hideConnectionStatus();
+  currentRoom = data.roomId;
+  sessionStorage.setItem("duoduels_room", data.roomId);
+});
+socket.on("rejoinFailed", () => {
+  hideConnectionStatus();
+  currentRoom = null;
+  sessionStorage.removeItem("duoduels_room");
+  showScreen("lobby");
+  Swal.fire({ title: "Bağlantı Koptu", text: "Oyun odası artık mevcut değil.", icon: "warning" });
 });
 socket.on("gameError", (msg) => {
   Swal.fire({ title: "Hata", text: msg, icon: "error" });
 });
 socket.on("roomCreated", (id) => {
   currentRoom = id;
+  sessionStorage.setItem("duoduels_room", id);
   showScreen("waiting");
   document.getElementById("displayRoomCode").innerText = id;
 });
 socket.on("joinedRoom", (id) => {
   currentRoom = id;
+  sessionStorage.setItem("duoduels_room", id);
   showScreen("waiting");
   document.getElementById("displayRoomCode").innerText = id;
+});
+
+socket.on("hostChanged", (data) => {
+  Swal.fire({
+    title: "Kurucu Değişti",
+    text: data.newHostName + " yeni kurucu oldu!",
+    icon: "info",
+    timer: 3000,
+    timerProgressBar: true,
+    showConfirmButton: false,
+  });
+});
+socket.on("playerDisconnected", (data) => {
+  document.querySelectorAll(".slot.filled").forEach((el) => {
+    if (el.textContent.includes(data.username)) {
+      el.classList.add("player-disconnected");
+    }
+  });
+});
+socket.on("playerReconnected", (data) => {
+  document.querySelectorAll(".slot.filled.player-disconnected").forEach((el) => {
+    if (el.textContent.includes(data.username)) {
+      el.classList.remove("player-disconnected");
+    }
+  });
 });
 
 socket.on("hostLeft", () => {
   clearInterval(timerInterval);
   currentRoom = null;
+  sessionStorage.removeItem("duoduels_room");
   amIPlaying = false;
-  // Scoreboard panelini kapat
   document.getElementById("scoreboard-panel").style.display = "none";
-  // Açık kalan Swal popup'larını kapat
   Swal.close();
-  // Match overlay'lerini temizle
   document.querySelectorAll(".match-overlay").forEach((el) => el.remove());
-  alert("Oda kurucusu ayrıldı, oda kapatıldı!");
+  Swal.fire({ title: "Oda Kapandı", text: "Tüm oyuncular ayrıldı.", icon: "warning" });
   showScreen("lobby");
 });
 
@@ -2250,3 +2316,11 @@ socket.on("sayiTahminWin", (data) => {
 socket.on("sayiTahminGameOver", (msg) => {
   Swal.fire({ title: "BİTTİ", text: msg });
 });
+
+// --- SESSION RECOVERY ---
+(function() {
+  const savedRoom = sessionStorage.getItem("duoduels_room");
+  if (savedRoom) {
+    currentRoom = savedRoom;
+  }
+})();

@@ -4,6 +4,45 @@
   box-sizing: border-box;
 }
 
+/* --- Connection Status Banner --- */
+.connection-status {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100000;
+  text-align: center;
+  padding: 10px 16px;
+  font-family: 'Poppins', sans-serif;
+  font-weight: 600;
+  font-size: 14px;
+  animation: slideDown 0.3s ease;
+}
+.connection-status.disconnected {
+  background: #e74c3c;
+  color: white;
+}
+.connection-status.reconnecting {
+  background: #f39c12;
+  color: white;
+}
+@keyframes slideDown {
+  from { transform: translateY(-100%); }
+  to { transform: translateY(0); }
+}
+
+/* --- Disconnected Player Indicator --- */
+.player-disconnected {
+  opacity: 0.4;
+  position: relative;
+}
+.player-disconnected::after {
+  content: " (koptu)";
+  font-size: 0.7em;
+  color: #e74c3c;
+  font-weight: 700;
+}
+
 body {
   font-family: "Poppins", sans-serif;
   background: linear-gradient(135deg, #ff512f, #dd2476 45%, #24c6dc);

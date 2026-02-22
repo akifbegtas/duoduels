@@ -19,12 +19,13 @@
       rel="stylesheet"
     />
 
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" integrity="sha384-6W5GbmA1e/krqeMofQ3ghXcfiCAF0UOhB5fh5Hp6BenD1NBQq4BFtyz4nAfOrryB" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js" integrity="sha384-HAH79XdRvHr6axVGh4xQWVCp14kcd32bNk4Xu0sHDHtFQ42n6BAM8ykvB47dGz6D" crossorigin="anonymous"></script>
 
     <link rel="stylesheet" href="style.css" />
   </head>
   <body style="background-color:#dd2476;">
+    <div id="connection-status" class="connection-status" style="display:none"></div>
     <!-- Animasyonlu Splash Screen (inline style: CSS yüklenmeden önce beyaz arka plan) -->
     <div id="app-splash" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:linear-gradient(135deg,#ff512f,#dd2476 45%,#24c6dc);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;">
       <img src="apple-touch-icon.png" alt="DuoDuels" class="splash-logo" />
