@@ -3,7 +3,7 @@ const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window
 const isLocalDev = !isNative && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
 const SERVER_URL = isLocalDev
   ? window.location.origin
-  : (window.location.hostname === 'duoduels.com' || window.location.hostname === 'www.duoduels.com')
+  : (window.location.hostname === 'duoduels.com' || window.location.hostname === 'www.duoduels.com' || window.location.hostname.endsWith('.run.app'))
     ? window.location.origin
     : 'https://duoduels.onrender.com';
 const socket = io(SERVER_URL);
