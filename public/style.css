@@ -143,31 +143,7 @@ body, html, .main-container {
   scrollbar-width: none;
   -ms-overflow-style: none;
 }
-/* ======= KREM + GEOMETRİK SVG ARKAPLAN (Figma) ======= */
-body::before {
-  content: "";
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: -2;
-  background-color: var(--bg-cream);
-  background-image: url('bg-pattern.svg');
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-}
-body::after {
-  content: "";
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: -1;
-  pointer-events: none;
-}
+/* ======= KREM + GEOMETRİK SVG ARKAPLAN (inline HTML #bg-pattern) ======= */
 
 .main-container {
   max-width: 600px;
