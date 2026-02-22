@@ -30,6 +30,49 @@ let currentTargetLetter = null;
 let selectedMode = "cift";
 let _listenersAttached = {};
 
+// --- TEMA DEĞİŞTİRME (cinsiyet seçimine göre) ---
+function applyGenderTheme(gender) {
+  document.body.classList.remove("theme-male", "theme-female");
+  if (gender === "male") {
+    document.body.classList.add("theme-male");
+  } else if (gender === "female") {
+    document.body.classList.add("theme-female");
+  }
+  // SVG arka plan renklerini güncelle
+  updateSvgColors(gender);
+}
+
+function updateSvgColors(gender) {
+  const svg = document.getElementById("bg-svg");
+  if (!svg) return;
+  let c1, c2, c3;
+  if (gender === "male") {
+    c1 = "#4A90D9"; c2 = "#3ABFBF"; c3 = "#5CB88A";
+  } else if (gender === "female") {
+    c1 = "#e84393"; c2 = "#a855f7"; c3 = "#f78fb3";
+  } else {
+    c1 = "#95a5a6"; c2 = "#7f8c8d"; c3 = "#b2bec3";
+  }
+  const shapes = svg.querySelectorAll("circle, rect, polygon, path");
+  shapes.forEach((s, i) => {
+    const colors = [c1, c2, c3];
+    s.setAttribute("stroke", colors[i % 3]);
+  });
+}
+
+// Sayfa yüklendiğinde cinsiyet seçim listener'ı ekle
+document.addEventListener("DOMContentLoaded", () => {
+  // Başlangıçta nötr tema (gri) - body'de hiç class yok
+  updateSvgColors(null);
+
+  const genderRadios = document.querySelectorAll('input[name="gender"]');
+  genderRadios.forEach(radio => {
+    radio.addEventListener("change", (e) => {
+      applyGenderTheme(e.target.value);
+    });
+  });
+});
+
 // --- INPUT UYARI ---
 function showHint(msg, target) {
   const ih = document.getElementById("input-hint");

@@ -22,12 +22,12 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" integrity="sha384-6W5GbmA1e/krqeMofQ3ghXcfiCAF0UOhB5fh5Hp6BenD1NBQq4BFtyz4nAfOrryB" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js" integrity="sha384-HAH79XdRvHr6axVGh4xQWVCp14kcd32bNk4Xu0sHDHtFQ42n6BAM8ykvB47dGz6D" crossorigin="anonymous"></script>
 
-    <link rel="stylesheet" href="style.css?v=29" />
+    <link rel="stylesheet" href="style.css?v=30" />
   </head>
   <body style="background-color:#f5f0e8;">
     <!-- Geometrik SVG Arkaplan -->
     <div id="bg-pattern" style="position:fixed;top:0;left:0;width:100%;height:100%;z-index:0;pointer-events:none;">
-      <svg xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+      <svg id="bg-svg" xmlns="http://www.w3.org/2000/svg" width="100%" height="100%" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
         <defs>
           <pattern id="grid" width="50" height="50" patternUnits="userSpaceOnUse">
             <path d="M 50 0 L 0 0 0 50" fill="none" stroke="#4A90D9" stroke-width="0.8" opacity="0.25"/>
@@ -906,7 +906,7 @@
       </div>
     </div>
     <script src="socket.io.min.js"></script>
-    <script src="client.js?v=29"></script>
+    <script src="client.js?v=30"></script>
     <script>
       // Capacitor plugin'lerini başlat (native ortamda)
       if (window.Capacitor && window.Capacitor.isNativePlatform()) {

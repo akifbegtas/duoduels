@@ -6,6 +6,52 @@
   --accent-turquoise: #3ABFBF;
   --accent-teal: #2D8F8F;
   --card-dark: rgba(15, 12, 41, 0.88);
+  /* Tema renkleri (varsayılan: nötr gri) */
+  --theme-primary: #7f8c8d;
+  --theme-secondary: #95a5a6;
+  --theme-dark: #636e72;
+  --theme-glow: rgba(127, 140, 141, 0.35);
+  --theme-border: rgba(127, 140, 141, 0.15);
+  --theme-shadow: rgba(127, 140, 141, 0.06);
+  --theme-gradient: linear-gradient(135deg, #7f8c8d, #95a5a6);
+  --theme-gradient-hover: linear-gradient(135deg, #636e72, #7f8c8d);
+  --theme-title-gradient: linear-gradient(135deg, #2d3436 0%, #636e72 50%, #95a5a6 100%);
+  --theme-tab-gradient: linear-gradient(135deg, #7f8c8d, #95a5a6);
+  --svg-color1: #95a5a6;
+  --svg-color2: #7f8c8d;
+  --svg-color3: #b2bec3;
+}
+/* Erkek teması: turkuaz-mavi */
+body.theme-male {
+  --theme-primary: #3ABFBF;
+  --theme-secondary: #4A90D9;
+  --theme-dark: #2D8F8F;
+  --theme-glow: rgba(58, 191, 191, 0.35);
+  --theme-border: rgba(74, 144, 217, 0.15);
+  --theme-shadow: rgba(74, 144, 217, 0.06);
+  --theme-gradient: linear-gradient(135deg, #3ABFBF, #4A90D9);
+  --theme-gradient-hover: linear-gradient(135deg, #2D8F8F, #3ABFBF);
+  --theme-title-gradient: linear-gradient(135deg, #2d3436 0%, #4A90D9 50%, #3ABFBF 100%);
+  --theme-tab-gradient: linear-gradient(135deg, #3ABFBF, #4A90D9);
+  --svg-color1: #4A90D9;
+  --svg-color2: #3ABFBF;
+  --svg-color3: #5CB88A;
+}
+/* Kadın teması: pembe-mor */
+body.theme-female {
+  --theme-primary: #e84393;
+  --theme-secondary: #a855f7;
+  --theme-dark: #c2185b;
+  --theme-glow: rgba(232, 67, 147, 0.35);
+  --theme-border: rgba(232, 67, 147, 0.15);
+  --theme-shadow: rgba(232, 67, 147, 0.06);
+  --theme-gradient: linear-gradient(135deg, #e84393, #a855f7);
+  --theme-gradient-hover: linear-gradient(135deg, #c2185b, #e84393);
+  --theme-title-gradient: linear-gradient(135deg, #2d3436 0%, #a855f7 50%, #e84393 100%);
+  --theme-tab-gradient: linear-gradient(135deg, #e84393, #a855f7);
+  --svg-color1: #e84393;
+  --svg-color2: #a855f7;
+  --svg-color3: #f78fb3;
 }
 
 * {
@@ -75,8 +121,8 @@ body.keyboard-open {
   bottom: 0;
   z-index: 99999;
   background:
-    radial-gradient(ellipse 80% 60% at 50% 40%, rgba(74, 144, 217, 0.15) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 50% at 30% 70%, rgba(58, 191, 191, 0.1) 0%, transparent 50%),
+    radial-gradient(ellipse 80% 60% at 50% 40%, var(--theme-border) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 30% 70%, var(--theme-border) 0%, transparent 50%),
     linear-gradient(160deg, #f5f0e8 0%, #e8f0f0 40%, #e0ece8 70%, #f5f0e8 100%);
   display: flex;
   flex-direction: column;
@@ -101,7 +147,7 @@ body.keyboard-open {
   font-size: 2rem;
   color: #fff;
   color: #2d3436;
-  text-shadow: 0 0 30px rgba(74, 144, 217, 0.4), 0 0 60px rgba(58, 191, 191, 0.2);
+  text-shadow: 0 0 30px var(--theme-glow), 0 0 60px var(--theme-border);
   opacity: 0;
   animation: splashTitleIn 0.6s 0.4s ease-out both;
 }
@@ -171,11 +217,11 @@ header {
 .game-title {
   font-family: "Pacifico", cursive;
   font-size: 2.5rem;
-  background: linear-gradient(135deg, #2d3436 0%, #4A90D9 50%, #3ABFBF 100%);
+  background: var(--theme-title-gradient);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
-  filter: drop-shadow(0 2px 8px rgba(74, 144, 217, 0.25));
+  filter: drop-shadow(0 2px 8px var(--theme-glow));
   letter-spacing: 1px;
 }
 #interactive-heart {
@@ -201,8 +247,8 @@ header {
   background: linear-gradient(145deg, rgba(20, 18, 50, 0.94), rgba(10, 8, 35, 0.96));
   padding: 18px;
   border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 0 4px 16px rgba(74, 144, 217, 0.08);
-  border: 1.5px solid rgba(74, 144, 217, 0.2);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 0 4px 16px var(--theme-shadow);
+  border: 1.5px solid var(--theme-border);
   z-index: 9999;
   display: none;
   backdrop-filter: blur(12px);
@@ -271,11 +317,11 @@ body.keyboard-open #lobby-screen.active {
   background: linear-gradient(145deg, rgba(20, 18, 50, 0.92), rgba(10, 8, 35, 0.95));
   backdrop-filter: blur(24px) saturate(1.3);
   -webkit-backdrop-filter: blur(24px) saturate(1.3);
-  border: 1px solid rgba(74, 144, 217, 0.15);
+  border: 1px solid var(--theme-border);
   border-radius: 24px;
   box-shadow:
     0 12px 40px rgba(0, 0, 0, 0.2),
-    0 4px 16px rgba(74, 144, 217, 0.06),
+    0 4px 16px var(--theme-shadow),
     inset 0 1px 0 rgba(255, 255, 255, 0.08);
   color: #fff;
 }
@@ -321,9 +367,9 @@ body.keyboard-open #lobby-screen.active {
   transition: all 0.3s;
 }
 .tab-btn.active {
-  background: linear-gradient(135deg, #3ABFBF, #4A90D9);
+  background: var(--theme-tab-gradient);
   color: white;
-  box-shadow: 0 4px 15px rgba(58, 191, 191, 0.35);
+  box-shadow: 0 4px 15px var(--theme-glow);
 }
 .forms-window {
   overflow: hidden;
@@ -415,7 +461,7 @@ body.keyboard-open #lobby-screen.active {
   vertical-align: middle;
 }
 .highlight-code {
-  background: linear-gradient(135deg, #4A90D9, #6DAEE7);
+  background: var(--theme-gradient);
   color: white;
   padding: 6px 16px;
   border-radius: 10px;
@@ -423,7 +469,7 @@ body.keyboard-open #lobby-screen.active {
   font-size: 1.4rem;
   font-weight: 800;
   display: inline-block;
-  box-shadow: 0 4px 15px rgba(74, 144, 217, 0.4);
+  box-shadow: 0 4px 15px var(--theme-glow);
   cursor: pointer;
   transition: transform 0.15s, box-shadow 0.15s;
 }
@@ -647,9 +693,9 @@ input::placeholder {
 input:focus,
 select:focus {
   outline: none;
-  border-color: #4A90D9;
+  border-color: var(--theme-primary);
   background: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 0 20px rgba(74, 144, 217, 0.2);
+  box-shadow: 0 0 20px var(--theme-border);
 }
 select {
   background: rgba(255, 255, 255, 0.1);
@@ -680,13 +726,13 @@ button:active {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #3ABFBF, #4A90D9);
+  background: var(--theme-gradient);
   width: 80%;
-  box-shadow: 0 4px 20px rgba(58, 191, 191, 0.35), 0 0 0 1px rgba(58, 191, 191, 0.15);
+  box-shadow: 0 4px 20px var(--theme-glow), 0 0 0 1px var(--theme-border);
 }
 .btn-primary:hover {
-  box-shadow: 0 6px 30px rgba(58, 191, 191, 0.5);
-  background: linear-gradient(135deg, #2D8F8F, #3ABFBF);
+  box-shadow: 0 6px 30px var(--theme-glow);
+  background: var(--theme-gradient-hover);
 }
 .btn-secondary {
   background: linear-gradient(135deg, #6c5ce7, #a855f7);
@@ -757,7 +803,7 @@ button:active {
   top: 0;
   right: 0;
   background: rgba(20, 18, 50, 0.85);
-  border: 1px solid rgba(74, 144, 217, 0.3);
+  border: 1px solid var(--theme-border);
   padding: 8px 16px;
   border-radius: 10px;
   color: #fff;
@@ -768,7 +814,7 @@ button:active {
 }
 .btn-back-corner:hover {
   background: rgba(30, 28, 70, 0.95);
-  border-color: rgba(74, 144, 217, 0.5);
+  border-color: var(--theme-primary);
 }
 .select-title {
   color: #fff;
@@ -785,7 +831,7 @@ button:active {
   background: linear-gradient(145deg, rgba(20, 18, 50, 0.92), rgba(10, 8, 35, 0.95));
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1.5px solid rgba(74, 144, 217, 0.12);
+  border: 1.5px solid var(--theme-border);
   border-radius: 18px;
   padding: 20px 14px;
   cursor: pointer;
@@ -801,9 +847,9 @@ button:active {
 }
 .game-card:active {
   transform: scale(0.96);
-  border-color: rgba(74, 144, 217, 0.6);
+  border-color: var(--theme-primary);
   box-shadow:
-    0 4px 20px rgba(74, 144, 217, 0.3),
+    0 4px 20px var(--theme-glow),
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
   background: rgba(255, 255, 255, 0.1);
 }
@@ -824,8 +870,8 @@ button:active {
 .face-to-face-badge {
   display: inline-block;
   font-size: 0.6rem;
-  background: rgba(74, 144, 217, 0.2);
-  color: #6DAEE7;
+  background: var(--theme-border);
+  color: var(--theme-primary);
   padding: 3px 8px;
   border-radius: 8px;
   font-weight: 600;
@@ -1298,9 +1344,9 @@ button:active {
   transition: all 0.3s;
 }
 .mode-btn.active {
-  background: linear-gradient(135deg, #4A90D9, #6DAEE7);
+  background: var(--theme-gradient);
   color: #fff;
-  box-shadow: 0 4px 15px rgba(74, 144, 217, 0.4);
+  box-shadow: 0 4px 15px var(--theme-glow);
 }
 .game-card.disabled-card {
   opacity: 0.25;
@@ -1906,7 +1952,7 @@ button:active {
   background: linear-gradient(145deg, rgba(20, 18, 50, 0.92), rgba(10, 8, 35, 0.95));
   backdrop-filter: blur(24px) saturate(1.3);
   -webkit-backdrop-filter: blur(24px) saturate(1.3);
-  border: 1px solid rgba(74, 144, 217, 0.15);
+  border: 1px solid var(--theme-border);
   border-radius: 16px;
   padding: 20px;
   text-align: center;
@@ -1969,7 +2015,7 @@ button:active {
   background: linear-gradient(145deg, rgba(20, 18, 50, 0.92), rgba(10, 8, 35, 0.95));
   backdrop-filter: blur(24px) saturate(1.3);
   -webkit-backdrop-filter: blur(24px) saturate(1.3);
-  border: 1px solid rgba(74, 144, 217, 0.15);
+  border: 1px solid var(--theme-border);
   border-radius: 16px;
   padding: 20px;
   text-align: center;
@@ -1987,7 +2033,7 @@ button:active {
   background: linear-gradient(145deg, rgba(20, 18, 50, 0.92), rgba(10, 8, 35, 0.95));
   backdrop-filter: blur(24px) saturate(1.3);
   -webkit-backdrop-filter: blur(24px) saturate(1.3);
-  border: 1px solid rgba(74, 144, 217, 0.15);
+  border: 1px solid var(--theme-border);
   border-radius: 16px;
   padding: 12px;
   margin: 10px auto;
@@ -2097,7 +2143,7 @@ button:active {
   background: linear-gradient(145deg, rgba(20, 18, 50, 0.92), rgba(10, 8, 35, 0.95));
   backdrop-filter: blur(24px) saturate(1.3);
   -webkit-backdrop-filter: blur(24px) saturate(1.3);
-  border: 1px solid rgba(74, 144, 217, 0.15);
+  border: 1px solid var(--theme-border);
   border-radius: 16px;
   text-align: center;
   padding: 30px 20px;
