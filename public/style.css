@@ -1317,28 +1317,14 @@ button:active {
 .username-row input {
   margin-bottom: 0;
 }
-/* ======= INPUT UYARI ======= */
-.input-warning {
-  width: 100%;
+/* ======= INPUT HINT ======= */
+.input-hint {
+  display: block;
   text-align: center;
-  color: #e74c3c;
-  font-size: 0.8rem;
-  font-weight: 600;
-  padding: 6px 12px;
-  margin-bottom: 6px;
-  background: rgba(231, 76, 60, 0.1);
-  border: 1px solid rgba(231, 76, 60, 0.3);
-  border-radius: 8px;
-}
-.input-warning.warn-enter {
-  animation: warnShake 0.4s ease-out;
-}
-@keyframes warnShake {
-  0%, 100% { transform: translateX(0); }
-  20% { transform: translateX(-6px); }
-  40% { transform: translateX(6px); }
-  60% { transform: translateX(-4px); }
-  80% { transform: translateX(4px); }
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.72rem;
+  font-weight: 400;
+  margin-top: 4px;
 }
 
 /* ======= IMPOSTER ======= */

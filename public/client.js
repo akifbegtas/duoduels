@@ -30,33 +30,32 @@ let selectedMode = "cift";
 let _listenersAttached = {};
 
 // --- AYI UYARI ---
-function showWarning(msg) {
-  const warn = document.getElementById("input-warning");
-  if (!warn) return;
-  warn.textContent = msg;
-  warn.classList.remove("hidden");
-  warn.classList.remove("warn-enter");
-  void warn.offsetWidth;
-  warn.classList.add("warn-enter");
+function showHint(msg) {
+  const h = document.getElementById("input-hint");
+  if (!h) return;
+  h.textContent = msg;
+  h.classList.remove("hidden");
 }
-function hideWarning() {
-  const warn = document.getElementById("input-warning");
-  if (!warn) return;
-  warn.classList.add("hidden");
+function hideHint() {
+  const h = document.getElementById("input-hint");
+  if (!h) return;
+  h.classList.add("hidden");
 }
 // Eski fonksiyon isimleri uyumluluk için
-function showBearBubble(msg) { showWarning(msg); }
-function hideBearBubble() { hideWarning(); }
+function showBearBubble(msg) { showHint(msg); }
+function hideBearBubble() { hideHint(); }
+function showWarning(msg) { showHint(msg); }
+function hideWarning() { hideHint(); }
 
 // --- GİRİŞ ---
 function createRoom() {
   const username = document.getElementById("username").value;
   const genderEl = document.querySelector('input[name="gender"]:checked');
 
-  if (!username) return showBearBubble("İsmini yazmadan nereye :)", "name");
-  if (!genderEl) return showBearBubble("Cinsiyetini seçsene :)", "gender");
+  if (!username) return showHint("Adınızı giriniz");
+  if (!genderEl) return showHint("Cinsiyetinizi seçiniz");
 
-  hideBearBubble();
+  hideHint();
   pendingRoomData = { username, gender: genderEl.value };
   showScreen("gameSelect");
 }
@@ -235,9 +234,9 @@ function joinRoom() {
   const username = document.getElementById("username").value;
   const genderEl = document.querySelector('input[name="gender"]:checked');
   const code = document.getElementById("roomCodeInput").value;
-  if (!username) return showBearBubble("İsmini yazmadan nereye :)", "name");
-  if (!genderEl) return showBearBubble("Cinsiyetini seçsene :)", "gender");
-  hideBearBubble();
+  if (!username) return showHint("Adınızı giriniz");
+  if (!genderEl) return showHint("Cinsiyetinizi seçiniz");
+  hideHint();
   socket.emit("joinRoom", { roomId: code.toUpperCase(), username, gender: genderEl.value });
 }
 

@@ -130,14 +130,14 @@
           <h2>Giriş Yap</h2>
 
           <div class="username-row">
-            <div id="input-warning" class="input-warning hidden"></div>
             <input
               type="text"
               id="username"
               placeholder="İsminiz"
               maxlength="12"
-              oninput="hideWarning()"
+              oninput="hideHint()"
             />
+            <span id="input-hint" class="input-hint hidden"></span>
           </div>
           <div class="gender-selection">
             <label class="gender-option male"
@@ -145,7 +145,7 @@
                 type="radio"
                 name="gender"
                 value="male"
-                onchange="hideWarning()"
+                onchange="hideHint()"
               /><span>Erkek 💙</span></label
             >
             <label class="gender-option female"
@@ -153,7 +153,7 @@
                 type="radio"
                 name="gender"
                 value="female"
-                onchange="hideWarning()"
+                onchange="hideHint()"
               /><span>Kadın 🩷</span></label
             >
           </div>
