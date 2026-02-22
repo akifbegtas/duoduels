@@ -2354,21 +2354,31 @@ socket.on("sayiTahminGuessStart", (data) => {
   historyArea.classList.remove("hidden");
   waitArea.classList.add("hidden");
 
-  // Sütun başlıklarını ayarla (sol=ben, sağ=rakip)
+  // Sütun başlıklarını ayarla (sol=ben, sağ=rakip) + cinsiyet teması
+  const leftCol = document.getElementById("st-history-left").parentElement;
+  const rightCol = document.getElementById("st-history-right").parentElement;
+  // Eski cinsiyet class'larını temizle
+  leftCol.classList.remove("gender-male", "gender-female");
+  rightCol.classList.remove("gender-male", "gender-female");
+
   if (amIPlaying) {
-    const myName = iamP1 ? data.p1.username : data.p2.username;
-    const opName = iamP1 ? data.p2.username : data.p1.username;
-    document.getElementById("st-history-left-title").innerText = myName + " (Ben)";
-    document.getElementById("st-history-right-title").innerText = opName;
+    const myData = iamP1 ? data.p1 : data.p2;
+    const opData = iamP1 ? data.p2 : data.p1;
+    document.getElementById("st-history-left-title").innerText = myData.username + " (Ben)";
+    document.getElementById("st-history-right-title").innerText = opData.username;
     window._stMyId = myPlayerId;
 
-    // İkisi de aynı anda tahmin edebilir
-    infoBar.innerText = `${opName}'in sayısını tahmin et! 🎯`;
+    // Cinsiyet teması
+    leftCol.classList.add(myData.gender === "female" ? "gender-female" : "gender-male");
+    rightCol.classList.add(opData.gender === "female" ? "gender-female" : "gender-male");
+
+    // İkisi de aynı anda tahmin girer
+    infoBar.innerText = `${opData.username}'in sayısını tahmin et! 🎯`;
     infoBar.style.backgroundColor = "#27ae60";
     guessArea.classList.remove("hidden");
 
     const dc = data.digitCount || _stDigitCount;
-    document.getElementById("st-target-label").innerText = `${opName}'in ${dc} haneli sayısını tahmin et`;
+    document.getElementById("st-target-label").innerText = `${opData.username}'in ${dc} haneli sayısını tahmin et`;
     const inp = document.getElementById("st-guess-input");
     inp.value = "";
     inp.disabled = false;
@@ -2381,6 +2391,10 @@ socket.on("sayiTahminGuessStart", (data) => {
     document.getElementById("st-history-left-title").innerText = data.p1.username;
     document.getElementById("st-history-right-title").innerText = data.p2.username;
     window._stMyId = null;
+
+    // Seyirci de cinsiyet temasını görsün
+    leftCol.classList.add(data.p1.gender === "female" ? "gender-female" : "gender-male");
+    rightCol.classList.add(data.p2.gender === "female" ? "gender-female" : "gender-male");
 
     infoBar.innerText = `${data.p1.username} vs ${data.p2.username} - Tahmin ediyorlar!`;
     infoBar.style.backgroundColor = "#34495e";
