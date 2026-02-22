@@ -202,7 +202,7 @@ body::after {
 }
 
 .main-container {
-  max-width: 500px;
+  max-width: 720px;
   margin: 0 auto;
   padding: 20px 15px;
   padding-top: calc(50px + env(safe-area-inset-top));
@@ -794,6 +794,7 @@ button:active {
 .game-select-container {
   text-align: center;
   position: relative;
+  max-width: 100%;
 }
 .btn-back-corner {
   position: absolute;
@@ -816,7 +817,7 @@ button:active {
 }
 .game-cards {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 12px;
 }
 .game-card {
@@ -825,7 +826,7 @@ button:active {
   -webkit-backdrop-filter: blur(20px);
   border: 1.5px solid rgba(255, 255, 255, 0.1);
   border-radius: 18px;
-  padding: 18px 14px;
+  padding: 20px 14px;
   cursor: pointer;
   transition: all 0.3s;
   color: #fff;
@@ -833,7 +834,9 @@ button:active {
   display: flex;
   flex-direction: column;
   align-items: center;
+  justify-content: center;
   gap: 6px;
+  min-height: 140px;
 }
 .game-card:active {
   transform: scale(0.96);
