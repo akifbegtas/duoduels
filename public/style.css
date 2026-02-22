@@ -341,9 +341,13 @@ body.keyboard-open #lobby-screen.active {
 /* ======= CİNSİYET ======= */
 .gender-selection {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   gap: 12px;
   margin-bottom: 18px;
+}
+.gender-selection .input-hint {
+  width: 100%;
 }
 .gender-option {
   cursor: pointer;

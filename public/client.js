@@ -31,21 +31,27 @@ let _listenersAttached = {};
 
 // --- INPUT UYARI ---
 function showHint(msg, target) {
-  const h = document.getElementById("input-hint");
-  if (h) { h.textContent = msg; h.classList.remove("hidden"); }
-  // Kırmızı border ekle
+  const ih = document.getElementById("input-hint");
+  const gh = document.getElementById("gender-hint");
+  // Önce ikisini de gizle
+  if (ih) ih.classList.add("hidden");
+  if (gh) gh.classList.add("hidden");
+  // Kırmızı border + hint text
   if (target === "gender") {
+    if (gh) { gh.textContent = msg; gh.classList.remove("hidden"); }
     const gs = document.querySelector(".gender-selection");
     if (gs) gs.classList.add("gender-error");
   } else {
+    if (ih) { ih.textContent = msg; ih.classList.remove("hidden"); }
     const inp = document.getElementById("username");
     if (inp) inp.classList.add("input-error");
   }
 }
 function hideHint() {
-  const h = document.getElementById("input-hint");
-  if (h) h.classList.add("hidden");
-  // Kırmızı border temizle
+  const ih = document.getElementById("input-hint");
+  const gh = document.getElementById("gender-hint");
+  if (ih) ih.classList.add("hidden");
+  if (gh) gh.classList.add("hidden");
   const inp = document.getElementById("username");
   if (inp) inp.classList.remove("input-error");
   const gs = document.querySelector(".gender-selection");
