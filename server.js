@@ -11,6 +11,7 @@ const ALLOWED_ORIGINS = [
   'https://duoduels.com',
   'https://www.duoduels.com',
   'https://duoduels.onrender.com',
+  'https://duoduels-efwwv7zyia-ew.a.run.app',
   'capacitor://localhost',
   'http://localhost',
   'http://localhost:3000',
