@@ -1,3 +1,29 @@
+// --- PREMIUM SWAL DEFAULTS ---
+const SwalPremium = Swal.mixin({
+  background: 'linear-gradient(145deg, rgba(20, 18, 50, 0.97), rgba(10, 8, 35, 0.98))',
+  color: '#fff',
+  backdrop: 'rgba(0,0,0,0.6)',
+  showClass: { popup: 'swal2-show', backdrop: 'swal2-backdrop-show' },
+  hideClass: { popup: 'swal2-hide', backdrop: 'swal2-backdrop-hide' },
+  customClass: { popup: 'swal-premium', confirmButton: 'swal-premium-btn', timerProgressBar: 'swal-premium-timer' },
+});
+// Override global Swal.fire
+const _origSwalFire = Swal.fire.bind(Swal);
+Swal.fire = function(opts) {
+  if (typeof opts === 'object' && opts !== null) {
+    // Merge premium defaults, keep explicit overrides
+    const merged = {
+      background: 'linear-gradient(145deg, rgba(20, 18, 50, 0.97), rgba(10, 8, 35, 0.98))',
+      color: '#fff',
+      backdrop: 'rgba(0,0,0,0.6)',
+      customClass: { popup: 'swal-premium', confirmButton: 'swal-premium-btn', timerProgressBar: 'swal-premium-timer' },
+      ...opts,
+    };
+    return _origSwalFire(merged);
+  }
+  return _origSwalFire(opts);
+};
+
 // Tüm ortamlarda sunucuya bağlan
 const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
 const isLocalDev = !isNative && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
@@ -2352,7 +2378,7 @@ socket.on("sayiTahminSecretPhase", (data) => {
     window._stMyGender = myData.gender;
 
     infoBar.innerText = "GİZLİ SAYINI GİR! 🔒";
-    infoBar.style.backgroundColor = "#8e44ad";
+    infoBar.style.background = "var(--theme-gradient)";
     secretArea.classList.remove("hidden");
     phaseLabel.classList.remove("hidden");
     phaseLabel.innerText = `${data.p1.username} vs ${data.p2.username}`;
@@ -2370,7 +2396,7 @@ socket.on("sayiTahminSecretPhase", (data) => {
     inp.focus();
   } else {
     infoBar.innerText = `${data.p1.username} & ${data.p2.username} sayı seçiyor...`;
-    infoBar.style.backgroundColor = "#34495e";
+    infoBar.style.background = "var(--theme-gradient)";
     secretArea.classList.add("hidden");
     phaseLabel.classList.remove("hidden");
     phaseLabel.innerText = `${data.teamName}`;
@@ -2431,7 +2457,7 @@ socket.on("sayiTahminGuessStart", (data) => {
 
     // İkisi de aynı anda tahmin girer
     infoBar.innerText = `${opData.username}'in sayısını tahmin et! 🎯`;
-    infoBar.style.backgroundColor = "#27ae60";
+    infoBar.style.background = "var(--theme-gradient)";
     guessArea.classList.remove("hidden");
 
     const dc = data.digitCount || _stDigitCount;
@@ -2457,7 +2483,7 @@ socket.on("sayiTahminGuessStart", (data) => {
     rightCol.classList.add(data.p2.gender === "female" ? "gender-female" : "gender-male");
 
     infoBar.innerText = `${data.p1.username} vs ${data.p2.username} - Tahmin ediyorlar!`;
-    infoBar.style.backgroundColor = "#34495e";
+    infoBar.style.background = "var(--theme-gradient)";
     guessArea.classList.add("hidden");
     waitArea.classList.remove("hidden");
     document.querySelector("#st-wait-area .st-wait-text").innerText = "Oyuncular birbirlerinin sayılarını tahmin ediyor...";
@@ -2469,7 +2495,7 @@ socket.on("sayiTahminGuessWaiting", () => {
   if (!amIPlaying) return;
   const infoBar = document.getElementById("st-turn-info");
   infoBar.innerHTML = '<span class="hourglass" style="font-size:1.1rem">⏳</span> Rakip bekleniyor...';
-  infoBar.style.backgroundColor = "#f39c12";
+  infoBar.style.background = "var(--theme-gradient-hover)";
 });
 
 // Partner tahminini gönderdi bilgisi
@@ -2480,7 +2506,7 @@ socket.on("sayiTahminPartnerGuessed", () => {
   if (!inp.disabled) {
     const infoBar = document.getElementById("st-turn-info");
     infoBar.innerText = "⚡ Rakip tahminini gönderdi! Seni bekliyor...";
-    infoBar.style.backgroundColor = "#e67e22";
+    infoBar.style.background = "var(--theme-gradient-hover)";
   }
 });
 
@@ -2538,7 +2564,7 @@ socket.on("sayiTahminNextRoundReady", () => {
 
   const infoBar = document.getElementById("st-turn-info");
   infoBar.innerText = "🎯 Yeni tahmin gir!";
-  infoBar.style.backgroundColor = "#27ae60";
+  infoBar.style.background = "var(--theme-gradient)";
 });
 
 socket.on("sayiTahminWin", (data) => {

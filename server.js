@@ -747,7 +747,7 @@ io.on("connection", (socket) => {
 
       setTimeout(() => {
         startSayiTahminSecretPhase(roomId);
-      }, 2000);
+      }, 1200);
     } else {
       // Telepati
       io.to(roomId).emit("gameInit", {
@@ -1394,7 +1394,7 @@ io.on("connection", (socket) => {
 
         setTimeout(() => {
           nextSayiTahminStep(roomId);
-        }, 5000);
+        }, 3500);
         return;
       }
 
@@ -1405,7 +1405,7 @@ io.on("connection", (socket) => {
         room.spectators.forEach(s => {
           io.to(getSocketId(s.id)).emit("sayiTahminNextRoundReady");
         });
-      }, 1500);
+      }, 800);
     }
   });
 
@@ -2443,7 +2443,7 @@ function nextSayiTahminStep(roomId) {
     // Next pair
     setTimeout(() => {
       startSayiTahminSecretPhase(roomId);
-    }, 1500);
+    }, 1000);
     return;
   }
 
@@ -2458,14 +2458,14 @@ function nextSayiTahminStep(roomId) {
     setTimeout(() => {
       room.gameStatus = "waiting";
       emitBackToSelect(roomId);
-    }, 5000);
+    }, 3500);
     return;
   }
 
   io.to(roomId).emit("roundChanged", room.currentRound);
   setTimeout(() => {
     startSayiTahminSecretPhase(roomId);
-  }, 2000);
+  }, 1200);
 }
 
 function emitBackToSelect(roomId) {
