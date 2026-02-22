@@ -1402,6 +1402,16 @@ button:active {
   80% { transform: translateX(4px); }
 }
 
+/* ======= CİNSİYET BAZLI INPUT BORDER ======= */
+#username.gender-border-male {
+  border: 2px solid #4A90D9;
+  box-shadow: 0 0 16px rgba(74, 144, 217, 0.35);
+}
+#username.gender-border-female {
+  border: 2px solid #e84393;
+  box-shadow: 0 0 16px rgba(232, 67, 147, 0.35);
+}
+
 /* ======= IMPOSTER ======= */
 .imposter-card {
   background: rgba(30, 30, 50, 0.9);

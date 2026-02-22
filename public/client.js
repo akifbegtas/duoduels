@@ -38,6 +38,13 @@ function applyGenderTheme(gender) {
   } else if (gender === "female") {
     document.body.classList.add("theme-female");
   }
+  // Username input'a cinsiyet bazlı border
+  const usernameInput = document.getElementById("username");
+  if (usernameInput) {
+    usernameInput.classList.remove("gender-border-male", "gender-border-female");
+    if (gender === "male") usernameInput.classList.add("gender-border-male");
+    else if (gender === "female") usernameInput.classList.add("gender-border-female");
+  }
   // SVG arka plan renklerini güncelle
   updateSvgColors(gender);
 }

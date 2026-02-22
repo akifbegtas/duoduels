@@ -22,7 +22,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" integrity="sha384-6W5GbmA1e/krqeMofQ3ghXcfiCAF0UOhB5fh5Hp6BenD1NBQq4BFtyz4nAfOrryB" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js" integrity="sha384-HAH79XdRvHr6axVGh4xQWVCp14kcd32bNk4Xu0sHDHtFQ42n6BAM8ykvB47dGz6D" crossorigin="anonymous"></script>
 
-    <link rel="stylesheet" href="style.css?v=30" />
+    <link rel="stylesheet" href="style.css?v=31" />
   </head>
   <body style="background-color:#f5f0e8;">
     <!-- Geometrik SVG Arkaplan -->
@@ -253,14 +253,16 @@
             </button>
           </div>
           <div id="cift-count" style="margin: 10px auto; text-align: center">
-            <label style="color: #fff; font-weight: 600">Çift Sayısı:</label>
+            <label style="color: #2d3436; font-weight: 600">Çift Sayısı:</label>
             <select
               id="ciftCountSelect"
               style="
                 padding: 6px 12px;
                 border-radius: 8px;
-                border: none;
+                border: 1px solid rgba(0,0,0,0.15);
                 font-size: 1rem;
+                background: rgba(255,255,255,0.85);
+                color: #2d3436;
               "
             >
               <option value="" disabled selected>Çift Sayısını Seçiniz</option>
@@ -271,14 +273,16 @@
             </select>
           </div>
           <div id="duo-count" style="margin: 10px auto; text-align: center; display: none">
-            <label style="color: #fff; font-weight: 600">Çift Sayısı:</label>
+            <label style="color: #2d3436; font-weight: 600">Çift Sayısı:</label>
             <select
               disabled
               style="
                 padding: 6px 12px;
                 border-radius: 8px;
-                border: none;
+                border: 1px solid rgba(0,0,0,0.15);
                 font-size: 1rem;
+                background: rgba(255,255,255,0.85);
+                color: #2d3436;
                 opacity: 0.8;
               "
             >
@@ -286,14 +290,16 @@
             </select>
           </div>
           <div id="tek-count" style="margin: 10px auto; text-align: center; display: none">
-            <label style="color: #fff; font-weight: 600">Kişi Sayısı:</label>
+            <label style="color: #2d3436; font-weight: 600">Kişi Sayısı:</label>
             <select
               id="tekCountSelect"
               style="
                 padding: 6px 12px;
                 border-radius: 8px;
-                border: none;
+                border: 1px solid rgba(0,0,0,0.15);
                 font-size: 1rem;
+                background: rgba(255,255,255,0.85);
+                color: #2d3436;
               "
             >
               <option value="" disabled selected>Kişi Sayısını Seçiniz</option>
@@ -906,7 +912,7 @@
       </div>
     </div>
     <script src="socket.io.min.js"></script>
-    <script src="client.js?v=30"></script>
+    <script src="client.js?v=31"></script>
     <script>
       // Capacitor plugin'lerini başlat (native ortamda)
       if (window.Capacitor && window.Capacitor.isNativePlatform()) {
