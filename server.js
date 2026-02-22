@@ -594,6 +594,13 @@ io.on("connection", (socket) => {
     const room = rooms[roomId];
     if (!room) return;
 
+    // Sadece host başlatabilir
+    const pid = playerId || socket.id;
+    if (!isPlayerHost(room, pid)) {
+      socket.emit("gameError", "Sadece kurucu oyunu başlatabilir!");
+      return;
+    }
+
     // --- IMPOSTOR OYUNU ---
     if (room.gameType === "imposter") {
       if (room.gameMode !== "tek") {
@@ -2432,6 +2439,10 @@ function emitBackToSelect(roomId) {
       if (t.p1 && t.p1.isHost) { hostId = t.p1.id; break; }
       if (t.p2 && t.p2.isHost) { hostId = t.p2.id; break; }
     }
+    if (!hostId) {
+      const specHost = room.spectators.find(s => s.isHost);
+      if (specHost) hostId = specHost.id;
+    }
     if (!hostId && room.teams[0] && room.teams[0].p1) hostId = room.teams[0].p1.id;
   }
 
@@ -2456,6 +2467,11 @@ function emitLobbyUpdate(roomId) {
     for (const t of room.teams) {
       if (t.p1 && t.p1.isHost) { hostId = t.p1.id; break; }
       if (t.p2 && t.p2.isHost) { hostId = t.p2.id; break; }
+    }
+    // Spectator'larda da host olabilir
+    if (!hostId) {
+      const specHost = room.spectators.find(s => s.isHost);
+      if (specHost) hostId = specHost.id;
     }
     if (!hostId && room.teams[0] && room.teams[0].p1) hostId = room.teams[0].p1.id;
   }
