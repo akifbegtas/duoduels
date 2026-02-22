@@ -833,10 +833,18 @@
           </div>
         </div>
 
-        <!-- Tahmin Geçmişi -->
+        <!-- Tahmin Geçmişi (iki sütun) -->
         <div id="st-history" class="st-history hidden">
-          <h4 style="color:#fff; margin-bottom:8px;">Tahmin Geçmişi</h4>
-          <div id="st-history-list" class="st-history-list"></div>
+          <div class="st-history-columns">
+            <div class="st-history-col">
+              <h4 id="st-history-left-title" class="st-col-title">Ben</h4>
+              <div id="st-history-left" class="st-history-list"></div>
+            </div>
+            <div class="st-history-col">
+              <h4 id="st-history-right-title" class="st-col-title">Rakip</h4>
+              <div id="st-history-right" class="st-history-list"></div>
+            </div>
+          </div>
         </div>
 
         <!-- Bekleme Alanı (seyirci / karşı taraf bekliyor) -->

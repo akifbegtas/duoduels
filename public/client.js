@@ -2282,7 +2282,8 @@ socket.on("sayiTahminSecretPhase", (data) => {
   guessArea.classList.add("hidden");
   historyArea.classList.add("hidden");
   waitArea.classList.add("hidden");
-  document.getElementById("st-history-list").innerHTML = "";
+  document.getElementById("st-history-left").innerHTML = "";
+  document.getElementById("st-history-right").innerHTML = "";
   document.getElementById("st-game-log").innerHTML = "";
 
   // Secret area başlığını güncelle
@@ -2318,12 +2319,19 @@ socket.on("sayiTahminSecretPhase", (data) => {
 });
 
 socket.on("secretSubmitted", () => {
-  // Own secret submitted confirmation
+  if (amIPlaying) {
+    document.getElementById("st-secret-status").innerText = "✅ Sayın gönderildi! Rakip bekleniyor...";
+  }
 });
 
 socket.on("partnerSecretSubmitted", () => {
   if (amIPlaying) {
-    document.getElementById("st-secret-status").innerText = "Partneriniz sayısını girdi!";
+    const statusEl = document.getElementById("st-secret-status");
+    if (_stSecretSubmitted) {
+      statusEl.innerText = "✅ İkiniz de girdi! Oyun başlıyor...";
+    } else {
+      statusEl.innerText = "⏳ Rakip sayısını girdi, seni bekliyor!";
+    }
   }
 });
 
@@ -2340,6 +2348,20 @@ socket.on("sayiTahminGuessTurn", (data) => {
 
   secretArea.classList.add("hidden");
   historyArea.classList.remove("hidden");
+
+  // Sütun başlıklarını ayarla (sol=ben, sağ=rakip)
+  if (amIPlaying) {
+    const myName = iamP1 ? data.p1.username : data.p2.username;
+    const opName = iamP1 ? data.p2.username : data.p1.username;
+    document.getElementById("st-history-left-title").innerText = myName + " (Ben)";
+    document.getElementById("st-history-right-title").innerText = opName;
+    // Oyuncu ID'lerini sakla (doğru sütuna yazmak için)
+    window._stMyId = myPlayerId;
+  } else {
+    document.getElementById("st-history-left-title").innerText = data.p1.username;
+    document.getElementById("st-history-right-title").innerText = data.p2.username;
+    window._stMyId = null;
+  }
 
   const isMyTurn = myPlayerId === data.guesserId;
 
@@ -2374,7 +2396,6 @@ socket.on("sayiTahminGuessTurn", (data) => {
 });
 
 socket.on("sayiTahminGuessResult", (data) => {
-  const historyList = document.getElementById("st-history-list");
   const div = document.createElement("div");
   div.className = "st-history-item";
 
@@ -2390,11 +2411,25 @@ socket.on("sayiTahminGuessResult", (data) => {
   }
 
   div.innerHTML = `
-    <span class="st-history-who">${escapeHtml(data.guesserName)}</span>
     <span class="st-history-digits">${digitBoxes}</span>
     <span class="st-history-count">#${data.guessCount}</span>
   `;
-  historyList.prepend(div);
+
+  // Doğru sütuna ekle (sol=ben/p1, sağ=rakip/p2)
+  let targetList;
+  if (window._stMyId) {
+    // Oyuncuyum: sol=benim tahminlerim, sağ=rakibin tahminleri
+    const isMyGuess = data.guesserId === window._stMyId;
+    targetList = isMyGuess
+      ? document.getElementById("st-history-left")
+      : document.getElementById("st-history-right");
+  } else {
+    // Seyirciyim: sol=p1, sağ=p2
+    targetList = data.who === "p1"
+      ? document.getElementById("st-history-left")
+      : document.getElementById("st-history-right");
+  }
+  targetList.prepend(div);
 
   // Log
   const allCorrect = data.greens === dc;

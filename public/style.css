@@ -1824,24 +1824,27 @@ button:active {
     letter-spacing: 4px;
   }
   .st-history {
-    padding: 10px;
+    padding: 8px;
     margin: 8px 0;
     max-height: 220px;
+    max-width: 100%;
   }
-  .st-history-item {
-    padding: 6px 8px;
-    font-size: 0.8rem;
+  .st-history-columns {
     gap: 6px;
   }
-  .st-digit-box {
-    width: 28px;
-    height: 32px;
-    font-size: 0.95rem;
-    border-radius: 6px;
+  .st-col-title {
+    font-size: 0.7rem;
   }
-  .st-history-who {
-    font-size: 0.65rem;
-    min-width: 40px;
+  .st-history-item {
+    padding: 4px 6px;
+    font-size: 0.75rem;
+    gap: 4px;
+  }
+  .st-digit-box {
+    width: 24px;
+    height: 28px;
+    font-size: 0.85rem;
+    border-radius: 6px;
   }
 
   /* Imposter */
@@ -1950,14 +1953,33 @@ button:active {
   border-radius: 16px;
   padding: 12px;
   margin: 10px auto;
-  max-width: 500px;
-  max-height: 280px;
+  max-width: 600px;
+  max-height: 350px;
   overflow-y: auto;
   box-shadow: 0 12px 40px rgba(0, 0, 0, 0.2);
 }
-.st-history h4 {
-  margin: 0 0 8px 0;
+.st-history-columns {
+  display: flex;
+  gap: 10px;
+}
+.st-history-col {
+  flex: 1;
+  min-width: 0;
+}
+.st-col-title {
+  color: #fff;
+  font-size: 0.8rem;
+  font-weight: 700;
   text-align: center;
+  margin: 0 0 8px 0;
+  padding-bottom: 6px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+.st-history-col:first-child .st-col-title {
+  color: #3ABFBF;
+}
+.st-history-col:last-child .st-col-title {
+  color: #e74c3c;
 }
 .st-history-list {
   display: flex;
@@ -1967,12 +1989,13 @@ button:active {
 .st-history-item {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 8px;
   background: rgba(255, 255, 255, 0.06);
-  border-radius: 12px;
+  border-radius: 10px;
   color: #fff;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
 }
 .st-history-who {
   font-weight: 600;

@@ -1287,6 +1287,7 @@ io.on("connection", (socket) => {
     // Broadcast result to both players
     const resultPayload = {
       who: who,
+      guesserId: pid,
       guesserName: guesserName,
       guess: str,
       greens: greens,
@@ -2442,9 +2443,14 @@ function emitBackToSelect(roomId) {
 
   let hostId = null;
   if (room.gameMode === "tek") {
-    hostId = room.players.length > 0 ? room.players[0].id : null;
+    const host = room.players.find(p => p.isHost);
+    hostId = host ? host.id : (room.players.length > 0 ? room.players[0].id : null);
   } else {
-    hostId = room.teams[0] && room.teams[0].p1 ? room.teams[0].p1.id : null;
+    for (const t of room.teams) {
+      if (t.p1 && t.p1.isHost) { hostId = t.p1.id; break; }
+      if (t.p2 && t.p2.isHost) { hostId = t.p2.id; break; }
+    }
+    if (!hostId && room.teams[0] && room.teams[0].p1) hostId = room.teams[0].p1.id;
   }
 
   io.to(roomId).emit("backToSelect", {
@@ -2462,9 +2468,14 @@ function emitLobbyUpdate(roomId) {
   if (!room) return;
   let hostId = null;
   if (room.gameMode === "tek") {
-    hostId = room.players.length > 0 ? room.players[0].id : null;
+    const host = room.players.find(p => p.isHost);
+    hostId = host ? host.id : (room.players.length > 0 ? room.players[0].id : null);
   } else {
-    hostId = room.teams[0] && room.teams[0].p1 ? room.teams[0].p1.id : null;
+    for (const t of room.teams) {
+      if (t.p1 && t.p1.isHost) { hostId = t.p1.id; break; }
+      if (t.p2 && t.p2.isHost) { hostId = t.p2.id; break; }
+    }
+    if (!hostId && room.teams[0] && room.teams[0].p1) hostId = room.teams[0].p1.id;
   }
   io.to(roomId).emit("updateLobby", {
     gameMode: room.gameMode,
