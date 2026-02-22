@@ -30,43 +30,23 @@ let selectedMode = "cift";
 let _listenersAttached = {};
 
 // --- AYI UYARI ---
-function showBearBubble(msg, target) {
-  const bubble = document.getElementById("bear-bubble");
-  const bear = document.getElementById("bear-hint");
-  bubble.innerText = msg || "İsmini yazmadan nereye :)";
-  bubble.classList.remove("hidden");
-  bubble.classList.remove("bubble-enter");
-  void bubble.offsetWidth;
-  bubble.classList.add("bubble-enter");
-
-  if (target === "gender") {
-    bear.classList.add("bear-at-gender", "bear-grin");
-  } else {
-    bear.classList.remove("bear-at-gender", "bear-grin");
-  }
+function showWarning(msg) {
+  const warn = document.getElementById("input-warning");
+  if (!warn) return;
+  warn.textContent = msg;
+  warn.classList.remove("hidden");
+  warn.classList.remove("warn-enter");
+  void warn.offsetWidth;
+  warn.classList.add("warn-enter");
 }
-function hideBearBubble() {
-  const bubble = document.getElementById("bear-bubble");
-  const bear = document.getElementById("bear-hint");
-  const isAtGender = bear.classList.contains("bear-at-gender");
-
-  if (isAtGender) {
-    // Cinsiyet seçildi - teşekkür et, yerinde kal
-    bear.classList.remove("bear-grin");
-    bear.classList.add("bear-kiss");
-    bubble.innerText = "Teşekkürler \u{1F618}";
-    bubble.classList.remove("hidden", "bubble-enter");
-    void bubble.offsetWidth;
-    bubble.classList.add("bubble-enter");
-    setTimeout(() => {
-      bubble.classList.add("hidden");
-      bear.classList.remove("bear-kiss");
-    }, 1500);
-  } else {
-    bubble.classList.add("hidden");
-    bear.classList.remove("bear-grin");
-  }
+function hideWarning() {
+  const warn = document.getElementById("input-warning");
+  if (!warn) return;
+  warn.classList.add("hidden");
 }
+// Eski fonksiyon isimleri uyumluluk için
+function showBearBubble(msg) { showWarning(msg); }
+function hideBearBubble() { hideWarning(); }
 
 // --- GİRİŞ ---
 function createRoom() {

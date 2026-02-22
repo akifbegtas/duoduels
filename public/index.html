@@ -130,28 +130,13 @@
           <h2>Giriş Yap</h2>
 
           <div class="username-row">
-            <div id="bear-hint" class="bear-hint">
-              <div id="bear-bubble" class="bear-bubble hidden">
-                İsmini yazmadan nereye :)
-              </div>
-              <div class="bear-face">
-                <div class="bear-ear bear-ear-l"></div>
-                <div class="bear-ear bear-ear-r"></div>
-                <div class="bear-eyes">
-                  <span class="bear-eye"></span>
-                  <span class="bear-eye"></span>
-                </div>
-                <div class="bear-nose"></div>
-                <div class="bear-mouth"></div>
-              </div>
-              <div class="bear-paw">&#128073;</div>
-            </div>
+            <div id="input-warning" class="input-warning hidden"></div>
             <input
               type="text"
               id="username"
               placeholder="İsminiz"
               maxlength="12"
-              oninput="hideBearBubble()"
+              oninput="hideWarning()"
             />
           </div>
           <div class="gender-selection">
@@ -160,7 +145,7 @@
                 type="radio"
                 name="gender"
                 value="male"
-                onchange="hideBearBubble()"
+                onchange="hideWarning()"
               /><span>Erkek 💙</span></label
             >
             <label class="gender-option female"
@@ -168,7 +153,7 @@
                 type="radio"
                 name="gender"
                 value="female"
-                onchange="hideBearBubble()"
+                onchange="hideWarning()"
               /><span>Kadın 🩷</span></label
             >
           </div>

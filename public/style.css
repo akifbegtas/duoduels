@@ -238,6 +238,7 @@ header {
 }
 #lobby-screen.active {
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
   min-height: calc(100vh - 50px - env(safe-area-inset-top));
@@ -287,13 +288,7 @@ body.keyboard-open #lobby-screen.active {
   max-width: 400px;
   margin: 0 auto;
 }
-#lobby-screen {
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  min-height: calc(100vh - 150px);
-  min-height: calc(100dvh - 150px);
-}
+/* #lobby-screen display artık sadece .active ile kontrol ediliyor (satır 239) */
 .card h2 {
   color: #fff;
   font-size: 1.5rem;
@@ -326,9 +321,9 @@ body.keyboard-open #lobby-screen.active {
   transition: all 0.3s;
 }
 .tab-btn.active {
-  background: linear-gradient(135deg, var(--accent-blue), #6DAEE7);
+  background: linear-gradient(135deg, #3ABFBF, #4A90D9);
   color: white;
-  box-shadow: 0 4px 15px rgba(74, 144, 217, 0.4);
+  box-shadow: 0 4px 15px rgba(58, 191, 191, 0.35);
 }
 .forms-window {
   overflow: hidden;
@@ -1322,221 +1317,28 @@ button:active {
 .username-row input {
   margin-bottom: 0;
 }
-.bear-hint {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  flex-shrink: 0;
-  margin-right: -4px;
+/* ======= INPUT UYARI ======= */
+.input-warning {
+  width: 100%;
+  text-align: center;
+  color: #e74c3c;
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 6px 12px;
+  margin-bottom: 6px;
+  background: rgba(231, 76, 60, 0.1);
+  border: 1px solid rgba(231, 76, 60, 0.3);
+  border-radius: 8px;
 }
-.bear-bubble {
-  position: absolute;
-  top: -38px;
-  left: 0;
-  transform: none;
-  background: #fff;
-  color: #5a3e2b;
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 5px 10px;
-  border-radius: 12px;
-  white-space: nowrap;
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.15);
-  border: 2px solid #e6a756;
-  z-index: 10;
+.input-warning.warn-enter {
+  animation: warnShake 0.4s ease-out;
 }
-.bear-bubble::after {
-  content: "";
-  position: absolute;
-  bottom: -7px;
-  left: 20px;
-  transform: none;
-  width: 0;
-  height: 0;
-  border-left: 7px solid transparent;
-  border-right: 7px solid transparent;
-  border-top: 7px solid #fff;
-}
-.bear-bubble::before {
-  content: "";
-  position: absolute;
-  bottom: -10px;
-  left: 18px;
-  transform: none;
-  width: 0;
-  height: 0;
-  border-left: 9px solid transparent;
-  border-right: 9px solid transparent;
-  border-top: 9px solid #e6a756;
-}
-.bear-bubble.bubble-enter {
-  animation: bubblePop 0.4s ease-out;
-}
-@keyframes bubblePop {
-  0% {
-    transform: scale(0);
-    opacity: 0;
-  }
-  70% {
-    transform: scale(1.1);
-    opacity: 1;
-  }
-  100% {
-    transform: scale(1);
-    opacity: 1;
-  }
-}
-.bear-face {
-  width: 52px;
-  height: 48px;
-  background: #c8915a;
-  border-radius: 50% 50% 46% 46%;
-  position: relative;
-  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.2);
-}
-.bear-ear {
-  width: 18px;
-  height: 18px;
-  background: #c8915a;
-  border-radius: 50%;
-  position: absolute;
-  top: -6px;
-  border: 3px solid #a06b3a;
-}
-.bear-ear::after {
-  content: "";
-  width: 8px;
-  height: 8px;
-  background: #e8b87a;
-  border-radius: 50%;
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-}
-.bear-ear-l {
-  left: 2px;
-}
-.bear-ear-r {
-  right: 2px;
-}
-.bear-eyes {
-  display: flex;
-  justify-content: center;
-  gap: 12px;
-  padding-top: 14px;
-}
-.bear-eye {
-  width: 6px;
-  height: 7px;
-  background: #2c1810;
-  border-radius: 50%;
-  display: inline-block;
-  animation: bearBlink 3s ease-in-out infinite;
-}
-@keyframes bearBlink {
-  0%,
-  90%,
-  100% {
-    transform: scaleY(1);
-  }
-  95% {
-    transform: scaleY(0.1);
-  }
-}
-.bear-nose {
-  width: 10px;
-  height: 7px;
-  background: #2c1810;
-  border-radius: 50%;
-  margin: 3px auto 0;
-}
-.bear-mouth {
-  width: 12px;
-  height: 5px;
-  border-bottom: 2px solid #2c1810;
-  border-radius: 0 0 50% 50%;
-  margin: 1px auto 0;
-}
-.bear-paw {
-  font-size: 1.2rem;
-  position: absolute;
-  right: -6px;
-  bottom: -2px;
-  animation: bearPoint 0.8s ease-in-out infinite alternate;
-}
-@keyframes bearPoint {
-  0% {
-    transform: translateX(0);
-  }
-  100% {
-    transform: translateX(5px);
-  }
-}
-
-/* Ayı cinsiyet uyarısı: aşağı kayma */
-.bear-hint.bear-at-gender {
-  transition: transform 0.4s ease;
-  transform: translateY(52px);
-}
-.bear-hint.bear-at-gender .bear-paw {
-  transform: rotate(90deg);
-  bottom: -12px;
-  right: 4px;
-}
-
-/* Ayı sırıtma */
-.bear-hint.bear-grin .bear-mouth {
-  width: 20px;
-  height: 10px;
-  border-bottom: none;
-  background: #2c1810;
-  border-radius: 0 0 50% 50%;
-  margin: 2px auto 0;
-  position: relative;
-  overflow: hidden;
-}
-.bear-hint.bear-grin .bear-mouth::after {
-  content: "";
-  position: absolute;
-  top: 0;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 14px;
-  height: 5px;
-  background: #fff;
-  border-radius: 0 0 3px 3px;
-  display: flex;
-  border-left: 1px solid #ddd;
-  border-right: 1px solid #ddd;
-  background-image:
-    linear-gradient(to right, #ccc 1px, transparent 1px),
-    linear-gradient(to right, #ccc 1px, transparent 1px);
-  background-size: 3.5px 100%;
-  background-position: 0 0;
-}
-.bear-hint.bear-grin .bear-eyes .bear-eye {
-  height: 3px;
-  width: 8px;
-  border-radius: 4px 4px 0 0;
-  animation: none;
-}
-
-/* Ayı öpücük */
-.bear-hint.bear-kiss .bear-mouth {
-  width: 8px;
-  height: 8px;
-  border: none;
-  background: #e91e63;
-  border-radius: 50%;
-  margin: 3px auto 0;
-}
-.bear-hint.bear-kiss .bear-eyes .bear-eye {
-  height: 3px;
-  width: 8px;
-  border-radius: 4px 4px 0 0;
-  animation: none;
+@keyframes warnShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
 }
 
 /* ======= IMPOSTER ======= */
