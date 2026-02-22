@@ -15,10 +15,11 @@ function escapeHtml(str) {
 }
 
 let currentRoom = null;
-let myPlayerId = localStorage.getItem('duoduels_playerId');
+// sessionStorage: her sekme farklı player ID alır (aynı sekme yenilemede korunur)
+let myPlayerId = sessionStorage.getItem('duoduels_playerId');
 if (!myPlayerId) {
   myPlayerId = 'p_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
-  localStorage.setItem('duoduels_playerId', myPlayerId);
+  sessionStorage.setItem('duoduels_playerId', myPlayerId);
 }
 let amIPlaying = false;
 let timerInterval = null;
