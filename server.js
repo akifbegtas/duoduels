@@ -12,6 +12,7 @@ const ALLOWED_ORIGINS = [
   'https://www.duoduels.com',
   'https://duoduels.onrender.com',
   'https://duoduels-efwwv7zyia-ew.a.run.app',
+  'https://duoduels-599689373205.europe-west1.run.app',
   'capacitor://localhost',
   'http://localhost',
   'http://localhost:3000',
@@ -546,6 +547,7 @@ io.on("connection", (socket) => {
     const cleanRoomId = typeof roomId === 'string' ? roomId.toUpperCase().trim() : '';
     const cleanUsername = sanitizeString(username, 12) || "Oyuncu";
     const cleanGender = VALID_GENDERS.includes(gender) ? gender : "male";
+    console.log(`joinRoom isteği: oda=${cleanRoomId} kullanıcı=${cleanUsername} mevcut=${!!rooms[cleanRoomId]}`);
     const room = rooms[cleanRoomId];
     if (room && room.gameStatus === "waiting") {
       const pid = playerId || socket.id;
