@@ -2335,7 +2335,7 @@ socket.on("partnerSecretSubmitted", () => {
   }
 });
 
-socket.on("sayiTahminGuessTurn", (data) => {
+socket.on("sayiTahminGuessStart", (data) => {
   const iamP1 = myPlayerId === data.p1.id;
   const iamP2 = myPlayerId === data.p2.id;
   amIPlaying = iamP1 || iamP2;
@@ -2348,6 +2348,7 @@ socket.on("sayiTahminGuessTurn", (data) => {
 
   secretArea.classList.add("hidden");
   historyArea.classList.remove("hidden");
+  waitArea.classList.add("hidden");
 
   // Sütun başlıklarını ayarla (sol=ben, sağ=rakip)
   if (amIPlaying) {
@@ -2355,24 +2356,15 @@ socket.on("sayiTahminGuessTurn", (data) => {
     const opName = iamP1 ? data.p2.username : data.p1.username;
     document.getElementById("st-history-left-title").innerText = myName + " (Ben)";
     document.getElementById("st-history-right-title").innerText = opName;
-    // Oyuncu ID'lerini sakla (doğru sütuna yazmak için)
     window._stMyId = myPlayerId;
-  } else {
-    document.getElementById("st-history-left-title").innerText = data.p1.username;
-    document.getElementById("st-history-right-title").innerText = data.p2.username;
-    window._stMyId = null;
-  }
 
-  const isMyTurn = myPlayerId === data.guesserId;
-
-  if (isMyTurn) {
-    infoBar.innerText = `SIRA SENDE! ${data.targetName}'in sayısını tahmin et 🎯`;
+    // İkisi de aynı anda tahmin edebilir
+    infoBar.innerText = `${opName}'in sayısını tahmin et! 🎯`;
     infoBar.style.backgroundColor = "#27ae60";
     guessArea.classList.remove("hidden");
-    waitArea.classList.add("hidden");
 
-    const dc = _stDigitCount;
-    document.getElementById("st-target-label").innerText = `${data.targetName}'in ${dc} haneli sayısını tahmin et`;
+    const dc = data.digitCount || _stDigitCount;
+    document.getElementById("st-target-label").innerText = `${opName}'in ${dc} haneli sayısını tahmin et`;
     const inp = document.getElementById("st-guess-input");
     inp.value = "";
     inp.disabled = false;
@@ -2380,18 +2372,17 @@ socket.on("sayiTahminGuessTurn", (data) => {
     inp.placeholder = `${dc} haneli tahmin...`;
     document.getElementById("st-guess-btn").disabled = false;
     inp.focus();
-  } else if (amIPlaying) {
-    infoBar.innerText = `${data.guesserName} senin sayını tahmin ediyor... 🤔`;
-    infoBar.style.backgroundColor = "#e67e22";
-    guessArea.classList.add("hidden");
-    waitArea.classList.remove("hidden");
-    document.querySelector("#st-wait-area .st-wait-text").innerText = `${data.guesserName} tahmin ediyor...`;
   } else {
-    infoBar.innerText = `${data.guesserName} tahmin ediyor...`;
+    // Seyirci
+    document.getElementById("st-history-left-title").innerText = data.p1.username;
+    document.getElementById("st-history-right-title").innerText = data.p2.username;
+    window._stMyId = null;
+
+    infoBar.innerText = `${data.p1.username} vs ${data.p2.username} - Tahmin ediyorlar!`;
     infoBar.style.backgroundColor = "#34495e";
     guessArea.classList.add("hidden");
     waitArea.classList.remove("hidden");
-    document.querySelector("#st-wait-area .st-wait-text").innerText = `${data.guesserName}, ${data.targetName}'in sayısını tahmin ediyor...`;
+    document.querySelector("#st-wait-area .st-wait-text").innerText = "Oyuncular birbirlerinin sayılarını tahmin ediyor...";
   }
 });
 

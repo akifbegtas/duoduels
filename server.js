@@ -1228,8 +1228,7 @@ io.on("connection", (socket) => {
     const s1 = room.sayiTahminSecrets[pairKey][currentPair.p1.id];
     const s2 = room.sayiTahminSecrets[pairKey][currentPair.p2.id];
     if (s1 && s2) {
-      // Start guessing phase - p1 goes first
-      room.sayiTahminCurrentTurn = "p1";
+      // İkisi de girdi - eşzamanlı tahmin fazı başlasın
       room.sayiTahminGuesses[pairKey] = { p1: [], p2: [] };
       setTimeout(() => {
         startSayiTahminGuessPhase(roomId);
@@ -1237,7 +1236,7 @@ io.on("connection", (socket) => {
     }
   });
 
-  // --- SAYI TAHMİN: TAHMİN GÖNDERME ---
+  // --- SAYI TAHMİN: TAHMİN GÖNDERME (eşzamanlı - sıra yok) ---
   socket.on("submitNumberGuess", ({ roomId, guess }) => {
     const room = rooms[roomId];
     if (!room || room.gameStatus !== "playing" || room.gameType !== "sayiTahmin") return;
@@ -1249,10 +1248,6 @@ io.on("connection", (socket) => {
     const isP1 = pid === currentPair.p1.id;
     const isP2 = pid === currentPair.p2.id;
     if (!isP1 && !isP2) return;
-
-    // Check if it's this player's turn
-    const expectedTurn = room.sayiTahminCurrentTurn;
-    if ((expectedTurn === "p1" && !isP1) || (expectedTurn === "p2" && !isP2)) return;
 
     // Validate guess (dynamic digit count)
     const dc = room.sayiTahminDigitCount || 4;
@@ -1268,10 +1263,10 @@ io.on("connection", (socket) => {
       ? room.sayiTahminSecrets[pairKey][currentPair.p2.id]
       : room.sayiTahminSecrets[pairKey][currentPair.p1.id];
 
-    // Calculate per-digit result: true = correct position (green), false = wrong
+    // Calculate per-digit result
     const targetDigits = targetSecret.split("");
     const guessDigits = str.split("");
-    const digitResults = []; // array of booleans: true = green (doğru basamak)
+    const digitResults = [];
     let greens = 0;
 
     for (let i = 0; i < dc; i++) {
@@ -1284,7 +1279,7 @@ io.on("connection", (socket) => {
     const guesserName = isP1 ? currentPair.p1.username : currentPair.p2.username;
     room.sayiTahminGuesses[pairKey][who].push({ guess: str, greens, digitResults });
 
-    // Broadcast result to both players
+    // Broadcast result to both players and spectators
     const resultPayload = {
       who: who,
       guesserId: pid,
@@ -1297,8 +1292,6 @@ io.on("connection", (socket) => {
     };
 
     io.to(getSocketId(currentPair.p1.id)).to(getSocketId(currentPair.p2.id)).emit("sayiTahminGuessResult", resultPayload);
-
-    // Broadcast to spectators too
     room.spectators.forEach(s => {
       io.to(getSocketId(s.id)).emit("sayiTahminGuessResult", resultPayload);
     });
@@ -1323,16 +1316,11 @@ io.on("connection", (socket) => {
         teamName: currentPair.teamName,
       });
 
-      // Next pair or next round
       setTimeout(() => {
         nextSayiTahminStep(roomId);
       }, 5000);
       return;
     }
-
-    // Switch turn
-    room.sayiTahminCurrentTurn = room.sayiTahminCurrentTurn === "p1" ? "p2" : "p1";
-    startSayiTahminGuessPhase(roomId);
   });
 
   // --- ODA AYARLARINI GÜNCELLE (oyun bitince tekrar seçim) ---
@@ -2346,18 +2334,12 @@ function startSayiTahminGuessPhase(roomId) {
   const pair = room.pairs[room.currentPairIndex];
   if (!pair) return;
 
-  const turn = room.sayiTahminCurrentTurn;
-  const guesser = turn === "p1" ? pair.p1 : pair.p2;
-  const target = turn === "p1" ? pair.p2 : pair.p1;
-
-  io.to(roomId).emit("sayiTahminGuessTurn", {
-    turn: turn,
-    guesserId: guesser.id,
-    guesserName: guesser.username,
-    targetName: target.username,
+  // Eşzamanlı: ikisi de aynı anda tahmin edebilir
+  io.to(roomId).emit("sayiTahminGuessStart", {
     p1: pair.p1,
     p2: pair.p2,
     roundTime: room.roundTime,
+    digitCount: room.sayiTahminDigitCount || 4,
   });
 }
 
