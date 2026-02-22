@@ -7,7 +7,7 @@
       content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content"
     />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="format-detection" content="telephone=no" />
     <title>DuoDuels</title>
@@ -24,10 +24,10 @@
 
     <link rel="stylesheet" href="style.css" />
   </head>
-  <body style="background-color:#0f0c29;">
+  <body style="background-color:#f5f0e8;">
     <div id="connection-status" class="connection-status" style="display:none"></div>
     <!-- Animasyonlu Splash Screen (inline style: CSS yüklenmeden önce beyaz arka plan) -->
-    <div id="app-splash" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:linear-gradient(160deg,#0f0c29,#1a0a2e 40%,#16213e 70%,#0f0c29);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;">
+    <div id="app-splash" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;background:linear-gradient(160deg,#f5f0e8,#e8f0f0 40%,#e0ece8 70%,#f5f0e8);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;">
       <img src="apple-touch-icon.png" alt="DuoDuels" class="splash-logo" />
       <div class="splash-title">DuoDuels</div>
       <div class="splash-dots"><span></span><span></span><span></span></div>
@@ -840,8 +840,8 @@
         document.addEventListener('DOMContentLoaded', async () => {
           try {
             const { StatusBar } = window.Capacitor.Plugins;
-            await StatusBar.setStyle({ style: 'DARK' });
-            await StatusBar.setBackgroundColor({ color: '#0f0c29' });
+            await StatusBar.setStyle({ style: 'LIGHT' });
+            await StatusBar.setBackgroundColor({ color: '#f5f0e8' });
           } catch (e) {}
 
           try {
@@ -860,7 +860,7 @@
             const splash = document.getElementById('app-splash');
             if (splash) {
               splash.classList.add('splash-hide');
-              setTimeout(() => { splash.remove(); document.body.style.backgroundColor = '#0f0c29'; }, 600);
+              setTimeout(() => { splash.remove(); document.body.style.backgroundColor = '#f5f0e8'; }, 600);
             }
           }, 2500);
         });
@@ -871,7 +871,7 @@
             const splash = document.getElementById('app-splash');
             if (splash) {
               splash.classList.add('splash-hide');
-              setTimeout(() => { splash.remove(); document.body.style.backgroundColor = '#0f0c29'; }, 600);
+              setTimeout(() => { splash.remove(); document.body.style.backgroundColor = '#f5f0e8'; }, 600);
             }
           }, 2000);
         });

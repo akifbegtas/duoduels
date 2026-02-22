@@ -144,7 +144,7 @@ function selectGame(type) {
         html: `<div style="font-size:3.5rem;margin-bottom:10px">👆</div>
                <div style="font-size:1.3rem;font-weight:700;color:#fff;margin-bottom:6px">Dur bir dakika!</div>
                <div style="font-size:0.95rem;color:rgba(255,255,255,0.7)">Önce kaç çift oynayacak onu seç 💑</div>`,
-        background: 'linear-gradient(135deg, #0f0c29, #16213e)',
+        background: 'linear-gradient(135deg, #1a1a2e, #2d3436)',
         color: '#fff',
         showConfirmButton: true,
         confirmButtonText: 'Anladım! 👍',
@@ -165,7 +165,7 @@ function selectGame(type) {
         html: `<div style="font-size:3.5rem;margin-bottom:10px">👆</div>
                <div style="font-size:1.3rem;font-weight:700;color:#fff;margin-bottom:6px">Dur bir dakika!</div>
                <div style="font-size:0.95rem;color:rgba(255,255,255,0.7)">Önce kaç kişi oynayacak onu seç 🧑‍🤝‍🧑</div>`,
-        background: 'linear-gradient(135deg, #0f0c29, #16213e)',
+        background: 'linear-gradient(135deg, #1a1a2e, #2d3436)',
         color: '#fff',
         showConfirmButton: true,
         confirmButtonText: 'Anladım! 👍',
@@ -919,7 +919,7 @@ socket.on("telepatiGameOver", (data) => {
       </div>
       <div style="font-size:2.5rem;margin:10px 0">🎉🥳🎊</div>
       <div style="color:#27ae60;font-weight:bold">${data.lastStanding ? "Son hayatta kalan takım!" : "En az hatayla bitirdiniz!"}</div>`,
-      background: "linear-gradient(135deg, #0f0c29, #16213e)",
+      background: "linear-gradient(135deg, #1a1a2e, #2d3436)",
       color: "#fff",
       confirmButtonColor: "#27ae60",
       confirmButtonText: "Harikayız! 💪",
@@ -934,7 +934,7 @@ socket.on("telepatiGameOver", (data) => {
       <div style="font-size:1rem">${escapeHtml(data.winnerP1)} & ${escapeHtml(data.winnerP2)} kazandı!</div>
       <div style="font-size:2rem;margin:10px 0">😤</div>
       <div style="color:#e67e22;font-weight:bold">Bir dahaki sefere! 💪</div>`,
-      background: "linear-gradient(135deg, #0f0c29, #2d1b1b)",
+      background: "linear-gradient(135deg, #1a1a2e, #3d2020)",
       color: "#fff",
       confirmButtonColor: "#e74c3c",
       confirmButtonText: "Tekrar Dene",
@@ -2410,7 +2410,7 @@ socket.on("sayiTahminWin", (data) => {
     <div style="font-size:0.9rem;color:rgba(255,255,255,0.7)">
       Gizli sayı: <strong>${data.targetSecret}</strong>
     </div>`,
-    background: "linear-gradient(135deg, #0f0c29, #16213e)",
+    background: "linear-gradient(135deg, #1a1a2e, #2d3436)",
     color: "#fff",
     confirmButtonColor: iWon ? "#27ae60" : "#e74c3c",
     confirmButtonText: iWon ? "Harika! 💪" : "Tamam",
