@@ -1923,6 +1923,35 @@ button:active {
   letter-spacing: 6px;
   margin-bottom: 0 !important;
 }
+/* Cinsiyet bazlı input border */
+.st-big-input.gender-border-male {
+  border: 2px solid #4A90D9 !important;
+  box-shadow: 0 0 12px rgba(74, 144, 217, 0.3) !important;
+}
+.st-big-input.gender-border-female {
+  border: 2px solid #e84393 !important;
+  box-shadow: 0 0 12px rgba(232, 67, 147, 0.3) !important;
+}
+/* Kum saati bekleme animasyonu */
+.st-waiting-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 10px;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.7);
+}
+.st-waiting-spinner .hourglass {
+  display: inline-block;
+  font-size: 1.4rem;
+  animation: hourglassSpin 1.5s ease-in-out infinite;
+}
+@keyframes hourglassSpin {
+  0% { transform: rotate(0deg); }
+  50% { transform: rotate(180deg); }
+  100% { transform: rotate(180deg); }
+}
 .st-input-row button {
   background: linear-gradient(135deg, #27ae60, #2ecc71);
   box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);

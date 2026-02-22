@@ -2217,7 +2217,7 @@ function sendSecretNumber() {
   socket.emit("submitSecretNumber", { roomId: currentRoom, number: val });
   inp.disabled = true;
   document.getElementById("st-secret-btn").disabled = true;
-  document.getElementById("st-secret-status").innerText = "Gönderildi! Partner bekleniyor...";
+  document.getElementById("st-secret-status").innerHTML = '<div class="st-waiting-spinner"><span class="hourglass">⏳</span> Rakip bekleniyor...</div>';
 }
 
 function sendNumberGuess() {
@@ -2297,6 +2297,10 @@ socket.on("sayiTahminSecretPhase", (data) => {
   if (secretDesc) secretDesc.innerText = `0-9 arası rakamlarla ${dc} haneli bir sayı seç`;
 
   if (amIPlaying) {
+    const myData = iamP1 ? data.p1 : data.p2;
+    // Cinsiyet bilgisini sakla (guess phase'de kullanılacak)
+    window._stMyGender = myData.gender;
+
     infoBar.innerText = "GİZLİ SAYINI GİR! 🔒";
     infoBar.style.backgroundColor = "#8e44ad";
     secretArea.classList.remove("hidden");
@@ -2308,8 +2312,11 @@ socket.on("sayiTahminSecretPhase", (data) => {
     inp.disabled = false;
     inp.maxLength = dc;
     inp.placeholder = `Örn: ${"0123456789".slice(0, dc)}`;
+    // Cinsiyet bazlı input border
+    inp.classList.remove("gender-border-male", "gender-border-female");
+    inp.classList.add(myData.gender === "female" ? "gender-border-female" : "gender-border-male");
     document.getElementById("st-secret-btn").disabled = false;
-    document.getElementById("st-secret-status").innerText = "";
+    document.getElementById("st-secret-status").innerHTML = "";
     inp.focus();
   } else {
     infoBar.innerText = `${data.p1.username} & ${data.p2.username} sayı seçiyor...`;
@@ -2324,7 +2331,7 @@ socket.on("sayiTahminSecretPhase", (data) => {
 
 socket.on("secretSubmitted", () => {
   if (amIPlaying) {
-    document.getElementById("st-secret-status").innerText = "✅ Sayın gönderildi! Rakip bekleniyor...";
+    document.getElementById("st-secret-status").innerHTML = '<div class="st-waiting-spinner"><span class="hourglass">⏳</span> Rakip bekleniyor...</div>';
   }
 });
 
@@ -2332,9 +2339,9 @@ socket.on("partnerSecretSubmitted", () => {
   if (amIPlaying) {
     const statusEl = document.getElementById("st-secret-status");
     if (_stSecretSubmitted) {
-      statusEl.innerText = "✅ İkiniz de girdi! Oyun başlıyor...";
+      statusEl.innerHTML = '✅ İkiniz de girdi! Oyun başlıyor...';
     } else {
-      statusEl.innerText = "⏳ Rakip sayısını girdi, seni bekliyor!";
+      statusEl.innerHTML = '<div class="st-waiting-spinner"><span class="hourglass">⏳</span> Rakip girdi, seni bekliyor!</div>';
     }
   }
 });
@@ -2384,6 +2391,9 @@ socket.on("sayiTahminGuessStart", (data) => {
     inp.disabled = false;
     inp.maxLength = dc;
     inp.placeholder = `${dc} haneli tahmin...`;
+    // Cinsiyet bazlı input border
+    inp.classList.remove("gender-border-male", "gender-border-female");
+    inp.classList.add(myData.gender === "female" ? "gender-border-female" : "gender-border-male");
     document.getElementById("st-guess-btn").disabled = false;
     inp.focus();
   } else {
@@ -2408,7 +2418,7 @@ socket.on("sayiTahminGuessStart", (data) => {
 socket.on("sayiTahminGuessWaiting", () => {
   if (!amIPlaying) return;
   const infoBar = document.getElementById("st-turn-info");
-  infoBar.innerText = "⏳ Tahminin gönderildi! Rakip bekleniyor...";
+  infoBar.innerHTML = '<span class="hourglass" style="font-size:1.1rem">⏳</span> Rakip bekleniyor...';
   infoBar.style.backgroundColor = "#f39c12";
 });
 
