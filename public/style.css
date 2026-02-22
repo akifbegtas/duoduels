@@ -153,8 +153,8 @@ body::before {
   bottom: 0;
   z-index: -2;
   background-color: var(--bg-cream);
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='80' height='80'%3E%3C!-- Grid lines --%3E%3Cline x1='0' y1='40' x2='80' y2='40' stroke='%234A90D9' stroke-opacity='0.07' stroke-width='0.5'/%3E%3Cline x1='40' y1='0' x2='40' y2='80' stroke='%234A90D9' stroke-opacity='0.07' stroke-width='0.5'/%3E%3C!-- Diagonal lines --%3E%3Cline x1='0' y1='0' x2='80' y2='80' stroke='%233ABFBF' stroke-opacity='0.04' stroke-width='0.5'/%3E%3Cline x1='80' y1='0' x2='0' y2='80' stroke='%233ABFBF' stroke-opacity='0.04' stroke-width='0.5'/%3E%3C!-- Center dot --%3E%3Ccircle cx='40' cy='40' r='2.5' fill='%233ABFBF' fill-opacity='0.12'/%3E%3C!-- Corner dots --%3E%3Ccircle cx='0' cy='0' r='1.5' fill='%234A90D9' fill-opacity='0.1'/%3E%3Ccircle cx='80' cy='0' r='1.5' fill='%234A90D9' fill-opacity='0.1'/%3E%3Ccircle cx='0' cy='80' r='1.5' fill='%234A90D9' fill-opacity='0.1'/%3E%3Ccircle cx='80' cy='80' r='1.5' fill='%234A90D9' fill-opacity='0.1'/%3E%3C!-- Small hexagon accent --%3E%3Cpolygon points='40,10 48,15 48,25 40,30 32,25 32,15' fill='none' stroke='%235CB88A' stroke-opacity='0.06' stroke-width='0.5'/%3E%3C!-- Small diamond --%3E%3Cpolygon points='65,40 70,35 75,40 70,45' fill='none' stroke='%234A90D9' stroke-opacity='0.06' stroke-width='0.5'/%3E%3C!-- Small triangle --%3E%3Cpolygon points='10,55 20,55 15,65' fill='none' stroke='%233ABFBF' stroke-opacity='0.05' stroke-width='0.5'/%3E%3C/svg%3E");
-  background-size: 80px 80px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cline x1='0' y1='30' x2='60' y2='30' stroke='%234A90D9' stroke-opacity='0.15' stroke-width='0.8'/%3E%3Cline x1='30' y1='0' x2='30' y2='60' stroke='%234A90D9' stroke-opacity='0.15' stroke-width='0.8'/%3E%3Cline x1='0' y1='0' x2='60' y2='60' stroke='%233ABFBF' stroke-opacity='0.08' stroke-width='0.6'/%3E%3Cline x1='60' y1='0' x2='0' y2='60' stroke='%233ABFBF' stroke-opacity='0.08' stroke-width='0.6'/%3E%3Ccircle cx='30' cy='30' r='3' fill='%233ABFBF' fill-opacity='0.2'/%3E%3Ccircle cx='0' cy='0' r='2' fill='%234A90D9' fill-opacity='0.18'/%3E%3Ccircle cx='60' cy='0' r='2' fill='%234A90D9' fill-opacity='0.18'/%3E%3Ccircle cx='0' cy='60' r='2' fill='%234A90D9' fill-opacity='0.18'/%3E%3Ccircle cx='60' cy='60' r='2' fill='%234A90D9' fill-opacity='0.18'/%3E%3Cpolygon points='30,8 38,13 38,23 30,28 22,23 22,13' fill='none' stroke='%235CB88A' stroke-opacity='0.12' stroke-width='0.8'/%3E%3Cpolygon points='50,30 55,25 60,30 55,35' fill='none' stroke='%234A90D9' stroke-opacity='0.12' stroke-width='0.8'/%3E%3Cpolygon points='5,42 15,42 10,52' fill='none' stroke='%233ABFBF' stroke-opacity='0.1' stroke-width='0.8'/%3E%3C/svg%3E");
+  background-size: 60px 60px;
   background-repeat: repeat;
 }
 body::after {
@@ -166,10 +166,10 @@ body::after {
   bottom: 0;
   z-index: -1;
   background:
-    radial-gradient(circle 400px at 15% 15%, rgba(74, 144, 217, 0.1) 0%, transparent 70%),
-    radial-gradient(circle 350px at 85% 75%, rgba(58, 191, 191, 0.08) 0%, transparent 70%),
-    radial-gradient(circle 300px at 50% 50%, rgba(92, 184, 138, 0.06) 0%, transparent 60%),
-    radial-gradient(circle 250px at 75% 20%, rgba(45, 143, 143, 0.05) 0%, transparent 60%);
+    radial-gradient(circle 500px at 10% 10%, rgba(74, 144, 217, 0.15) 0%, transparent 70%),
+    radial-gradient(circle 450px at 90% 80%, rgba(58, 191, 191, 0.12) 0%, transparent 70%),
+    radial-gradient(circle 400px at 50% 40%, rgba(92, 184, 138, 0.08) 0%, transparent 60%),
+    radial-gradient(circle 350px at 80% 15%, rgba(45, 143, 143, 0.07) 0%, transparent 60%);
   pointer-events: none;
 }
 
@@ -196,11 +196,12 @@ header {
 }
 .game-title {
   font-family: "Pacifico", cursive;
-  color: #2d3436;
   font-size: 2.5rem;
-  text-shadow:
-    0 2px 15px rgba(74, 144, 217, 0.3),
-    0 0 40px rgba(58, 191, 191, 0.15);
+  background: linear-gradient(135deg, #2d3436 0%, #4A90D9 50%, #3ABFBF 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  filter: drop-shadow(0 2px 8px rgba(74, 144, 217, 0.25));
   letter-spacing: 1px;
 }
 #interactive-heart {
@@ -223,11 +224,11 @@ header {
   top: calc(20px + env(safe-area-inset-top));
   left: calc(20px + env(safe-area-inset-left));
   width: 230px;
-  background: rgba(15, 12, 41, 0.92);
+  background: linear-gradient(145deg, rgba(20, 18, 50, 0.94), rgba(10, 8, 35, 0.96));
   padding: 18px;
   border-radius: 16px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
-  border: 2px solid rgba(74, 144, 217, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 0 4px 16px rgba(74, 144, 217, 0.08);
+  border: 1.5px solid rgba(74, 144, 217, 0.2);
   z-index: 9999;
   display: none;
   backdrop-filter: blur(12px);
@@ -292,14 +293,15 @@ body.keyboard-open #lobby-screen.active {
 .team-card,
 .spectators-area,
 .game-footer {
-  background: var(--card-dark);
-  backdrop-filter: blur(20px) saturate(1.2);
-  -webkit-backdrop-filter: blur(20px) saturate(1.2);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(145deg, rgba(20, 18, 50, 0.92), rgba(10, 8, 35, 0.95));
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  border: 1px solid rgba(74, 144, 217, 0.15);
   border-radius: 24px;
   box-shadow:
-    0 8px 32px rgba(0, 0, 0, 0.18),
-    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    0 12px 40px rgba(0, 0, 0, 0.2),
+    0 4px 16px rgba(74, 144, 217, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
   color: #fff;
 }
 
@@ -310,6 +312,13 @@ body.keyboard-open #lobby-screen.active {
 .lobby-card {
   max-width: 400px;
   margin: 0 auto;
+}
+#lobby-screen {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-height: calc(100vh - 150px);
+  min-height: calc(100dvh - 150px);
 }
 .card h2 {
   color: #fff;
@@ -698,13 +707,13 @@ button:active {
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #4A90D9, #6DAEE7);
+  background: linear-gradient(135deg, #3ABFBF, #4A90D9);
   width: 80%;
-  box-shadow: 0 4px 20px rgba(74, 144, 217, 0.4), 0 0 0 1px rgba(74, 144, 217, 0.2);
+  box-shadow: 0 4px 20px rgba(58, 191, 191, 0.35), 0 0 0 1px rgba(58, 191, 191, 0.15);
 }
 .btn-primary:hover {
-  box-shadow: 0 6px 30px rgba(74, 144, 217, 0.55);
-  background: linear-gradient(135deg, #3A7BC8, #4A90D9);
+  box-shadow: 0 6px 30px rgba(58, 191, 191, 0.5);
+  background: linear-gradient(135deg, #2D8F8F, #3ABFBF);
 }
 .btn-secondary {
   background: linear-gradient(135deg, #6c5ce7, #a855f7);
@@ -795,10 +804,10 @@ button:active {
   gap: 12px;
 }
 .game-card {
-  background: var(--card-dark);
+  background: linear-gradient(145deg, rgba(20, 18, 50, 0.92), rgba(10, 8, 35, 0.95));
   backdrop-filter: blur(20px);
   -webkit-backdrop-filter: blur(20px);
-  border: 1.5px solid rgba(255, 255, 255, 0.08);
+  border: 1.5px solid rgba(74, 144, 217, 0.12);
   border-radius: 18px;
   padding: 20px 14px;
   cursor: pointer;
