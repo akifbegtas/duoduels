@@ -229,30 +229,46 @@ function confirmGameSettings() {
   pendingRoomData.roundTime = document.getElementById("roundTimeInput").value;
   pendingRoomData.digitCount = document.getElementById("digitCountInput").value;
 
-  if (currentRoom) {
-    // Oda zaten var, ayarları güncelle
-    socket.emit("updateRoom", {
-      roomId: currentRoom,
-      gameType: pendingRoomData.gameType,
-      gameMode: pendingRoomData.gameMode,
-      roundCount: pendingRoomData.roundCount,
-      roundTime: pendingRoomData.roundTime,
-      digitCount: pendingRoomData.digitCount,
-    });
-    pendingRoomData = null;
-  } else {
-    socket.emit("createRoom", pendingRoomData);
-    pendingRoomData = null;
+  function doEmit() {
+    if (currentRoom) {
+      socket.emit("updateRoom", {
+        roomId: currentRoom,
+        gameType: pendingRoomData.gameType,
+        gameMode: pendingRoomData.gameMode,
+        roundCount: pendingRoomData.roundCount,
+        roundTime: pendingRoomData.roundTime,
+        digitCount: pendingRoomData.digitCount,
+      });
+      pendingRoomData = null;
+    } else {
+      socket.emit("createRoom", pendingRoomData);
+      pendingRoomData = null;
+    }
   }
+
+  if (!socket.connected) {
+    socket.connect();
+    socket.once("connect", doEmit);
+    return;
+  }
+  doEmit();
 }
 
 function joinRoom() {
   const username = document.getElementById("username").value;
   const genderEl = document.querySelector('input[name="gender"]:checked');
-  const code = document.getElementById("roomCodeInput").value;
+  const code = document.getElementById("roomCodeInput").value.trim();
   if (!username) return showHint("Adınızı giriniz", "username");
   if (!genderEl) return showHint("Cinsiyetinizi seçiniz", "gender");
+  if (!code) return showHint("Oda kodunu giriniz", "username");
   hideHint();
+  if (!socket.connected) {
+    socket.connect();
+    socket.once("connect", () => {
+      socket.emit("joinRoom", { roomId: code.toUpperCase(), username, gender: genderEl.value });
+    });
+    return;
+  }
   socket.emit("joinRoom", { roomId: code.toUpperCase(), username, gender: genderEl.value });
 }
 
