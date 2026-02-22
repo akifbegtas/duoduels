@@ -29,17 +29,27 @@ let currentTargetLetter = null;
 let selectedMode = "cift";
 let _listenersAttached = {};
 
-// --- AYI UYARI ---
-function showHint(msg) {
+// --- INPUT UYARI ---
+function showHint(msg, target) {
   const h = document.getElementById("input-hint");
-  if (!h) return;
-  h.textContent = msg;
-  h.classList.remove("hidden");
+  if (h) { h.textContent = msg; h.classList.remove("hidden"); }
+  // Kırmızı border ekle
+  if (target === "gender") {
+    const gs = document.querySelector(".gender-selection");
+    if (gs) gs.classList.add("gender-error");
+  } else {
+    const inp = document.getElementById("username");
+    if (inp) inp.classList.add("input-error");
+  }
 }
 function hideHint() {
   const h = document.getElementById("input-hint");
-  if (!h) return;
-  h.classList.add("hidden");
+  if (h) h.classList.add("hidden");
+  // Kırmızı border temizle
+  const inp = document.getElementById("username");
+  if (inp) inp.classList.remove("input-error");
+  const gs = document.querySelector(".gender-selection");
+  if (gs) gs.classList.remove("gender-error");
 }
 // Eski fonksiyon isimleri uyumluluk için
 function showBearBubble(msg) { showHint(msg); }
@@ -52,8 +62,8 @@ function createRoom() {
   const username = document.getElementById("username").value;
   const genderEl = document.querySelector('input[name="gender"]:checked');
 
-  if (!username) return showHint("Adınızı giriniz");
-  if (!genderEl) return showHint("Cinsiyetinizi seçiniz");
+  if (!username) return showHint("Adınızı giriniz", "username");
+  if (!genderEl) return showHint("Cinsiyetinizi seçiniz", "gender");
 
   hideHint();
   pendingRoomData = { username, gender: genderEl.value };
@@ -234,8 +244,8 @@ function joinRoom() {
   const username = document.getElementById("username").value;
   const genderEl = document.querySelector('input[name="gender"]:checked');
   const code = document.getElementById("roomCodeInput").value;
-  if (!username) return showHint("Adınızı giriniz");
-  if (!genderEl) return showHint("Cinsiyetinizi seçiniz");
+  if (!username) return showHint("Adınızı giriniz", "username");
+  if (!genderEl) return showHint("Cinsiyetinizi seçiniz", "gender");
   hideHint();
   socket.emit("joinRoom", { roomId: code.toUpperCase(), username, gender: genderEl.value });
 }

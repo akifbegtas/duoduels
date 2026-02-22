@@ -1322,10 +1322,29 @@ button:active {
 .input-hint {
   display: block;
   text-align: center;
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(231, 76, 60, 0.9);
   font-size: 0.72rem;
-  font-weight: 400;
+  font-weight: 500;
   margin-top: 4px;
+}
+
+/* ======= INPUT ERROR (kırmızı border) ======= */
+.input-error {
+  border-color: #e74c3c !important;
+  box-shadow: 0 0 12px rgba(231, 76, 60, 0.35) !important;
+  animation: inputShake 0.4s ease;
+}
+.gender-error .gender-option {
+  border-color: #e74c3c !important;
+  box-shadow: 0 0 12px rgba(231, 76, 60, 0.25) !important;
+  animation: inputShake 0.4s ease;
+}
+@keyframes inputShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
 }
 
 /* ======= IMPOSTER ======= */
