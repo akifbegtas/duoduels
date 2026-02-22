@@ -2475,13 +2475,6 @@ function _addGuessToHistory(result, dc) {
       : document.getElementById("st-history-right");
   }
   targetList.prepend(div);
-
-  // Log
-  const allCorrect = result.greens === dc;
-  const logDiv = document.createElement("div");
-  logDiv.className = allCorrect ? "log-item log-success" : "log-item log-fail";
-  logDiv.innerHTML = `${escapeHtml(result.guesserName)}: ${escapeHtml(result.guess)} → ${result.greens}/${dc} doğru`;
-  document.getElementById("st-game-log").prepend(logDiv);
 }
 
 // Yeni round: input tekrar açılıyor

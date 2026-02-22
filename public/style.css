@@ -756,14 +756,19 @@ button:active {
   position: absolute;
   top: 0;
   right: 0;
-  background: rgba(255, 255, 255, 0.15);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(20, 18, 50, 0.85);
+  border: 1px solid rgba(74, 144, 217, 0.3);
   padding: 8px 16px;
   border-radius: 10px;
   color: #fff;
   font-size: 0.85rem;
   font-weight: 600;
   cursor: pointer;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+.btn-back-corner:hover {
+  background: rgba(30, 28, 70, 0.95);
+  border-color: rgba(74, 144, 217, 0.5);
 }
 .select-title {
   color: #fff;
@@ -1952,6 +1957,10 @@ button:active {
   50% { transform: rotate(180deg); }
   100% { transform: rotate(180deg); }
 }
+@keyframes stSlideDown {
+  0% { opacity: 0; transform: translateY(-20px) scale(0.95); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
 .st-input-row button {
   background: linear-gradient(135deg, #27ae60, #2ecc71);
   box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
@@ -2037,6 +2046,7 @@ button:active {
   justify-content: center;
   gap: 6px;
   padding: 6px 8px;
+  animation: stSlideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
   background: rgba(255, 255, 255, 0.06);
   border-radius: 10px;
   color: #fff;

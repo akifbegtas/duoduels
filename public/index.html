@@ -22,7 +22,7 @@
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" integrity="sha384-6W5GbmA1e/krqeMofQ3ghXcfiCAF0UOhB5fh5Hp6BenD1NBQq4BFtyz4nAfOrryB" crossorigin="anonymous"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js" integrity="sha384-HAH79XdRvHr6axVGh4xQWVCp14kcd32bNk4Xu0sHDHtFQ42n6BAM8ykvB47dGz6D" crossorigin="anonymous"></script>
 
-    <link rel="stylesheet" href="style.css?v=28" />
+    <link rel="stylesheet" href="style.css?v=29" />
   </head>
   <body style="background-color:#f5f0e8;">
     <!-- Geometrik SVG Arkaplan -->
@@ -856,7 +856,7 @@
 
         <div class="game-footer">
           <div id="st-round-display" style="font-size: 1.2rem; margin-bottom: 5px"></div>
-          <div id="st-game-log" class="log-container"></div>
+          <div id="st-game-log" class="log-container hidden"></div>
         </div>
       </div>
 
@@ -906,7 +906,7 @@
       </div>
     </div>
     <script src="socket.io.min.js"></script>
-    <script src="client.js?v=28"></script>
+    <script src="client.js?v=29"></script>
     <script>
       // Capacitor plugin'lerini başlat (native ortamda)
       if (window.Capacitor && window.Capacitor.isNativePlatform()) {
