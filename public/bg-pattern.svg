@@ -1,0 +1,81 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="390" height="844" viewBox="0 0 390 844">
+  <defs>
+    <pattern id="grid" width="40" height="40" patternUnits="userSpaceOnUse">
+      <path d="M 40 0 L 0 0 0 40" fill="none" stroke="#4A90D9" stroke-width="0.5" opacity="0.3"/>
+      <circle cx="0" cy="0" r="1.5" fill="#4A90D9" opacity="0.4"/>
+    </pattern>
+    <radialGradient id="glow1" cx="10%" cy="10%" r="50%">
+      <stop offset="0%" stop-color="#4A90D9" stop-opacity="0.15"/>
+      <stop offset="100%" stop-color="#4A90D9" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow2" cx="90%" cy="90%" r="50%">
+      <stop offset="0%" stop-color="#3ABFBF" stop-opacity="0.12"/>
+      <stop offset="100%" stop-color="#3ABFBF" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="glow3" cx="50%" cy="50%" r="45%">
+      <stop offset="0%" stop-color="#5CB88A" stop-opacity="0.08"/>
+      <stop offset="100%" stop-color="#5CB88A" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <!-- Base -->
+  <rect width="100%" height="100%" fill="#f5f0e8"/>
+
+  <!-- Radial glows -->
+  <rect width="100%" height="100%" fill="url(#glow1)"/>
+  <rect width="100%" height="100%" fill="url(#glow2)"/>
+  <rect width="100%" height="100%" fill="url(#glow3)"/>
+
+  <!-- Grid -->
+  <rect width="100%" height="100%" fill="url(#grid)"/>
+
+  <!-- HEXAGONS (12) -->
+  <path d="M 60 80 L 75 72 L 90 80 L 90 96 L 75 104 L 60 96 Z" fill="none" stroke="#5CB88A" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 280 180 L 295 172 L 310 180 L 310 196 L 295 204 L 280 196 Z" fill="none" stroke="#3ABFBF" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 140 460 L 155 452 L 170 460 L 170 476 L 155 484 L 140 476 Z" fill="none" stroke="#4A90D9" stroke-width="0.8" opacity="0.5"/>
+  <path d="M 330 680 L 345 672 L 360 680 L 360 696 L 345 704 L 330 696 Z" fill="none" stroke="#5CB88A" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 200 300 L 215 292 L 230 300 L 230 316 L 215 324 L 200 316 Z" fill="none" stroke="#4A90D9" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 100 580 L 115 572 L 130 580 L 130 596 L 115 604 L 100 596 Z" fill="none" stroke="#3ABFBF" stroke-width="0.8" opacity="0.5"/>
+  <path d="M 320 420 L 335 412 L 350 420 L 350 436 L 335 444 L 320 436 Z" fill="none" stroke="#5CB88A" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 50 250 L 65 242 L 80 250 L 80 266 L 65 274 L 50 266 Z" fill="none" stroke="#4A90D9" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 250 560 L 265 552 L 280 560 L 280 576 L 265 584 L 250 576 Z" fill="none" stroke="#3ABFBF" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 180 740 L 195 732 L 210 740 L 210 756 L 195 764 L 180 756 Z" fill="none" stroke="#5CB88A" stroke-width="0.8" opacity="0.5"/>
+  <path d="M 310 140 L 325 132 L 340 140 L 340 156 L 325 164 L 310 156 Z" fill="none" stroke="#3ABFBF" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 120 380 L 135 372 L 150 380 L 150 396 L 135 404 L 120 396 Z" fill="none" stroke="#4A90D9" stroke-width="0.8" opacity="0.6"/>
+
+  <!-- DIAMONDS (12) -->
+  <path d="M 180 130 L 195 145 L 180 160 L 165 145 Z" fill="none" stroke="#4A90D9" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 300 380 L 315 395 L 300 410 L 285 395 Z" fill="none" stroke="#3ABFBF" stroke-width="0.8" opacity="0.5"/>
+  <path d="M 80 580 L 95 595 L 80 610 L 65 595 Z" fill="none" stroke="#5CB88A" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 240 790 L 255 805 L 240 820 L 225 805 Z" fill="none" stroke="#4A90D9" stroke-width="0.8" opacity="0.5"/>
+  <path d="M 340 250 L 355 265 L 340 280 L 325 265 Z" fill="none" stroke="#3ABFBF" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 150 650 L 165 665 L 150 680 L 135 665 Z" fill="none" stroke="#5CB88A" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 270 500 L 285 515 L 270 530 L 255 515 Z" fill="none" stroke="#4A90D9" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 40 180 L 55 195 L 40 210 L 25 195 Z" fill="none" stroke="#5CB88A" stroke-width="0.8" opacity="0.5"/>
+  <path d="M 360 550 L 375 565 L 360 580 L 345 565 Z" fill="none" stroke="#3ABFBF" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 200 420 L 215 435 L 200 450 L 185 435 Z" fill="none" stroke="#4A90D9" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 90 330 L 105 345 L 90 360 L 75 345 Z" fill="none" stroke="#3ABFBF" stroke-width="0.8" opacity="0.5"/>
+  <path d="M 310 720 L 325 735 L 310 750 L 295 735 Z" fill="none" stroke="#5CB88A" stroke-width="0.8" opacity="0.6"/>
+
+  <!-- TRIANGLES (10) -->
+  <path d="M 140 220 L 160 250 L 120 250 Z" fill="none" stroke="#3ABFBF" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 290 530 L 310 560 L 270 560 Z" fill="none" stroke="#5CB88A" stroke-width="0.8" opacity="0.5"/>
+  <path d="M 40 380 L 60 410 L 20 410 Z" fill="none" stroke="#4A90D9" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 190 720 L 210 750 L 170 750 Z" fill="none" stroke="#3ABFBF" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 320 90 L 340 120 L 300 120 Z" fill="none" stroke="#4A90D9" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 100 480 L 120 510 L 80 510 Z" fill="none" stroke="#5CB88A" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 260 350 L 280 380 L 240 380 Z" fill="none" stroke="#3ABFBF" stroke-width="0.8" opacity="0.5"/>
+  <path d="M 70 650 L 90 680 L 50 680 Z" fill="none" stroke="#4A90D9" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 350 480 L 370 510 L 330 510 Z" fill="none" stroke="#5CB88A" stroke-width="0.8" opacity="0.6"/>
+  <path d="M 160 140 L 180 170 L 140 170 Z" fill="none" stroke="#3ABFBF" stroke-width="0.8" opacity="0.6"/>
+
+  <!-- CIRCLES (8) -->
+  <circle cx="110" cy="170" r="5" fill="#5CB88A" opacity="0.4"/>
+  <circle cx="270" cy="310" r="5" fill="#4A90D9" opacity="0.4"/>
+  <circle cx="170" cy="440" r="5" fill="#3ABFBF" opacity="0.4"/>
+  <circle cx="320" cy="630" r="5" fill="#5CB88A" opacity="0.4"/>
+  <circle cx="60" cy="710" r="5" fill="#4A90D9" opacity="0.4"/>
+  <circle cx="240" cy="220" r="5" fill="#3ABFBF" opacity="0.4"/>
+  <circle cx="140" cy="540" r="5" fill="#5CB88A" opacity="0.4"/>
+  <circle cx="300" cy="760" r="5" fill="#4A90D9" opacity="0.4"/>
+</svg>
