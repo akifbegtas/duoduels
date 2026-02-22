@@ -1305,17 +1305,18 @@ button:active {
   padding: 8px 0;
 }
 
-/* ======= AYI UYARI ======= */
+/* ======= USERNAME ROW ======= */
 .username-row {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
   gap: 0;
   position: relative;
   margin-bottom: 12px;
 }
 .username-row input {
   margin-bottom: 0;
+  width: 100%;
 }
 /* ======= INPUT HINT ======= */
 .input-hint {
