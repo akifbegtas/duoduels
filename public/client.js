@@ -151,6 +151,7 @@ function createRoom() {
   hideHint();
   pendingRoomData = { username, gender: genderEl.value };
   showScreen("gameSelect");
+  selectMode("cift");
 }
 
 function selectMode(mode) {
