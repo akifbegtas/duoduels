@@ -252,19 +252,9 @@
               Herkes Tek
             </button>
           </div>
-          <div id="cift-count" style="margin: 10px auto; text-align: center">
-            <label style="color: #2d3436; font-weight: 600">Çift Sayısı:</label>
-            <select
-              id="ciftCountSelect"
-              style="
-                padding: 6px 12px;
-                border-radius: 8px;
-                border: 1px solid rgba(0,0,0,0.15);
-                font-size: 1rem;
-                background: rgba(255,255,255,0.85);
-                color: #2d3436;
-              "
-            >
+          <div id="cift-count" class="count-selector">
+            <label class="count-label">Çift Sayısı</label>
+            <select id="ciftCountSelect" class="count-select">
               <option value="" disabled selected>Çift Sayısını Seçiniz</option>
               <option value="2">2 Çift (4 Kişi)</option>
               <option value="3">3 Çift (6 Kişi)</option>
@@ -272,36 +262,15 @@
               <option value="5">5 Çift (10 Kişi)</option>
             </select>
           </div>
-          <div id="duo-count" style="margin: 10px auto; text-align: center; display: none">
-            <label style="color: #2d3436; font-weight: 600">Çift Sayısı:</label>
-            <select
-              disabled
-              style="
-                padding: 6px 12px;
-                border-radius: 8px;
-                border: 1px solid rgba(0,0,0,0.15);
-                font-size: 1rem;
-                background: rgba(255,255,255,0.85);
-                color: #2d3436;
-                opacity: 0.8;
-              "
-            >
+          <div id="duo-count" class="count-selector" style="display: none">
+            <label class="count-label">Çift Sayısı</label>
+            <select disabled class="count-select" style="opacity: 0.7">
               <option selected>1 Çift (2 Kişi)</option>
             </select>
           </div>
-          <div id="tek-count" style="margin: 10px auto; text-align: center; display: none">
-            <label style="color: #2d3436; font-weight: 600">Kişi Sayısı:</label>
-            <select
-              id="tekCountSelect"
-              style="
-                padding: 6px 12px;
-                border-radius: 8px;
-                border: 1px solid rgba(0,0,0,0.15);
-                font-size: 1rem;
-                background: rgba(255,255,255,0.85);
-                color: #2d3436;
-              "
-            >
+          <div id="tek-count" class="count-selector" style="display: none">
+            <label class="count-label">Kişi Sayısı</label>
+            <select id="tekCountSelect" class="count-select">
               <option value="" disabled selected>Kişi Sayısını Seçiniz</option>
               <option value="2">2 Kişi</option>
               <option value="3">3 Kişi</option>

@@ -1417,6 +1417,54 @@ button:active {
   60% { transform: scale(1.05); }
   100% { transform: scale(1); }
 }
+/* ======= SAYI SEÇİCİ (Çift/Kişi Sayısı) ======= */
+.count-selector {
+  margin: 14px auto;
+  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: linear-gradient(145deg, rgba(20, 18, 50, 0.7), rgba(10, 8, 35, 0.8));
+  border: 1.5px solid var(--theme-border);
+  border-radius: 14px;
+  padding: 12px 18px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.count-label {
+  color: rgba(255, 255, 255, 0.85);
+  font-weight: 600;
+  font-size: 0.9rem;
+  white-space: nowrap;
+}
+.count-select {
+  padding: 8px 14px;
+  border-radius: 10px;
+  border: 1.5px solid var(--theme-border);
+  font-size: 0.9rem;
+  background: linear-gradient(145deg, rgba(30, 28, 60, 0.9), rgba(20, 18, 45, 0.95));
+  color: #fff;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+  -webkit-appearance: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23ffffff' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 32px;
+}
+.count-select:focus {
+  outline: none;
+  border-color: var(--theme-primary);
+  box-shadow: 0 0 12px var(--theme-glow);
+}
+.count-select option {
+  background: #1a1840;
+  color: #fff;
+}
+
 .game-card.disabled-card {
   opacity: 0.25;
   cursor: not-allowed;
