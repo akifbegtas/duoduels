@@ -14,29 +14,29 @@ PODS:
     - Capacitor
 
 DEPENDENCIES:
-  - "Capacitor (from `../../node_modules/@capacitor/ios`)"
-  - "CapacitorCordova (from `../../node_modules/@capacitor/ios`)"
-  - "CapacitorHaptics (from `../../node_modules/@capacitor/haptics`)"
-  - "CapacitorKeyboard (from `../../node_modules/@capacitor/keyboard`)"
-  - "CapacitorShare (from `../../node_modules/@capacitor/share`)"
-  - "CapacitorSplashScreen (from `../../node_modules/@capacitor/splash-screen`)"
-  - "CapacitorStatusBar (from `../../node_modules/@capacitor/status-bar`)"
+  - "Capacitor (from `../../../../../node_modules/@capacitor/ios`)"
+  - "CapacitorCordova (from `../../../../../node_modules/@capacitor/ios`)"
+  - "CapacitorHaptics (from `../../../../../node_modules/@capacitor/haptics`)"
+  - "CapacitorKeyboard (from `../../../../../node_modules/@capacitor/keyboard`)"
+  - "CapacitorShare (from `../../../../../node_modules/@capacitor/share`)"
+  - "CapacitorSplashScreen (from `../../../../../node_modules/@capacitor/splash-screen`)"
+  - "CapacitorStatusBar (from `../../../../../node_modules/@capacitor/status-bar`)"
 
 EXTERNAL SOURCES:
   Capacitor:
-    :path: "../../node_modules/@capacitor/ios"
+    :path: "../../../../../node_modules/@capacitor/ios"
   CapacitorCordova:
-    :path: "../../node_modules/@capacitor/ios"
+    :path: "../../../../../node_modules/@capacitor/ios"
   CapacitorHaptics:
-    :path: "../../node_modules/@capacitor/haptics"
+    :path: "../../../../../node_modules/@capacitor/haptics"
   CapacitorKeyboard:
-    :path: "../../node_modules/@capacitor/keyboard"
+    :path: "../../../../../node_modules/@capacitor/keyboard"
   CapacitorShare:
-    :path: "../../node_modules/@capacitor/share"
+    :path: "../../../../../node_modules/@capacitor/share"
   CapacitorSplashScreen:
-    :path: "../../node_modules/@capacitor/splash-screen"
+    :path: "../../../../../node_modules/@capacitor/splash-screen"
   CapacitorStatusBar:
-    :path: "../../node_modules/@capacitor/status-bar"
+    :path: "../../../../../node_modules/@capacitor/status-bar"
 
 SPEC CHECKSUMS:
   Capacitor: c95400d761e376be9da6be5a05f226c0e865cebf
@@ -47,6 +47,6 @@ SPEC CHECKSUMS:
   CapacitorSplashScreen: ef140a8b1ea7244e0c245ce2dd4ce5251e7ab86a
   CapacitorStatusBar: 149cde8f1328ec3aa6cbdd872a55137ae3f98b16
 
-PODFILE CHECKSUM: ef738e994c3f309c5b926ca851bcd2857253b0e3
+PODFILE CHECKSUM: ca7c15403528046c5d9bb1bd53745ecfceb213e1
 
 COCOAPODS: 1.16.2

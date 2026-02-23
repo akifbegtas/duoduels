@@ -574,6 +574,8 @@ function hideConnectionStatus() {
   // Capacitor Keyboard plugin (native iOS/Android)
   if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Keyboard) {
     const Keyboard = window.Capacitor.Plugins.Keyboard;
+    Keyboard.setAccessoryBarVisible({ isVisible: false });
+    Keyboard.setScroll({ isDisabled: true });
     Keyboard.addListener("keyboardWillShow", (info) => onKeyboardShow(info.keyboardHeight));
     Keyboard.addListener("keyboardWillHide", () => onKeyboardHide());
   }
