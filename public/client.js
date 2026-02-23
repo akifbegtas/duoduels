@@ -180,6 +180,8 @@ function selectMode(mode) {
   duoCount.style.display = "none";
   tekCount.style.display = "none";
 
+  let visibleCards = [];
+
   if (mode === "cift") {
     // Çiftler modu: takımlar arası yarış (Sayı Tahmin hariç - o sadece duo)
     telepati.style.display = "";
@@ -187,6 +189,7 @@ function selectMode(mode) {
     tabu.style.display = "";
     pictionary.style.display = "";
     ciftCount.style.display = "";
+    visibleCards = [telepati, isimSehir, tabu, pictionary];
   } else if (mode === "duo") {
     // Başbaşa modu: tek çift kendi aralarında
     telepati.style.display = "";
@@ -194,6 +197,7 @@ function selectMode(mode) {
     pictionary.style.display = "";
     if (sayiTahmin) sayiTahmin.style.display = "";
     duoCount.style.display = "";
+    visibleCards = [telepati, isimSehir, pictionary, sayiTahmin].filter(Boolean);
   } else if (mode === "tek") {
     // Tek modu: herkes bireysel
     pictionary.style.display = "";
@@ -202,7 +206,18 @@ function selectMode(mode) {
       imposter.classList.remove("hidden");
     }
     tekCount.style.display = "";
+    visibleCards = [pictionary, imposter].filter(Boolean);
   }
+
+  // Kademeli animasyon
+  visibleCards.forEach((card, i) => {
+    card.classList.remove("card-animate-in");
+    card.style.opacity = "0";
+    setTimeout(() => {
+      card.style.opacity = "";
+      card.classList.add("card-animate-in");
+    }, i * 80);
+  });
 }
 
 function selectGame(type) {
