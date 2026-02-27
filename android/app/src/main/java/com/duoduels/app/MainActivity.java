@@ -1,4 +1,4 @@
-package com.couplegame.app;
+package com.duoduels.app;
 
 import com.getcapacitor.BridgeActivity;
 

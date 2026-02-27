@@ -12,29 +12,29 @@ const config: CapacitorConfig = {
   plugins: {
     SplashScreen: {
       launchAutoHide: false,
-      backgroundColor: '#0f0c29',
+      backgroundColor: '#ffffff',
       showSpinner: false,
       androidSpinnerStyle: 'small',
       splashFullScreen: true,
       splashImmersive: true
     },
     Keyboard: {
-      resize: 'none',
-      resizeOnFullScreen: false
+      resize: 'body',
+      resizeOnFullScreen: true
     },
     StatusBar: {
       style: 'DARK',
-      backgroundColor: '#0f0c29'
+      backgroundColor: '#ffffff'
     }
   },
   ios: {
     contentInset: 'automatic',
     preferredContentMode: 'mobile',
     scheme: 'DuoDuels',
-    backgroundColor: '#0f0c29'
+    backgroundColor: '#ffffff'
   },
   android: {
-    backgroundColor: '#0f0c29'
+    backgroundColor: '#ffffff'
   }
 };
 

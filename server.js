@@ -737,6 +737,11 @@ io.on("connection", (socket) => {
       room.sayiTahminGuesses = {};
       room.sayiTahminCurrentTurn = null;
       room.sayiTahminRound = 1;
+      room.sayiTahminScores = {};
+      validPairs.forEach(pair => {
+        room.sayiTahminScores[pair.p1.id] = 0;
+        room.sayiTahminScores[pair.p2.id] = 0;
+      });
 
       io.to(roomId).emit("sayiTahminStart", {
         roundCount: room.roundCount,
@@ -1343,11 +1348,33 @@ io.on("connection", (socket) => {
       const p2Won = pending.p2.greens === dc;
 
       if (p1Won || p2Won) {
-        // İkisi de aynı anda bildiyse, daha az tahmin yapan kazanır
+        // İkisi de aynı anda ve aynı tahmin sayısıyla bildiyse → berabere, tur tekrar
+        if (p1Won && p2Won && pending.p1.guessCount === pending.p2.guessCount) {
+          const p1Secret = room.sayiTahminSecrets[pairKey][currentPair.p1.id];
+          const p2Secret = room.sayiTahminSecrets[pairKey][currentPair.p2.id];
+          io.to(roomId).emit("sayiTahminTie", {
+            p1Name: currentPair.p1.username,
+            p2Name: currentPair.p2.username,
+            p1Secret: p1Secret,
+            p2Secret: p2Secret,
+            guessCount: pending.p1.guessCount,
+            currentRound: room.currentRound,
+            pairId: pairKey,
+            teamName: currentPair.teamName,
+          });
+
+          // Tur tekrar - aynı pair için yeni secret phase başlat
+          setTimeout(() => {
+            startSayiTahminSecretPhase(roomId);
+          }, 3500);
+          return;
+        }
+
+        // Kazanan belirleme
         let winnerId, winnerName, loserName, winnerGuess, targetSecretForWinner, winnerGuessCount;
         if (p1Won && p2Won) {
-          // İkisi de doğru bildi - tahmin sayısına bak
-          if (pending.p1.guessCount <= pending.p2.guessCount) {
+          // İkisi de doğru bildi ama farklı tahmin sayısı - daha az yapan kazanır
+          if (pending.p1.guessCount < pending.p2.guessCount) {
             winnerId = currentPair.p1.id;
             winnerName = currentPair.p1.username;
             loserName = currentPair.p2.username;
@@ -1376,6 +1403,11 @@ io.on("connection", (socket) => {
           winnerGuess = pending.p2.guess;
           targetSecretForWinner = room.sayiTahminSecrets[pairKey][currentPair.p1.id];
           winnerGuessCount = pending.p2.guessCount;
+        }
+
+        // Kazananın skorunu artır
+        if (room.sayiTahminScores) {
+          room.sayiTahminScores[winnerId] = (room.sayiTahminScores[winnerId] || 0) + 1;
         }
 
         const winnerSecret = room.sayiTahminSecrets[pairKey][winnerId];
@@ -2452,13 +2484,23 @@ function nextSayiTahminStep(roomId) {
   room.currentRound++;
 
   if (room.currentRound > room.roundCount) {
-    // Game over
-    io.to(roomId).emit("sayiTahminGameOver", "Oyun bitti! 🏆");
+    // Game over - skorları hesapla
+    const scores = room.sayiTahminScores || {};
+    const scoreList = room.pairs.map(pair => ({
+      p1: { id: pair.p1.id, name: pair.p1.username, wins: scores[pair.p1.id] || 0 },
+      p2: { id: pair.p2.id, name: pair.p2.username, wins: scores[pair.p2.id] || 0 },
+      teamName: pair.teamName,
+    }));
+    io.to(roomId).emit("sayiTahminGameOver", {
+      message: "Oyun bitti! 🏆",
+      scores: scoreList,
+      roundCount: room.roundCount,
+    });
     room.gameStatus = "finished";
     setTimeout(() => {
       room.gameStatus = "waiting";
       emitBackToSelect(roomId);
-    }, 3500);
+    }, 5000);
     return;
   }
 

@@ -485,8 +485,51 @@ body.keyboard-open #lobby-screen.active {
 /* ======= BEKLEME EKRANI ======= */
 .waiting-header {
   text-align: center;
-  padding: 25px;
+  padding: 28px 24px 22px;
   margin-bottom: 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+}
+.wh-room-code {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.wh-label {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: rgba(255,255,255,0.45);
+  font-weight: 600;
+}
+.wh-code-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.wh-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+}
+.btn-back-subtle {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.4);
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 6px 16px;
+  transition: color 0.2s;
+  font-family: 'Poppins', sans-serif;
+}
+.btn-back-subtle:hover {
+  color: rgba(255,255,255,0.7);
 }
 .waiting-header h2 {
   color: #fff;
@@ -547,8 +590,12 @@ body.keyboard-open #lobby-screen.active {
 }
 .slots-container {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   gap: 8px;
+}
+.slots-container .slot {
+  flex: 1;
+  min-width: 0;
 }
 .slot {
   padding: 12px;
@@ -874,7 +921,8 @@ button:active {
 }
 .game-cards {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
+  grid-auto-rows: 1fr;
   gap: 12px;
 }
 .game-card {
@@ -894,19 +942,6 @@ button:active {
   justify-content: center;
   gap: 6px;
   min-height: 140px;
-}
-.game-card.card-animate-in {
-  animation: cardSlideIn 0.35s ease-out forwards;
-}
-@keyframes cardSlideIn {
-  from {
-    opacity: 0;
-    transform: translateY(18px) scale(0.92);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
 }
 .game-card:active {
   transform: scale(0.96);
@@ -1410,61 +1445,65 @@ button:active {
   background: var(--theme-gradient);
   color: #fff;
   box-shadow: 0 4px 15px var(--theme-glow);
-  animation: modeBtnPop 0.3s ease-out;
 }
-@keyframes modeBtnPop {
-  0% { transform: scale(0.92); }
-  60% { transform: scale(1.05); }
-  100% { transform: scale(1); }
-}
-/* ======= SAYI SEÇİCİ (Çift/Kişi Sayısı) ======= */
-.count-selector {
-  margin: 14px auto;
+/* Premium Player Count Selector */
+.player-count-wrapper {
+  margin: 14px auto 10px;
   text-align: center;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  background: linear-gradient(145deg, rgba(20, 18, 50, 0.7), rgba(10, 8, 35, 0.8));
-  border: 1.5px solid var(--theme-border);
-  border-radius: 14px;
-  padding: 12px 18px;
-  backdrop-filter: blur(10px);
-  -webkit-backdrop-filter: blur(10px);
+  max-width: 60%;
 }
-.count-label {
-  color: rgba(255, 255, 255, 0.85);
-  font-weight: 600;
-  font-size: 0.9rem;
-  white-space: nowrap;
+.player-count-label {
+  display: block;
+  color: #2d3436;
+  font-weight: 700;
+  font-size: 0.95rem;
+  margin-bottom: 8px;
+  letter-spacing: 0.3px;
 }
-.count-select {
-  padding: 8px 14px;
-  border-radius: 10px;
+.premium-select {
+  width: 100%;
+  padding: 10px 14px;
   border: 1.5px solid var(--theme-border);
-  font-size: 0.9rem;
-  background: linear-gradient(145deg, rgba(30, 28, 60, 0.9), rgba(20, 18, 45, 0.95));
-  color: #fff;
+  border-radius: 12px;
+  background: rgba(255,255,255,0.75);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  color: #2d3436;
+  font-size: 0.82rem;
   font-weight: 500;
+  font-family: 'Poppins', sans-serif;
   cursor: pointer;
-  transition: all 0.3s;
+  transition: all 0.25s cubic-bezier(.4,0,.2,1);
+  box-shadow: 0 2px 10px rgba(0,0,0,0.05);
   -webkit-appearance: none;
+  -moz-appearance: none;
   appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath fill='%23ffffff' d='M6 8L0 0h12z'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 12 8'%3E%3Cpath fill='%232d3436' d='M1.41 0L6 4.58 10.59 0 12 1.41l-6 6-6-6z'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 12px center;
   padding-right: 32px;
 }
-.count-select:focus {
+.premium-select:focus {
   outline: none;
   border-color: var(--theme-primary);
-  box-shadow: 0 0 12px var(--theme-glow);
+  box-shadow: 0 4px 20px var(--theme-glow);
 }
-.count-select option {
-  background: #1a1840;
-  color: #fff;
+/* Mode viewport / track slide system */
+.mode-viewport {
+  overflow: hidden;
+  position: relative;
+  width: 100%;
 }
-
+.mode-track {
+  display: flex;
+  width: 300%;
+  transition: transform 0.35s cubic-bezier(.4, 0, .2, 1);
+  will-change: transform;
+}
+.mode-panel {
+  width: calc(100% / 3);
+  flex-shrink: 0;
+}
 .game-card.disabled-card {
   opacity: 0.25;
   cursor: not-allowed;

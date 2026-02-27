@@ -34,6 +34,41 @@ const SERVER_URL = isLocalDev
     : 'https://duoduels.onrender.com';
 const socket = io(SERVER_URL);
 
+// --- ROUND TRANSITION TOAST ---
+function showRoundToast(roundNum) {
+  // Remove existing toast if any
+  const existing = document.getElementById('round-toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.id = 'round-toast';
+  toast.innerHTML = `<span style="font-size:1.3rem;margin-right:8px">⚡</span><span>${roundNum}. Tura Geçiliyor</span>`;
+  toast.style.cssText = `
+    position:fixed;bottom:-60px;left:50%;transform:translateX(-50%);z-index:99999;
+    background:var(--theme-gradient,linear-gradient(135deg,#3ABFBF,#4A90D9));
+    color:#fff;padding:12px 28px;border-radius:16px;
+    font-family:'Poppins',sans-serif;font-weight:700;font-size:1rem;
+    display:flex;align-items:center;gap:4px;
+    box-shadow:0 8px 32px rgba(0,0,0,0.3),0 0 20px var(--theme-glow,rgba(58,191,191,0.35));
+    border:1px solid rgba(255,255,255,0.15);
+    backdrop-filter:blur(12px);
+    transition:bottom 0.5s cubic-bezier(0.34,1.56,0.64,1);
+    white-space:nowrap;
+  `;
+  document.body.appendChild(toast);
+
+  // Animate in
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => { toast.style.bottom = '24px'; });
+  });
+
+  // Animate out after 2s
+  setTimeout(() => {
+    toast.style.bottom = '-60px';
+    setTimeout(() => toast.remove(), 500);
+  }, 2000);
+}
+
 function escapeHtml(str) {
   const div = document.createElement("div");
   div.textContent = str;
@@ -154,71 +189,17 @@ function createRoom() {
   selectMode("cift");
 }
 
+var _modeIndex = { cift: 0, duo: 1, tek: 2 };
+
 function selectMode(mode) {
   selectedMode = mode;
   document.getElementById("mode-btn-cift").classList.toggle("active", mode === "cift");
   document.getElementById("mode-btn-duo").classList.toggle("active", mode === "duo");
   document.getElementById("mode-btn-tek").classList.toggle("active", mode === "tek");
 
-  const telepati = document.getElementById("card-telepati");
-  const isimSehir = document.getElementById("card-isimSehir");
-  const ciftCount = document.getElementById("cift-count");
-  const tabu = document.getElementById("card-tabu");
-  const imposter = document.getElementById("card-imposter");
-  const pictionary = document.getElementById("card-pictionary");
-  const sayiTahmin = document.getElementById("card-sayiTahmin");
-  const tekCount = document.getElementById("tek-count");
-  const duoCount = document.getElementById("duo-count");
-
-  // Tüm kartları ve sayaçları gizle
-  telepati.style.display = "none";
-  isimSehir.style.display = "none";
-  tabu.style.display = "none";
-  pictionary.style.display = "none";
-  if (sayiTahmin) sayiTahmin.style.display = "none";
-  if (imposter) imposter.style.display = "none";
-  ciftCount.style.display = "none";
-  duoCount.style.display = "none";
-  tekCount.style.display = "none";
-
-  let visibleCards = [];
-
-  if (mode === "cift") {
-    // Çiftler modu: takımlar arası yarış (Sayı Tahmin hariç - o sadece duo)
-    telepati.style.display = "";
-    isimSehir.style.display = "";
-    tabu.style.display = "";
-    pictionary.style.display = "";
-    ciftCount.style.display = "";
-    visibleCards = [telepati, isimSehir, tabu, pictionary];
-  } else if (mode === "duo") {
-    // Başbaşa modu: tek çift kendi aralarında
-    telepati.style.display = "";
-    isimSehir.style.display = "";
-    pictionary.style.display = "";
-    if (sayiTahmin) sayiTahmin.style.display = "";
-    duoCount.style.display = "";
-    visibleCards = [telepati, isimSehir, pictionary, sayiTahmin].filter(Boolean);
-  } else if (mode === "tek") {
-    // Tek modu: herkes bireysel
-    pictionary.style.display = "";
-    if (imposter) {
-      imposter.style.display = "";
-      imposter.classList.remove("hidden");
-    }
-    tekCount.style.display = "";
-    visibleCards = [pictionary, imposter].filter(Boolean);
-  }
-
-  // Kademeli animasyon
-  visibleCards.forEach((card, i) => {
-    card.classList.remove("card-animate-in");
-    card.style.opacity = "0";
-    setTimeout(() => {
-      card.style.opacity = "";
-      card.classList.add("card-animate-in");
-    }, i * 80);
-  });
+  var track = document.getElementById("modeTrack");
+  var offset = (_modeIndex[mode] || 0) * (100 / 3);
+  track.style.transform = "translateX(-" + offset + "%)";
 }
 
 function selectGame(type) {
@@ -2366,6 +2347,11 @@ socket.on("sayiTahminSecretPhase", (data) => {
   const iamP2 = myPlayerId === data.p2.id;
   amIPlaying = iamP1 || iamP2;
 
+  // Tur geçiş bildirimi (ilk tur hariç)
+  if (data.currentRound > 1) {
+    showRoundToast(data.currentRound);
+  }
+
   document.getElementById("st-round-display").innerText = `Tur: ${data.currentRound} / ${data.totalRounds}`;
 
   const infoBar = document.getElementById("st-turn-info");
@@ -2429,11 +2415,8 @@ socket.on("secretSubmitted", () => {
 
 socket.on("partnerSecretSubmitted", () => {
   if (amIPlaying) {
-    const statusEl = document.getElementById("st-secret-status");
-    if (_stSecretSubmitted) {
-      statusEl.innerHTML = '✅ İkiniz de girdi! Oyun başlıyor...';
-    } else {
-      statusEl.innerHTML = '<div class="st-waiting-spinner"><span class="hourglass">⏳</span> Rakip girdi, seni bekliyor!</div>';
+    if (!_stSecretSubmitted) {
+      document.getElementById("st-secret-status").innerHTML = '<div class="st-waiting-spinner"><span class="hourglass">⏳</span> Rakip girdi, seni bekliyor!</div>';
     }
   }
 });
@@ -2583,6 +2566,35 @@ socket.on("sayiTahminNextRoundReady", () => {
   infoBar.style.background = "var(--theme-gradient)";
 });
 
+socket.on("sayiTahminTie", (data) => {
+  clearInterval(timerInterval);
+
+  Swal.fire({
+    title: `${data.currentRound}. Tur Tekrar Ediliyor!`,
+    html: `<div style="padding:15px 0 10px">
+      <div style="font-size:3rem;margin-bottom:10px">🤝</div>
+      <div style="font-size:0.95rem;color:rgba(255,255,255,0.7);margin-bottom:14px">İkisi de <b>${data.guessCount}</b> tahminde bildi!</div>
+      <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+        <div style="padding:10px 16px;background:rgba(243,156,18,0.15);border:1px solid rgba(243,156,18,0.3);border-radius:12px;flex:1;min-width:100px">
+          <span style="font-size:0.7rem;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px">${escapeHtml(data.p1Name)}</span>
+          <div style="font-size:1.5rem;font-weight:900;letter-spacing:6px;color:#f39c12;margin-top:4px;font-family:monospace">${data.p1Secret}</div>
+        </div>
+        <div style="padding:10px 16px;background:rgba(243,156,18,0.15);border:1px solid rgba(243,156,18,0.3);border-radius:12px;flex:1;min-width:100px">
+          <span style="font-size:0.7rem;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px">${escapeHtml(data.p2Name)}</span>
+          <div style="font-size:1.5rem;font-weight:900;letter-spacing:6px;color:#f39c12;margin-top:4px;font-family:monospace">${data.p2Secret}</div>
+        </div>
+      </div>
+    </div>`,
+    background: "linear-gradient(145deg, rgba(243,156,18,0.12), rgba(20,18,50,0.97))",
+    color: "#fff",
+    confirmButtonColor: "#f39c12",
+    confirmButtonText: "Devam",
+    timer: 3500,
+    timerProgressBar: true,
+    showClass: { popup: 'swal2-show animate__animated animate__zoomIn' },
+  });
+});
+
 socket.on("sayiTahminWin", (data) => {
   clearInterval(timerInterval);
   const iWon = data.winnerId === myPlayerId;
@@ -2592,30 +2604,86 @@ socket.on("sayiTahminWin", (data) => {
   }
 
   Swal.fire({
-    title: iWon ? "BİLDİN! 🎉" : `${data.winnerName} BİLDİ!`,
-    html: `<div style="font-size:1rem;margin:10px 0">
-      <strong>${escapeHtml(data.winnerName)}</strong> ${data.guessCount} tahminde bildi!
-    </div>
-    <div style="font-size:0.9rem;color:rgba(255,255,255,0.7)">
-      Gizli sayı: <strong>${data.targetSecret}</strong>
+    title: iWon ? "BİLDİN!" : `${data.winnerName} BİLDİ!`,
+    html: `<div style="position:relative;padding:20px 0 10px">
+      <div style="font-size:3.5rem;margin-bottom:12px;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.3))">${iWon ? '🏆' : '😤'}</div>
+      <div style="display:inline-block;background:${iWon ? 'linear-gradient(135deg,#27ae60,#2ecc71)' : 'linear-gradient(135deg,#e74c3c,#c0392b)'};padding:8px 20px;border-radius:30px;margin-bottom:14px">
+        <span style="font-size:1.1rem;font-weight:800;color:#fff;letter-spacing:0.5px">${escapeHtml(data.winnerName)}</span>
+        <span style="font-size:0.95rem;color:rgba(255,255,255,0.85);margin-left:6px">${data.guessCount} tahminde bildi!</span>
+      </div>
+      <div style="display:flex;gap:12px;justify-content:center;margin-top:10px;flex-wrap:wrap">
+        <div style="padding:10px 16px;background:rgba(39,174,96,0.15);border:1px solid rgba(39,174,96,0.3);border-radius:12px;flex:1;min-width:120px">
+          <span style="font-size:0.7rem;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px">${escapeHtml(data.winnerName)}</span>
+          <div style="font-size:1.6rem;font-weight:900;letter-spacing:6px;color:#2ecc71;margin-top:4px;font-family:monospace">${data.winnerSecret}</div>
+        </div>
+        <div style="padding:10px 16px;background:rgba(231,76,60,0.15);border:1px solid rgba(231,76,60,0.3);border-radius:12px;flex:1;min-width:120px">
+          <span style="font-size:0.7rem;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px">${escapeHtml(data.loserName)}</span>
+          <div style="font-size:1.6rem;font-weight:900;letter-spacing:6px;color:#e74c3c;margin-top:4px;font-family:monospace">${data.targetSecret}</div>
+        </div>
+      </div>
     </div>`,
-    background: "linear-gradient(135deg, #1a1a2e, #2d3436)",
+    background: iWon
+      ? "linear-gradient(145deg, rgba(39,174,96,0.15), rgba(20,18,50,0.97))"
+      : "linear-gradient(145deg, rgba(231,76,60,0.12), rgba(20,18,50,0.97))",
     color: "#fff",
     confirmButtonColor: iWon ? "#27ae60" : "#e74c3c",
     confirmButtonText: iWon ? "Harika! 💪" : "Tamam",
-    timer: 4500,
+    timer: 5000,
     timerProgressBar: true,
+    showClass: { popup: 'swal2-show animate__animated animate__zoomIn' },
   });
 });
 
-socket.on("sayiTahminGameOver", (msg) => {
-  Swal.fire({ title: "BİTTİ", text: msg });
+socket.on("sayiTahminGameOver", (data) => {
+  // Eski format uyumluluğu (string mesaj)
+  if (typeof data === 'string') {
+    Swal.fire({ title: "BİTTİ", text: data });
+    return;
+  }
+
+  let scoresHtml = '';
+  if (data.scores && data.scores.length > 0) {
+    data.scores.forEach(pair => {
+      const p1Won = pair.p1.wins > pair.p2.wins;
+      const p2Won = pair.p2.wins > pair.p1.wins;
+      const tie = pair.p1.wins === pair.p2.wins;
+
+      scoresHtml += `
+        <div style="display:flex;align-items:center;justify-content:center;gap:12px;margin:12px 0;padding:14px;background:rgba(255,255,255,0.05);border-radius:14px;border:1px solid rgba(255,255,255,0.08)">
+          <div style="flex:1;text-align:center">
+            <div style="font-size:0.75rem;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${escapeHtml(pair.p1.name)}</div>
+            <div style="font-size:2.2rem;font-weight:900;color:${p1Won ? '#2ecc71' : tie ? '#f39c12' : '#e74c3c'}">${pair.p1.wins}</div>
+          </div>
+          <div style="font-size:1.2rem;font-weight:800;color:rgba(255,255,255,0.3)">-</div>
+          <div style="flex:1;text-align:center">
+            <div style="font-size:0.75rem;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px;margin-bottom:4px">${escapeHtml(pair.p2.name)}</div>
+            <div style="font-size:2.2rem;font-weight:900;color:${p2Won ? '#2ecc71' : tie ? '#f39c12' : '#e74c3c'}">${pair.p2.wins}</div>
+          </div>
+        </div>`;
+    });
+  }
+
+  Swal.fire({
+    title: "OYUN BİTTİ! 🏆",
+    html: `<div style="padding:10px 0">
+      <div style="font-size:0.85rem;color:rgba(255,255,255,0.5);margin-bottom:8px">${data.roundCount} Tur Tamamlandı</div>
+      ${scoresHtml}
+    </div>`,
+    background: "linear-gradient(145deg, rgba(20, 18, 50, 0.97), rgba(10, 8, 35, 0.98))",
+    color: "#fff",
+    confirmButtonText: "Tamam",
+    showClass: { popup: 'swal2-show animate__animated animate__zoomIn' },
+  });
 });
 
 // --- SESSION RECOVERY ---
 (function() {
   const savedRoom = sessionStorage.getItem("duoduels_room");
-  if (savedRoom) {
-    currentRoom = savedRoom;
+  if (savedRoom && socket.connected) {
+    socket.emit("rejoinRoom", { roomId: savedRoom, playerId: myPlayerId });
+  } else if (savedRoom) {
+    socket.once("connect", () => {
+      socket.emit("rejoinRoom", { roomId: savedRoom, playerId: myPlayerId });
+    });
   }
 })();

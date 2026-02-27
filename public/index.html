@@ -19,10 +19,10 @@
       rel="stylesheet"
     />
 
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11" integrity="sha384-6W5GbmA1e/krqeMofQ3ghXcfiCAF0UOhB5fh5Hp6BenD1NBQq4BFtyz4nAfOrryB" crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js" integrity="sha384-HAH79XdRvHr6axVGh4xQWVCp14kcd32bNk4Xu0sHDHtFQ42n6BAM8ykvB47dGz6D" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
-    <link rel="stylesheet" href="style.css?v=33" />
+    <link rel="stylesheet" href="style.css?v=32" />
   </head>
   <body style="background-color:#f5f0e8;">
     <!-- Geometrik SVG Arkaplan -->
@@ -198,23 +198,25 @@
 
       <div id="waiting-screen" class="screen">
         <div class="waiting-header">
-          <h2>
-            Oda Kodu: <span id="displayRoomCode" class="highlight-code" onclick="copyRoomCode()" title="Kopyalamak için dokun"></span>
-            <span class="share-btn" onclick="shareWhatsApp()" title="WhatsApp ile paylaş"
-              >
-              <svg class="whatsapp-icon" viewBox="0 0 24 24" fill="#25D366" width="28" height="28">
-                <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-              </svg>
-            </span>
-          </h2>
-          <div id="host-controls" class="hidden">
-            <button class="btn-start" onclick="startGame()">
-              OYUNU BAŞLAT 🚀
-            </button>
+          <div class="wh-room-code">
+            <span class="wh-label">Oda Kodu</span>
+            <div class="wh-code-row">
+              <span id="displayRoomCode" class="highlight-code" onclick="copyRoomCode()" title="Kopyalamak için dokun"></span>
+              <span class="share-btn" onclick="shareWhatsApp()" title="WhatsApp ile paylaş">
+                <svg class="whatsapp-icon" viewBox="0 0 24 24" fill="#25D366" width="28" height="28">
+                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
+                </svg>
+              </span>
+            </div>
           </div>
-          <button class="btn-back" onclick="goToMainMenu()" style="margin-top:10px">Ana Menü</button>
-          <div id="member-message" class="hidden">
-            <p>Kurucunun oyunu başlatması bekleniyor...</p>
+          <div class="wh-actions">
+            <div id="host-controls" class="hidden">
+              <button class="btn-start" onclick="startGame()">OYUNU BAŞLAT 🚀</button>
+            </div>
+            <div id="member-message" class="hidden">
+              <p>Kurucunun oyunu başlatması bekleniyor...</p>
+            </div>
+            <button class="btn-back-subtle" onclick="goToMainMenu()">Ana Menü</button>
           </div>
         </div>
         <div id="teams-container" class="teams-grid"></div>
@@ -252,90 +254,104 @@
               Herkes Tek
             </button>
           </div>
-          <div id="cift-count" class="count-selector">
-            <label class="count-label">Çift Sayısı</label>
-            <select id="ciftCountSelect" class="count-select">
-              <option value="" disabled selected>Çift Sayısını Seçiniz</option>
-              <option value="2">2 Çift (4 Kişi)</option>
-              <option value="3">3 Çift (6 Kişi)</option>
-              <option value="4">4 Çift (8 Kişi)</option>
-              <option value="5">5 Çift (10 Kişi)</option>
-            </select>
-          </div>
-          <div id="duo-count" class="count-selector" style="display: none">
-            <label class="count-label">Çift Sayısı</label>
-            <select disabled class="count-select" style="opacity: 0.7">
-              <option selected>1 Çift (2 Kişi)</option>
-            </select>
-          </div>
-          <div id="tek-count" class="count-selector" style="display: none">
-            <label class="count-label">Kişi Sayısı</label>
-            <select id="tekCountSelect" class="count-select">
-              <option value="" disabled selected>Kişi Sayısını Seçiniz</option>
-              <option value="2">2 Kişi</option>
-              <option value="3">3 Kişi</option>
-              <option value="4">4 Kişi</option>
-              <option value="5">5 Kişi</option>
-              <option value="6">6 Kişi</option>
-              <option value="7">7 Kişi</option>
-              <option value="8">8 Kişi</option>
-              <option value="9">9 Kişi</option>
-              <option value="10">10 Kişi</option>
-            </select>
-          </div>
-          <div class="game-cards">
-            <div
-              class="game-card"
-              id="card-telepati"
-              onclick="selectGame('telepati')"
-            >
-              <div class="game-card-icon">🧠</div>
-              <h3>Telepati</h3>
-              <p>Aynı kelimeyi yazmaya çalışın!</p>
-            </div>
-            <div
-              class="game-card"
-              id="card-isimSehir"
-              onclick="selectGame('isimSehir')"
-            >
-              <div class="game-card-icon">🔤</div>
-              <h3>İsim Şehir</h3>
-              <p>Harf gelir, kategori gelir, eşleşin!</p>
-            </div>
-            <div
-              class="game-card"
-              id="card-pictionary"
-              onclick="selectGame('pictionary')"
-            >
-              <div class="game-card-icon">🎨</div>
-              <h3>Resim Çiz</h3>
-              <p>Çiz, tahmin et, puan topla!</p>
-            </div>
-            <div class="game-card" id="card-tabu" onclick="selectGame('tabu')">
-              <div class="game-card-icon">🚫</div>
-              <h3>Tabu</h3>
-              <p>Yasaklı kelime kullanmadan anlat!</p>
-              <span class="face-to-face-badge">Yüz yüze oynanır</span>
-            </div>
-            <div
-              class="game-card"
-              id="card-sayiTahmin"
-              onclick="selectGame('sayiTahmin')"
-              style="display:none"
-            >
-              <div class="game-card-icon">🔢</div>
-              <h3>Sayı Tahmin</h3>
-              <p>4 haneli sayıyı tahmin et!</p>
-            </div>
-            <div
-              class="game-card"
-              id="card-imposter"
-              onclick="selectGame('imposter')"
-              style="display:none"
-            >
-              <div class="game-card-icon">🕵️‍♂️</div>
-              <h3>Imposter</h3>
-              <p>Bir kişi impostor! Herkes ne yazdı gözükecek.</p>
+          <div class="mode-viewport">
+            <div class="mode-track" id="modeTrack">
+              <!-- Panel 0: Çiftler -->
+              <div class="mode-panel" id="panel-cift">
+                <div class="player-count-wrapper">
+                  <label class="player-count-label">Çift Sayısı</label>
+                  <select id="ciftCountSelect" class="premium-select">
+                    <option value="" disabled selected>Çift Sayısını Seçiniz</option>
+                    <option value="2">2 Çift (4 Kişi)</option>
+                    <option value="3">3 Çift (6 Kişi)</option>
+                    <option value="4">4 Çift (8 Kişi)</option>
+                    <option value="5">5 Çift (10 Kişi)</option>
+                  </select>
+                </div>
+                <div class="game-cards">
+                  <div class="game-card" id="card-telepati-cift" onclick="selectGame('telepati')">
+                    <div class="game-card-icon">🧠</div>
+                    <h3>Telepati</h3>
+                    <p>Aynı kelimeyi yazmaya çalışın!</p>
+                  </div>
+                  <div class="game-card" id="card-isimSehir-cift" onclick="selectGame('isimSehir')">
+                    <div class="game-card-icon">🔤</div>
+                    <h3>İsim Şehir</h3>
+                    <p>Harf gelir, kategori gelir, eşleşin!</p>
+                  </div>
+                  <div class="game-card" id="card-pictionary-cift" onclick="selectGame('pictionary')">
+                    <div class="game-card-icon">🎨</div>
+                    <h3>Resim Çiz</h3>
+                    <p>Çiz, tahmin et, puan topla!</p>
+                  </div>
+                  <div class="game-card" id="card-tabu" onclick="selectGame('tabu')">
+                    <div class="game-card-icon">🚫</div>
+                    <h3>Tabu</h3>
+                    <p>Yasaklı kelime kullanmadan anlat!</p>
+                  </div>
+                </div>
+              </div>
+              <!-- Panel 1: Başbaşa -->
+              <div class="mode-panel" id="panel-duo">
+                <div class="player-count-wrapper">
+                  <label class="player-count-label">Çift Sayısı</label>
+                  <select disabled class="premium-select" style="opacity:0.7">
+                    <option selected>1 Çift (2 Kişi)</option>
+                  </select>
+                </div>
+                <div class="game-cards">
+                  <div class="game-card" id="card-telepati-duo" onclick="selectGame('telepati')">
+                    <div class="game-card-icon">🧠</div>
+                    <h3>Telepati</h3>
+                    <p>Aynı kelimeyi yazmaya çalışın!</p>
+                  </div>
+                  <div class="game-card" id="card-isimSehir-duo" onclick="selectGame('isimSehir')">
+                    <div class="game-card-icon">🔤</div>
+                    <h3>İsim Şehir</h3>
+                    <p>Harf gelir, kategori gelir, eşleşin!</p>
+                  </div>
+                  <div class="game-card" id="card-pictionary-duo" onclick="selectGame('pictionary')">
+                    <div class="game-card-icon">🎨</div>
+                    <h3>Resim Çiz</h3>
+                    <p>Çiz, tahmin et, puan topla!</p>
+                  </div>
+                  <div class="game-card" id="card-sayiTahmin" onclick="selectGame('sayiTahmin')">
+                    <div class="game-card-icon">🔢</div>
+                    <h3>Sayı Tahmin</h3>
+                    <p>4 haneli sayıyı tahmin et!</p>
+                  </div>
+                </div>
+              </div>
+              <!-- Panel 2: Herkes Tek -->
+              <div class="mode-panel" id="panel-tek">
+                <div class="player-count-wrapper">
+                  <label class="player-count-label">Kişi Sayısı</label>
+                  <select id="tekCountSelect" class="premium-select">
+                    <option value="" disabled selected>Kişi Sayısını Seçiniz</option>
+                    <option value="2">2 Kişi</option>
+                    <option value="3">3 Kişi</option>
+                    <option value="4">4 Kişi</option>
+                    <option value="5">5 Kişi</option>
+                    <option value="6">6 Kişi</option>
+                    <option value="7">7 Kişi</option>
+                    <option value="8">8 Kişi</option>
+                    <option value="9">9 Kişi</option>
+                    <option value="10">10 Kişi</option>
+                  </select>
+                </div>
+                <div class="game-cards">
+                  <div class="game-card" id="card-pictionary-tek" onclick="selectGame('pictionary')">
+                    <div class="game-card-icon">🎨</div>
+                    <h3>Resim Çiz</h3>
+                    <p>Çiz, tahmin et, puan topla!</p>
+                  </div>
+                  <div class="game-card" id="card-imposter" onclick="selectGame('imposter')">
+                    <div class="game-card-icon">🕵️‍♂️</div>
+                    <h3>Imposter</h3>
+                    <p>Bir kişi impostor! Herkes ne yazdı gözükecek.</p>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           <div id="select-players-container" class="select-players-container hidden">
@@ -882,7 +898,7 @@
       </div>
     </div>
     <script src="socket.io.min.js"></script>
-    <script src="client.js?v=33"></script>
+    <script src="client.js?v=32"></script>
     <script>
       // Capacitor plugin'lerini başlat (native ortamda)
       if (window.Capacitor && window.Capacitor.isNativePlatform()) {
