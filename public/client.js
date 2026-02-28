@@ -27,11 +27,12 @@ Swal.fire = function(opts) {
 // Tüm ortamlarda sunucuya bağlan
 const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
 const isLocalDev = !isNative && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const PRODUCTION_URL = 'https://duoduels-599689373205.europe-west1.run.app';
 const SERVER_URL = isLocalDev
   ? window.location.origin
   : (window.location.hostname === 'duoduels.com' || window.location.hostname === 'www.duoduels.com' || window.location.hostname.endsWith('.run.app'))
     ? window.location.origin
-    : 'https://duoduels.onrender.com';
+    : PRODUCTION_URL;
 const socket = io(SERVER_URL);
 
 // --- ROUND TRANSITION TOAST ---
@@ -258,6 +259,7 @@ function selectGame(type) {
     tabu: "Tabu",
     imposter: "Imposter",
     sayiTahmin: "Sayı Tahmin",
+    kelimeZinciri: "Kelime Zinciri",
   };
   document.getElementById("settings-game-title").innerText =
     names[type] + " - Ayarlar";
@@ -284,6 +286,9 @@ function selectGame(type) {
     timeInput.value = 60;
     // Basamak sayısı seçicisini göster
     document.getElementById("digitCountRow").style.display = "";
+  } else if (type === "kelimeZinciri") {
+    timeLabel.style.display = "";
+    timeInput.value = 10;
   } else {
     timeLabel.style.display = "";
     timeInput.value = 10;
@@ -1990,12 +1995,13 @@ const screens = {
   tabu: document.getElementById("tabu-screen"),
   imposter: document.getElementById("imposter-screen"),
   sayiTahmin: document.getElementById("sayiTahmin-screen"),
+  kelimeZinciri: document.getElementById("kelimeZinciri-screen"),
 };
 function showScreen(name) {
   Object.values(screens).forEach((s) => s.classList.remove("active"));
   screens[name].classList.add("active");
   // Oyun ekranlarında header'ı gizle (mobil yer kazanımı)
-  const gameScreens = ["game", "isimSehir", "pictionary", "tabu", "imposter", "sayiTahmin"];
+  const gameScreens = ["game", "isimSehir", "pictionary", "tabu", "imposter", "sayiTahmin", "kelimeZinciri"];
   if (gameScreens.includes(name)) {
     document.body.classList.add("game-active");
   } else {
@@ -2687,3 +2693,184 @@ socket.on("sayiTahminGameOver", (data) => {
     });
   }
 })();
+
+// ===================== KELİME ZİNCİRİ =====================
+var kzTimerInterval = null;
+
+function sendKzWord() {
+  var inp = document.getElementById("kzWordInput");
+  var val = inp.value.trim();
+  if (!val) return;
+  inp.value = "";
+  socket.emit("kzSubmitWord", { roomId: currentRoomId, word: val });
+}
+
+function kzStartTimer(seconds) {
+  if (kzTimerInterval) clearInterval(kzTimerInterval);
+  var bar = document.getElementById("kz-timer-bar");
+  var timerEl = document.getElementById("kz-timer");
+  timerEl.classList.remove("hidden");
+  var remaining = seconds * 1000;
+  var total = seconds * 1000;
+  bar.style.width = "100%";
+  bar.classList.remove("kz-timer-danger");
+
+  kzTimerInterval = setInterval(function () {
+    remaining -= 100;
+    if (remaining <= 0) {
+      clearInterval(kzTimerInterval);
+      bar.style.width = "0%";
+      return;
+    }
+    var pct = (remaining / total) * 100;
+    bar.style.width = pct + "%";
+    if (pct < 30) bar.classList.add("kz-timer-danger");
+  }, 100);
+}
+
+function kzRenderPlayers(players, currentPlayerId) {
+  var list = document.getElementById("kz-players-list");
+  list.innerHTML = "";
+  players.forEach(function (p) {
+    var div = document.createElement("div");
+    div.className = "kz-player-item" + (p.eliminated ? " kz-eliminated" : "") + (p.id === currentPlayerId ? " kz-active-player" : "");
+    var hearts = "";
+    for (var i = 0; i < 3; i++) {
+      hearts += i < p.lives ? '<span class="kz-heart">❤️</span>' : '<span class="kz-heart kz-heart-empty">🖤</span>';
+    }
+    div.innerHTML = '<span class="kz-player-name">' + p.username + '</span><span class="kz-player-hearts">' + hearts + "</span>";
+    list.appendChild(div);
+  });
+}
+
+function kzAddWordToChain(word) {
+  var container = document.getElementById("kz-chain-words");
+  var span = document.createElement("span");
+  span.className = "kz-chain-word";
+  // Vurgula son harf
+  var lastChar = word.charAt(word.length - 1);
+  span.innerHTML = word.slice(0, -1) + '<span class="kz-highlight-char">' + lastChar + "</span>";
+  if (container.children.length > 0) {
+    var arrow = document.createElement("span");
+    arrow.className = "kz-chain-arrow";
+    arrow.textContent = " → ";
+    container.appendChild(arrow);
+  }
+  container.appendChild(span);
+  container.scrollTop = container.scrollHeight;
+}
+
+// Socket events
+socket.on("kzStart", function (data) {
+  window._currentGameType = "kelimeZinciri";
+  showScreen("kelimeZinciri");
+  document.getElementById("kz-turn-info").innerText = "Kelime Zinciri Başlıyor...";
+  document.getElementById("kz-chain-words").innerHTML = "";
+  document.getElementById("kz-last-word-area").classList.add("hidden");
+  document.getElementById("kz-first-word-hint").classList.remove("hidden");
+  kzRenderPlayers(data.players, null);
+});
+
+socket.on("kzTurn", function (data) {
+  var isMyTurn = data.currentPlayerId === myPlayerId;
+  var inputArea = document.getElementById("kz-input-area");
+  var turnInfo = document.getElementById("kz-turn-info");
+
+  if (isMyTurn) {
+    turnInfo.innerText = "Senin sıran! 🎯";
+    turnInfo.style.background = "linear-gradient(135deg, #00b894, #00cec9)";
+    inputArea.classList.remove("hidden");
+    document.getElementById("kzWordInput").value = "";
+    document.getElementById("kzWordInput").focus();
+  } else {
+    turnInfo.innerText = data.currentPlayerName + " yazıyor...";
+    turnInfo.style.background = "linear-gradient(135deg, #6c5ce7, #a29bfe)";
+    inputArea.classList.add("hidden");
+  }
+
+  if (data.lastWord) {
+    document.getElementById("kz-last-word-area").classList.remove("hidden");
+    document.getElementById("kz-first-word-hint").classList.add("hidden");
+    var lastWordEl = document.getElementById("kz-last-word");
+    var lw = data.lastWord;
+    lastWordEl.innerHTML = lw.slice(0, -1) + '<span class="kz-highlight-char">' + lw.charAt(lw.length - 1) + "</span>";
+    document.getElementById("kz-required-char").textContent = data.lastChar;
+  } else {
+    document.getElementById("kz-last-word-area").classList.add("hidden");
+    document.getElementById("kz-first-word-hint").classList.remove("hidden");
+  }
+
+  kzRenderPlayers(data.players, data.currentPlayerId);
+  kzStartTimer(data.turnTime);
+});
+
+socket.on("kzWordAccepted", function (data) {
+  kzAddWordToChain(data.word);
+  if (kzTimerInterval) clearInterval(kzTimerInterval);
+});
+
+socket.on("kzWrongWord", function (data) {
+  if (kzTimerInterval) clearInterval(kzTimerInterval);
+  Swal.fire({
+    html: '<div style="font-size:2.5rem;margin-bottom:8px">❌</div><div style="font-size:1rem;font-weight:700;color:#fff">' + data.playerName + "</div><div style='font-size:0.85rem;color:rgba(255,255,255,0.7)'>" + data.reason + " (-1 ❤️)</div>",
+    background: "linear-gradient(135deg, #1a1a2e, #2d3436)",
+    color: "#fff",
+    showConfirmButton: false,
+    timer: 1500,
+  });
+});
+
+socket.on("kzPlayerEliminated", function (data) {
+  if (kzTimerInterval) clearInterval(kzTimerInterval);
+  Swal.fire({
+    html: '<div style="font-size:2.5rem;margin-bottom:8px">💀</div><div style="font-size:1.1rem;font-weight:700;color:#fff">' + data.playerName + " elendi!</div><div style='font-size:0.85rem;color:rgba(255,255,255,0.7)'>" + data.reason + "</div>",
+    background: "linear-gradient(135deg, #1a1a2e, #e74c3c)",
+    color: "#fff",
+    showConfirmButton: false,
+    timer: 2000,
+  });
+});
+
+socket.on("kzGameOver", function (data) {
+  if (kzTimerInterval) clearInterval(kzTimerInterval);
+  document.getElementById("kz-input-area").classList.add("hidden");
+  document.getElementById("kz-timer").classList.add("hidden");
+
+  var resultsHtml = '<div style="font-size:3rem;margin-bottom:10px">🏆</div>';
+  if (data.winner) {
+    resultsHtml += '<div style="font-size:1.3rem;font-weight:800;color:#ffd700;margin-bottom:12px">' + data.winner + " kazandı!</div>";
+  }
+  resultsHtml += '<div style="font-size:0.8rem;color:rgba(255,255,255,0.6);margin-bottom:10px">Toplam ' + data.totalWords + " kelime söylendi</div>";
+  resultsHtml += '<div style="text-align:left;max-width:220px;margin:0 auto">';
+  data.results.forEach(function (r) {
+    var medal = r.rank === 1 ? "🥇" : r.rank === 2 ? "🥈" : r.rank === 3 ? "🥉" : r.rank + ".";
+    var hearts = "";
+    for (var i = 0; i < r.lives; i++) hearts += "❤️";
+    resultsHtml += '<div style="font-size:0.9rem;margin:4px 0;color:#fff">' + medal + " " + r.username + " " + hearts + "</div>";
+  });
+  resultsHtml += "</div>";
+
+  Swal.fire({
+    html: resultsHtml,
+    background: "linear-gradient(135deg, #1a1a2e, #2d3436)",
+    color: "#fff",
+    showConfirmButton: true,
+    confirmButtonText: "Harika! 🎉",
+    confirmButtonColor: "#00b894",
+  });
+
+  if (data.winner && typeof confetti === "function") {
+    confetti({ particleCount: 150, spread: 80, origin: { y: 0.6 } });
+  }
+
+  document.getElementById("kz-turn-info").innerText = "Oyun Bitti!";
+  document.getElementById("kz-turn-info").style.background = "linear-gradient(135deg, #636e72, #2d3436)";
+});
+
+// Enter tuşu ile gönder
+document.addEventListener("keydown", function (e) {
+  if (e.key === "Enter" && document.activeElement && document.activeElement.id === "kzWordInput") {
+    e.preventDefault();
+    sendKzWord();
+  }
+});

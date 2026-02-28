@@ -54,7 +54,7 @@ app.use((req, res, next) => {
 app.use(express.static(path.join(__dirname, "public")));
 
 // --- Input Validation Helpers ---
-const VALID_GAME_TYPES = ['telepati', 'isimSehir', 'pictionary', 'tabu', 'sayiTahmin', 'imposter'];
+const VALID_GAME_TYPES = ['telepati', 'isimSehir', 'pictionary', 'tabu', 'sayiTahmin', 'imposter', 'kelimeZinciri'];
 const VALID_GENDERS = ['male', 'female'];
 const VALID_GAME_MODES = ['cift', 'duo', 'tek'];
 
@@ -630,10 +630,43 @@ io.on("connection", (socket) => {
       return;
     }
 
+    // --- KELİME ZİNCİRİ OYUNU ---
+    if (room.gameType === "kelimeZinciri") {
+      if (room.gameMode !== "tek") {
+        socket.emit("gameError", "Kelime Zinciri sadece tek modda oynanabilir!");
+        return;
+      }
+      if (!room.players || room.players.length < 2) {
+        socket.emit("gameError", "En az 2 oyuncu gerekli!");
+        return;
+      }
+      room.gameStatus = "playing";
+      room.soloPlayers = [...room.players];
+      room.kzCurrentIndex = 0;
+      room.kzLives = {};
+      room.kzUsedWords = [];
+      room.kzLastWord = null;
+      room.kzAlivePlayers = [...room.players];
+      room.kzTurnTimer = null;
+      room.soloPlayers.forEach((p) => {
+        room.kzLives[p.id] = 3;
+      });
+
+      const playerList = room.soloPlayers.map((p) => ({
+        id: p.id,
+        username: p.username,
+        lives: 3,
+      }));
+
+      io.to(roomId).emit("kzStart", { players: playerList });
+      setTimeout(() => startKelimeZinciriTurn(roomId), 2000);
+      return;
+    }
+
     // TEK MOD
     if (room.gameMode === "tek") {
-      if (room.gameType !== "pictionary") {
-        socket.emit("gameError", "Tek modda sadece Resim Çiz oynanabilir!");
+      if (room.gameType !== "pictionary" && room.gameType !== "kelimeZinciri") {
+        socket.emit("gameError", "Tek modda bu oyun oynanabilir değil!");
         return;
       }
       if (room.players.length < 2) {
@@ -1207,6 +1240,59 @@ io.on("connection", (socket) => {
     if (Object.keys(room.imposterVotes).length >= room.players.length) {
       endImposterVoting(roomId);
     }
+  });
+
+  // --- KELİME ZİNCİRİ: KELİME GÖNDERME ---
+  socket.on("kzSubmitWord", ({ roomId, word }) => {
+    const room = rooms[roomId];
+    if (!room || room.gameStatus !== "playing" || room.gameType !== "kelimeZinciri") return;
+
+    const pid = playerId || socket.id;
+    const currentPlayer = room.kzAlivePlayers[room.kzCurrentIndex];
+    if (!currentPlayer || currentPlayer.id !== pid) return;
+
+    // Timer'ı temizle
+    if (room.kzTurnTimer) clearTimeout(room.kzTurnTimer);
+
+    const cleanWord = String(word).trim().toUpperCase();
+    const validation = kzValidateWord(cleanWord, room);
+
+    if (!validation.valid) {
+      room.kzLives[pid]--;
+      const lives = room.kzLives[pid];
+
+      if (lives <= 0) {
+        io.to(roomId).emit("kzPlayerEliminated", {
+          playerId: pid,
+          playerName: currentPlayer.username,
+          reason: validation.reason,
+        });
+      } else {
+        io.to(roomId).emit("kzWrongWord", {
+          playerId: pid,
+          playerName: currentPlayer.username,
+          reason: validation.reason,
+          livesLeft: lives,
+        });
+      }
+
+      room.kzCurrentIndex++;
+      setTimeout(() => startKelimeZinciriTurn(roomId), 1500);
+      return;
+    }
+
+    // Kelime geçerli
+    room.kzUsedWords.push(cleanWord);
+    room.kzLastWord = cleanWord;
+
+    io.to(roomId).emit("kzWordAccepted", {
+      playerId: pid,
+      playerName: currentPlayer.username,
+      word: cleanWord,
+    });
+
+    room.kzCurrentIndex++;
+    setTimeout(() => startKelimeZinciriTurn(roomId), 1200);
   });
 
   // --- SAYI TAHMİN: GİZLİ SAYI GÖNDERME ---
@@ -2608,6 +2694,140 @@ function emitLobbyUpdate(roomId) {
     spectators: room.spectators,
     hostId: hostId,
   });
+}
+
+// ===================== KELİME ZİNCİRİ =====================
+
+function startKelimeZinciriTurn(roomId) {
+  const room = rooms[roomId];
+  if (!room || room.gameStatus !== "playing") return;
+
+  // Hayatta kalan oyuncuları filtrele
+  room.kzAlivePlayers = room.soloPlayers.filter((p) => room.kzLives[p.id] > 0);
+
+  // Oyun bitti mi?
+  if (room.kzAlivePlayers.length <= 1) {
+    endKelimeZinciri(roomId);
+    return;
+  }
+
+  // Sıradaki hayatta olan oyuncuyu bul
+  room.kzCurrentIndex = room.kzCurrentIndex % room.kzAlivePlayers.length;
+  const currentPlayer = room.kzAlivePlayers[room.kzCurrentIndex];
+
+  const lastChar = room.kzLastWord
+    ? room.kzLastWord.charAt(room.kzLastWord.length - 1).toUpperCase()
+    : null;
+
+  const playerList = room.soloPlayers.map((p) => ({
+    id: p.id,
+    username: p.username,
+    lives: room.kzLives[p.id],
+    eliminated: room.kzLives[p.id] <= 0,
+  }));
+
+  io.to(roomId).emit("kzTurn", {
+    currentPlayerId: currentPlayer.id,
+    currentPlayerName: currentPlayer.username,
+    lastWord: room.kzLastWord,
+    lastChar: lastChar,
+    usedWords: room.kzUsedWords,
+    players: playerList,
+    turnTime: room.roundTime || 10,
+  });
+
+  // Süre timer (kullanıcı seçimine göre)
+  const turnMs = (room.roundTime || 10) * 1000;
+  if (room.kzTurnTimer) clearTimeout(room.kzTurnTimer);
+  room.kzTurnTimer = setTimeout(() => {
+    kzHandleTimeout(roomId);
+  }, turnMs + 500);
+}
+
+function kzHandleTimeout(roomId) {
+  const room = rooms[roomId];
+  if (!room || room.gameStatus !== "playing") return;
+
+  const currentPlayer = room.kzAlivePlayers[room.kzCurrentIndex];
+  if (!currentPlayer) return;
+
+  room.kzLives[currentPlayer.id]--;
+  const lives = room.kzLives[currentPlayer.id];
+
+  if (lives <= 0) {
+    io.to(roomId).emit("kzPlayerEliminated", {
+      playerId: currentPlayer.id,
+      playerName: currentPlayer.username,
+      reason: "Süre doldu!",
+    });
+  } else {
+    io.to(roomId).emit("kzWrongWord", {
+      playerId: currentPlayer.id,
+      playerName: currentPlayer.username,
+      reason: "Süre doldu!",
+      livesLeft: lives,
+    });
+  }
+
+  room.kzCurrentIndex++;
+  setTimeout(() => startKelimeZinciriTurn(roomId), 1500);
+}
+
+function kzValidateWord(word, room) {
+  if (!word || word.length < 2) return { valid: false, reason: "Kelime en az 2 harf olmalı!" };
+
+  const upper = word.toUpperCase().trim();
+
+  // Tekrar kontrolü
+  if (room.kzUsedWords.includes(upper)) {
+    return { valid: false, reason: "Bu kelime daha önce söylendi!" };
+  }
+
+  // Son harf kontrolü
+  if (room.kzLastWord) {
+    const lastChar = room.kzLastWord.charAt(room.kzLastWord.length - 1).toUpperCase();
+    if (upper.charAt(0) !== lastChar) {
+      return { valid: false, reason: `Kelime "${lastChar}" harfiyle başlamalı!` };
+    }
+  }
+
+  return { valid: true };
+}
+
+function endKelimeZinciri(roomId) {
+  const room = rooms[roomId];
+  if (!room) return;
+
+  if (room.kzTurnTimer) clearTimeout(room.kzTurnTimer);
+
+  room.kzAlivePlayers = room.soloPlayers.filter((p) => room.kzLives[p.id] > 0);
+  const winner = room.kzAlivePlayers.length === 1 ? room.kzAlivePlayers[0] : null;
+
+  // Sıralama: hayatta kalanlar önce, sonra elenenler (kalan cana göre)
+  const sorted = [...room.soloPlayers].sort((a, b) => {
+    const aLives = room.kzLives[a.id];
+    const bLives = room.kzLives[b.id];
+    if (aLives > 0 && bLives <= 0) return -1;
+    if (aLives <= 0 && bLives > 0) return 1;
+    return bLives - aLives;
+  });
+
+  const results = sorted.map((p, i) => ({
+    rank: i + 1,
+    username: p.username,
+    lives: room.kzLives[p.id],
+  }));
+
+  io.to(roomId).emit("kzGameOver", {
+    winner: winner ? winner.username : null,
+    results: results,
+    totalWords: room.kzUsedWords.length,
+  });
+
+  room.gameStatus = "waiting";
+  setTimeout(() => {
+    io.to(roomId).emit("goBackToWaiting");
+  }, 8000);
 }
 
 const PORT = process.env.PORT || 3000;

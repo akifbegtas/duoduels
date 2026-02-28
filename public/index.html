@@ -350,6 +350,11 @@
                     <h3>Imposter</h3>
                     <p>Bir kişi impostor! Herkes ne yazdı gözükecek.</p>
                   </div>
+                  <div class="game-card" id="card-kelimeZinciri" onclick="selectGame('kelimeZinciri')">
+                    <div class="game-card-icon">🔗</div>
+                    <h3>Kelime Zinciri</h3>
+                    <p>Son harfle başla, zinciri kırma!</p>
+                  </div>
                 </div>
               </div>
             </div>
@@ -896,9 +901,42 @@
           <div id="imposter-game-log" class="log-container"></div>
         </div>
       </div>
+      <!-- KELİME ZİNCİRİ EKRANI -->
+      <div id="kelimeZinciri-screen" class="screen">
+        <div id="kz-turn-info" class="turn-info">Kelime Zinciri Başlıyor...</div>
+
+        <div id="kz-last-word-area" class="kz-last-word-area hidden">
+          <div class="kz-last-word-label">Son Kelime</div>
+          <div id="kz-last-word" class="kz-last-word"></div>
+          <div class="kz-arrow-hint">
+            <span id="kz-required-char" class="kz-required-char"></span> ile başlayan bir kelime yaz
+          </div>
+        </div>
+
+        <div id="kz-first-word-hint" class="kz-first-word-hint">
+          İlk kelimeyi sen belirle! Herhangi bir kelime yazabilirsin.
+        </div>
+
+        <div id="kz-input-area" class="kz-input-area hidden">
+          <input type="text" id="kzWordInput" class="kz-word-input" placeholder="Kelime yaz..." autocomplete="off" autocapitalize="characters" />
+          <button id="kzSendBtn" class="kz-send-btn" onclick="sendKzWord()">GÖNDER</button>
+        </div>
+
+        <div id="kz-timer" class="kz-timer hidden">
+          <div id="kz-timer-bar" class="kz-timer-bar"></div>
+        </div>
+
+        <div id="kz-players-list" class="kz-players-list"></div>
+
+        <div id="kz-word-chain" class="kz-word-chain">
+          <div class="kz-chain-title">Kelime Zinciri</div>
+          <div id="kz-chain-words" class="kz-chain-words"></div>
+        </div>
+      </div>
+
     </div>
     <script src="socket.io.min.js"></script>
-    <script src="client.js?v=32"></script>
+    <script src="client.js?v=33"></script>
     <script>
       // Capacitor plugin'lerini başlat (native ortamda)
       if (window.Capacitor && window.Capacitor.isNativePlatform()) {
