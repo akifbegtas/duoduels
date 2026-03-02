@@ -104,7 +104,8 @@ const rooms = {};
 const playerSockets = {}; // playerId -> socketId
 
 function getSocketId(playerId) {
-  return playerSockets[playerId] || playerId;
+  // Return mapped socket ID, or a non-existent room name to silently drop
+  return playerSockets[playerId] || "__disconnected__";
 }
 const TURKISH_LETTERS = [
   "A",
@@ -502,6 +503,7 @@ io.on("connection", (socket) => {
       currentRound: 1,
       pairs: [],
       moves: {},
+      telepatiTimer: null,
       soloPlayers: [],
       currentDrawerIndex: 0,
       // Pictionary specific
@@ -516,6 +518,7 @@ io.on("connection", (socket) => {
       categoryIndex: 0,
       isimSehirScores: {},
       usedLetters: [],
+      isimSehirTimer: null,
       // Tabu specific
       tabuScores: {},
       tabuUsedWords: [],
@@ -531,6 +534,8 @@ io.on("connection", (socket) => {
       sayiTahminCurrentTurn: null, // p1 or p2
       sayiTahminRound: 1,
       sayiTahminDigitCount: Math.min(Math.max(parseInt(data.digitCount) || 4, 3), 6),
+      sayiTahminTimer: null,
+      sayiTahminTieCount: 0,
     };
 
     console.log(
@@ -577,6 +582,7 @@ io.on("connection", (socket) => {
     const playerIndex = room.spectators.findIndex((p) => p.id === pid);
     if (playerIndex !== -1) {
       const player = room.spectators[playerIndex];
+      if (!Number.isInteger(teamIndex) || teamIndex < 0 || teamIndex >= room.teams.length) return;
       const targetTeam = room.teams[teamIndex];
       if (slot === "p1" && targetTeam.p1 === null) {
         targetTeam.p1 = player;
@@ -620,6 +626,8 @@ io.on("connection", (socket) => {
       room.imposterSubmissions2 = {};
       room.imposterVotes = {};
       room.imposterPhase = null;
+      room.imposterScores = {};
+      room.players.forEach(p => { room.imposterScores[p.id] = 0; });
 
       io.to(roomId).emit("imposterStart", {
         roundCount: room.roundCount,
@@ -781,6 +789,9 @@ io.on("connection", (socket) => {
       return;
     if (!room.moves[currentPair.id]) room.moves[currentPair.id] = {};
 
+    // Duplicate submission guard - player already submitted this turn
+    if (room.moves[currentPair.id][pid] !== undefined) return;
+
     let cleanWord = sanitizeString(word, 30).toLocaleUpperCase("tr-TR") || "⏰";
     if (cleanWord === "") cleanWord = "⏰";
 
@@ -797,6 +808,8 @@ io.on("connection", (socket) => {
     const w2 = room.moves[currentPair.id][currentPair.p2.id];
 
     if (w1 !== undefined && w2 !== undefined) {
+      // Clear server-side timeout
+      if (room.telepatiTimer) { clearTimeout(room.telepatiTimer); room.telepatiTimer = null; }
       currentPair.currentTurnAttempts++;
       const isMatch = w1 === w2 && w1 !== "⏰";
 
@@ -817,7 +830,38 @@ io.on("connection", (socket) => {
         currentPair.isEliminated = true;
         io.to(roomId).emit("spectatorUpdate", result);
         io.to(roomId).emit("gameOver", `${currentPair.teamName} ELENDİ! 💀`);
-        setTimeout(() => nextTurn(roomId), 2000);
+        // Check if game is already over before scheduling nextTurn
+        const alive = room.pairs.filter((p) => !p.isEliminated);
+        if (alive.length > 1) {
+          setTimeout(() => nextTurn(roomId), 2000);
+        } else if (alive.length === 1) {
+          const winner = alive[0];
+          const winnerIds = [winner.p1.id, winner.p2.id];
+          setTimeout(() => {
+            io.to(roomId).emit("telepatiGameOver", {
+              winnerTeam: winner.teamName,
+              winnerP1: winner.p1.username,
+              winnerP2: winner.p2.username,
+              winnerIds: winnerIds,
+              winnerScore: winner.totalAttempts,
+              lastStanding: true,
+            });
+            room.gameStatus = "finished";
+            setTimeout(() => {
+              room.gameStatus = "waiting";
+              emitBackToSelect(roomId);
+            }, 7000);
+          }, 2000);
+        } else {
+          setTimeout(() => {
+            io.to(roomId).emit("gameOver", "Herkes Elendi! 💀");
+            room.gameStatus = "finished";
+            setTimeout(() => {
+              room.gameStatus = "waiting";
+              emitBackToSelect(roomId);
+            }, 5000);
+          }, 2000);
+        }
         return;
       }
 
@@ -858,11 +902,15 @@ io.on("connection", (socket) => {
     const who = pid === currentPair.p1.id ? "P1" : "P2";
     console.log(`[IS] ${who} submitted:`, answers);
 
+    // Duplicate submission guard
+    const firstKey = currentPair.id + "_" + CATEGORIES[0];
+    if (room.moves[firstKey] && room.moves[firstKey][pid] !== undefined) return;
+
     // Her kategori için cevabı kaydet
     CATEGORIES.forEach((cat) => {
       const moveKey = currentPair.id + "_" + cat;
       if (!room.moves[moveKey]) room.moves[moveKey] = {};
-      let cleanWord = answers[cat] ? answers[cat].trim().toLocaleUpperCase("tr-TR") : "⏰";
+      let cleanWord = answers[cat] ? sanitizeString(answers[cat], 30).toLocaleUpperCase("tr-TR") : "⏰";
       if (cleanWord === "") cleanWord = "⏰";
       room.moves[moveKey][pid] = cleanWord;
     });
@@ -878,6 +926,9 @@ io.on("connection", (socket) => {
     console.log(`[IS] Check both submitted: w1=${w1}, w2=${w2}`);
 
     if (w1 !== undefined && w2 !== undefined) {
+      // Clear server-side timeout since both submitted
+      if (room.isimSehirTimer) { clearTimeout(room.isimSehirTimer); room.isimSehirTimer = null; }
+
       // Tüm kategorileri karşılaştır
       const allResults = [];
       let matchCount = 0;
@@ -1017,7 +1068,7 @@ io.on("connection", (socket) => {
         room.pictionaryGuessOrder.push(pair.id);
         const order = room.pictionaryGuessOrder.length;
         const pairCount = room.pairs.length;
-        const points = pairCount - order;
+        const points = pairCount - order + 1;
 
         room.pictionaryScores[pair.id] =
           (room.pictionaryScores[pair.id] || 0) + points;
@@ -1068,7 +1119,12 @@ io.on("connection", (socket) => {
 
     let usedForbidden = null;
     for (const fw of allForbidden) {
-      if (clueUpper.includes(fw)) {
+      // Use word boundary matching to prevent false positives
+      // e.g., "TOP" should not match "OTOPARKA"
+      const escaped = fw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const regex = new RegExp(`(^|\\s|[^A-ZÇĞIİÖŞÜa-zçğıiöşü])${escaped}($|\\s|[^A-ZÇĞIİÖŞÜa-zçğıiöşü])`, 'i');
+      // Also check exact match (whole clue is the forbidden word)
+      if (clueUpper === fw || regex.test(clueUpper)) {
         usedForbidden = fw;
         break;
       }
@@ -1196,6 +1252,8 @@ io.on("connection", (socket) => {
     if (!player) return;
     if (room.imposterVotes[pid]) return;
     if (pid === votedPlayerId) return;
+    // Validate voted player exists in room
+    if (!room.players.some(p => p.id === votedPlayerId)) return;
 
     room.imposterVotes[pid] = votedPlayerId;
 
@@ -1227,6 +1285,12 @@ io.on("connection", (socket) => {
       socket.emit("sayiTahminError", `${dc} haneli bir sayı girin!`);
       return;
     }
+    // Validate: no repeated digits
+    const uniqueDigits = new Set(str.split(""));
+    if (uniqueDigits.size !== dc) {
+      socket.emit("sayiTahminError", `Tekrarlı rakam kullanılamaz!`);
+      return;
+    }
 
     const pairKey = currentPair.id;
     if (!room.sayiTahminSecrets[pairKey]) room.sayiTahminSecrets[pairKey] = {};
@@ -1241,6 +1305,7 @@ io.on("connection", (socket) => {
     const s2 = room.sayiTahminSecrets[pairKey][currentPair.p2.id];
     if (s1 && s2) {
       // İkisi de girdi - eşzamanlı tahmin fazı başlasın
+      if (room.sayiTahminTimer) { clearTimeout(room.sayiTahminTimer); room.sayiTahminTimer = null; }
       room.sayiTahminGuesses[pairKey] = { p1: [], p2: [] };
       setTimeout(() => {
         startSayiTahminGuessPhase(roomId);
@@ -1328,6 +1393,7 @@ io.on("connection", (socket) => {
     // İkisi de gönderdiyse sonuçları aç
     const pending = room.sayiTahminPendingGuesses[pairKey];
     if (pending.p1 && pending.p2) {
+      if (room.sayiTahminTimer) { clearTimeout(room.sayiTahminTimer); room.sayiTahminTimer = null; }
       const bothPayload = {
         p1Result: pending.p1,
         p2Result: pending.p2,
@@ -1348,8 +1414,11 @@ io.on("connection", (socket) => {
       const p2Won = pending.p2.greens === dc;
 
       if (p1Won || p2Won) {
-        // İkisi de aynı anda ve aynı tahmin sayısıyla bildiyse → berabere, tur tekrar
+        // İkisi de aynı anda ve aynı tahmin sayısıyla bildiyse → berabere, tur tekrar (max 3 kez)
         if (p1Won && p2Won && pending.p1.guessCount === pending.p2.guessCount) {
+          if (!room.sayiTahminTieCount) room.sayiTahminTieCount = 0;
+          room.sayiTahminTieCount++;
+
           const p1Secret = room.sayiTahminSecrets[pairKey][currentPair.p1.id];
           const p2Secret = room.sayiTahminSecrets[pairKey][currentPair.p2.id];
           io.to(roomId).emit("sayiTahminTie", {
@@ -1363,10 +1432,16 @@ io.on("connection", (socket) => {
             teamName: currentPair.teamName,
           });
 
-          // Tur tekrar - aynı pair için yeni secret phase başlat
-          setTimeout(() => {
-            startSayiTahminSecretPhase(roomId);
-          }, 3500);
+          if (room.sayiTahminTieCount >= 3) {
+            // Max tie limit reached, move to next pair/round
+            room.sayiTahminTieCount = 0;
+            setTimeout(() => { nextSayiTahminStep(roomId); }, 3500);
+          } else {
+            // Tur tekrar - aynı pair için yeni secret phase başlat
+            setTimeout(() => {
+              startSayiTahminSecretPhase(roomId);
+            }, 3500);
+          }
           return;
         }
 
@@ -1405,6 +1480,9 @@ io.on("connection", (socket) => {
           winnerGuessCount = pending.p2.guessCount;
         }
 
+        // Reset tie count on resolution
+        room.sayiTahminTieCount = 0;
+
         // Kazananın skorunu artır
         if (room.sayiTahminScores) {
           room.sayiTahminScores[winnerId] = (room.sayiTahminScores[winnerId] || 0) + 1;
@@ -1437,14 +1515,34 @@ io.on("connection", (socket) => {
         room.spectators.forEach(s => {
           io.to(getSocketId(s.id)).emit("sayiTahminNextRoundReady");
         });
+        // Reset server-side timeout for the next guess round
+        if (room.sayiTahminTimer) clearTimeout(room.sayiTahminTimer);
+        room.sayiTahminTimer = setTimeout(() => {
+          autoSubmitSayiTahminGuess(roomId);
+        }, 93000);
       }, 800);
     }
+  });
+
+  // --- ODA AYARLARINI GÜNCELLE (oyun bitince tekrar seçim) ---
+  // --- ODADAN AYRILMA ---
+  socket.on("leaveRoom", (roomId) => {
+    const room = rooms[roomId];
+    if (!room) return;
+    const pid = playerId || socket.id;
+    socket.leave(roomId);
+    removePlayerFromRoom(roomId, pid);
   });
 
   // --- ODA AYARLARINI GÜNCELLE (oyun bitince tekrar seçim) ---
   socket.on("updateRoom", (data) => {
     const room = rooms[data.roomId];
     if (!room || room.gameStatus !== "waiting") return socket.emit("gameError", "Oda bulunamadı!");
+    const pid = playerId || socket.id;
+    if (!isPlayerHost(room, pid)) {
+      socket.emit("gameError", "Sadece kurucu ayarları değiştirebilir!");
+      return;
+    }
 
     room.gameType = VALID_GAME_TYPES.includes(data.gameType) ? data.gameType : "telepati";
     room.roundCount = Math.min(Math.max(parseInt(data.roundCount) || 5, 1), 20);
@@ -1475,7 +1573,14 @@ io.on("connection", (socket) => {
     playerId = pid;
 
     socket.join(roomId);
-    socket.emit("rejoinSuccess", { roomId, gameStatus: room.gameStatus, gameType: room.gameType });
+    socket.emit("rejoinSuccess", {
+      roomId,
+      gameStatus: room.gameStatus,
+      gameType: room.gameType,
+      currentRound: room.currentRound,
+      roundCount: room.roundCount,
+      roundTime: room.roundTime,
+    });
     io.to(roomId).emit("playerReconnected", { playerId: pid, username: player.username });
     emitLobbyUpdate(roomId);
   });
@@ -1524,6 +1629,9 @@ function clearAllRoomTimers(room) {
   if (room.pictionaryTimer) { clearTimeout(room.pictionaryTimer); room.pictionaryTimer = null; }
   if (room.tabuTimer) { clearTimeout(room.tabuTimer); room.tabuTimer = null; }
   if (room.imposterTimer) { clearTimeout(room.imposterTimer); room.imposterTimer = null; }
+  if (room.isimSehirTimer) { clearTimeout(room.isimSehirTimer); room.isimSehirTimer = null; }
+  if (room.sayiTahminTimer) { clearTimeout(room.sayiTahminTimer); room.sayiTahminTimer = null; }
+  if (room.telepatiTimer) { clearTimeout(room.telepatiTimer); room.telepatiTimer = null; }
 }
 
 function isRoomEmpty(room) {
@@ -1699,6 +1807,26 @@ function startTurn(roomId) {
     totalRounds: room.roundCount,
     totalMistakes: p.totalAttempts || 0,
   });
+
+  // Server-side timeout: auto-submit for players who don't respond
+  if (room.telepatiTimer) clearTimeout(room.telepatiTimer);
+  room.telepatiTimer = setTimeout(() => {
+    if (!room || room.gameStatus !== "playing") return;
+    const currentPair = room.pairs[room.currentPairIndex];
+    if (!currentPair) return;
+    if (!room.moves[currentPair.id]) room.moves[currentPair.id] = {};
+    if (room.moves[currentPair.id][currentPair.p1.id] === undefined) room.moves[currentPair.id][currentPair.p1.id] = "⏰";
+    if (room.moves[currentPair.id][currentPair.p2.id] === undefined) room.moves[currentPair.id][currentPair.p2.id] = "⏰";
+    // Trigger result processing
+    const w1 = room.moves[currentPair.id][currentPair.p1.id];
+    const w2 = room.moves[currentPair.id][currentPair.p2.id];
+    currentPair.currentTurnAttempts++;
+    currentPair.totalAttempts++;
+    updateLeaderboard(roomId);
+    const result = { pairId: currentPair.id, p1Word: w1, p2Word: w2, attempts: currentPair.currentTurnAttempts, totalMistakes: currentPair.totalAttempts, match: false };
+    io.to(roomId).emit("spectatorUpdate", result);
+    room.moves[currentPair.id] = {};
+  }, (room.roundTime + 3) * 1000);
 }
 
 function updateLeaderboard(roomId) {
@@ -1756,7 +1884,55 @@ function startIsimSehirRound(roomId) {
       currentRound: room.currentRound,
       totalRounds: room.roundCount,
     });
+    // Server-side timeout: auto-submit for players who don't respond
+    if (room.isimSehirTimer) clearTimeout(room.isimSehirTimer);
+    room.isimSehirTimer = setTimeout(() => {
+      autoSubmitIsimSehir(roomId);
+    }, (room.roundTime + 3) * 1000);
   }, 3500);
+}
+
+function autoSubmitIsimSehir(roomId) {
+  const room = rooms[roomId];
+  if (!room || room.gameStatus !== "playing" || room.gameType !== "isimSehir") return;
+  const currentPair = room.pairs[room.currentPairIndex];
+  if (!currentPair) return;
+
+  // Auto-fill missing submissions with timeout marker
+  CATEGORIES.forEach((cat) => {
+    const moveKey = currentPair.id + "_" + cat;
+    if (!room.moves[moveKey]) room.moves[moveKey] = {};
+    if (room.moves[moveKey][currentPair.p1.id] === undefined) room.moves[moveKey][currentPair.p1.id] = "⏰";
+    if (room.moves[moveKey][currentPair.p2.id] === undefined) room.moves[moveKey][currentPair.p2.id] = "⏰";
+  });
+
+  // Check if both already submitted (results already processed)
+  const firstCatKey = currentPair.id + "_" + CATEGORIES[0];
+  const w1 = room.moves[firstCatKey][currentPair.p1.id];
+  const w2 = room.moves[firstCatKey][currentPair.p2.id];
+  if (w1 !== undefined && w2 !== undefined) {
+    // Trigger result processing if not already done
+    const allResults = [];
+    let matchCount = 0;
+    CATEGORIES.forEach((cat) => {
+      const moveKey = currentPair.id + "_" + cat;
+      const p1w = room.moves[moveKey][currentPair.p1.id];
+      const p2w = room.moves[moveKey][currentPair.p2.id];
+      const isMatch = p1w === p2w && p1w !== "⏰";
+      if (isMatch) { room.isimSehirScores[currentPair.id]++; matchCount++; }
+      const bothFailed = p1w === "⏰" && p2w === "⏰";
+      const example = bothFailed && EXAMPLES[room.currentLetter] ? EXAMPLES[room.currentLetter][cat] : null;
+      allResults.push({ pairId: currentPair.id, p1Word: p1w, p2Word: p2w, match: isMatch, category: cat, example: example });
+    });
+    updateIsimSehirLeaderboard(roomId);
+    if (matchCount > 0) {
+      io.to(getSocketId(currentPair.p1.id)).to(getSocketId(currentPair.p2.id)).emit("levelFinished", { success: true });
+    }
+    room.categoryIndex = CATEGORIES.length - 1;
+    io.to(roomId).emit("isimSehirAllResults", { results: allResults, p1: currentPair.p1, p2: currentPair.p2 });
+    const animDelay = allResults.length * 2800 + 500;
+    setTimeout(() => { nextIsimSehirStep(roomId); }, animDelay);
+  }
 }
 
 function startCategory(roomId) {
@@ -1799,6 +1975,11 @@ function nextIsimSehirStep(roomId) {
       currentRound: room.currentRound,
       totalRounds: room.roundCount,
     });
+    // Server-side timeout for new pair
+    if (room.isimSehirTimer) clearTimeout(room.isimSehirTimer);
+    room.isimSehirTimer = setTimeout(() => {
+      autoSubmitIsimSehir(roomId);
+    }, (room.roundTime + 3) * 1000);
     return;
   }
 
@@ -2115,10 +2296,11 @@ function pickAndSendTabuWord(roomId) {
   room.tabuClues = [];
 
   // Send word to everyone except guesser
+  const guesserSocketId = playerSockets[room.tabuGuesserId];
   const allInRoom = io.sockets.adapter.rooms.get(roomId);
   if (allInRoom) {
     for (const sid of allInRoom) {
-      if (sid !== getSocketId(room.tabuGuesserId)) {
+      if (sid !== guesserSocketId) {
         io.to(sid).emit("tabuNewWord", {
           word: wordObj.word,
           forbidden: wordObj.forbidden,
@@ -2247,6 +2429,22 @@ function startImposterRound(roomId) {
     });
   });
 
+  // Spectator view - show round info without the word
+  if (room.spectators && room.spectators.length > 0) {
+    room.spectators.forEach((s) => {
+      io.to(getSocketId(s.id)).emit("imposterRound", {
+        currentRound: room.currentRound,
+        totalRounds: room.roundCount,
+        roundTime: room.roundTime,
+        isImposter: false,
+        word: wordObj.word,
+        hint: null,
+        phase: "write1",
+        isSpectator: true,
+      });
+    });
+  }
+
   // Timer
   if (room.imposterTimer) clearTimeout(room.imposterTimer);
   room.imposterTimer = setTimeout(() => {
@@ -2333,15 +2531,8 @@ function endImposterPhase(roomId) {
       if (room.imposterTimer) clearTimeout(room.imposterTimer);
       room.imposterTimer = setTimeout(() => {
         if (room.imposterPhase !== "vote") return;
-        // Oy vermeyenleri rastgele doldur
-        room.players.forEach((p) => {
-          if (!room.imposterVotes[p.id]) {
-            const others = room.players.filter((o) => o.id !== p.id);
-            if (others.length > 0) {
-              room.imposterVotes[p.id] = others[Math.floor(Math.random() * others.length)].id;
-            }
-          }
-        });
+        // Oy vermeyenler çekimser kalır (oy sayılmaz)
+        // No action needed - they simply don't have a vote entry
         endImposterVoting(roomId);
       }, 30000);
     }, 3000);
@@ -2364,19 +2555,40 @@ function endImposterVoting(roomId) {
     voteCounts[votedId] = (voteCounts[votedId] || 0) + 1;
   });
 
-  // En çok oy alanı bul
+  // En çok oy alanı bul (berabere durumda kimse seçilmez = imposter kaçar)
   let maxVotes = 0;
   let maxVotedId = null;
+  let tiedPlayers = [];
   for (const [pid, count] of Object.entries(voteCounts)) {
     if (count > maxVotes) {
       maxVotes = count;
       maxVotedId = pid;
+      tiedPlayers = [pid];
+    } else if (count === maxVotes && maxVotes > 0) {
+      tiedPlayers.push(pid);
     }
   }
+  // If there's a tie, no one is voted out (imposter escapes)
+  if (tiedPlayers.length > 1) {
+    maxVotedId = null;
+  }
 
-  const imposterCaught = maxVotedId === room.imposterId;
+  const imposterCaught = maxVotedId !== null && maxVotedId === room.imposterId;
   const imposterPlayer = room.players.find((p) => p.id === room.imposterId);
-  const votedPlayer = room.players.find((p) => p.id === maxVotedId);
+  const votedPlayer = maxVotedId ? room.players.find((p) => p.id === maxVotedId) : null;
+
+  // Scoring: if imposter is caught, everyone who voted correctly gets 1 point
+  // If imposter is not caught, imposter gets 2 points
+  if (!room.imposterScores) room.imposterScores = {};
+  if (imposterCaught) {
+    Object.entries(room.imposterVotes).forEach(([voterId, votedId]) => {
+      if (votedId === room.imposterId) {
+        room.imposterScores[voterId] = (room.imposterScores[voterId] || 0) + 1;
+      }
+    });
+  } else {
+    room.imposterScores[room.imposterId] = (room.imposterScores[room.imposterId] || 0) + 2;
+  }
 
   const voteDetails = room.players.map((p) => {
     const votedFor = room.imposterVotes[p.id];
@@ -2396,17 +2608,32 @@ function endImposterVoting(roomId) {
     imposterId: room.imposterId,
     imposterName: imposterPlayer ? imposterPlayer.username : "?",
     votedPlayerId: maxVotedId,
-    votedPlayerName: votedPlayer ? votedPlayer.username : "?",
+    votedPlayerName: votedPlayer ? votedPlayer.username : (tiedPlayers.length > 1 ? "Berabere!" : "?"),
     maxVotes: maxVotes,
+    tied: tiedPlayers.length > 1,
     secretWord: room.imposterCurrentWord.word,
     voteDetails: voteDetails,
+    scores: room.players.map(p => ({
+      username: p.username,
+      score: room.imposterScores[p.id] || 0,
+    })),
   });
 
   // Sonraki tur
   room.currentRound++;
   if (room.currentRound > room.roundCount) {
     setTimeout(() => {
-      io.to(roomId).emit("imposterGameOver", "Oyun bitti! 🏆");
+      // Determine winner by score
+      const scoreList = room.players.map(p => ({
+        playerId: p.id,
+        username: p.username,
+        score: room.imposterScores[p.id] || 0,
+      })).sort((a, b) => b.score - a.score);
+      const winner = scoreList[0];
+      io.to(roomId).emit("imposterGameOver", {
+        message: `${winner.username} kazandı! (${winner.score} puan) 🏆`,
+        scores: scoreList,
+      });
       room.gameStatus = "finished";
       setTimeout(() => {
         room.gameStatus = "waiting";
@@ -2443,6 +2670,12 @@ function startSayiTahminSecretPhase(roomId) {
     teamName: pair.teamName,
     digitCount: room.sayiTahminDigitCount || 4,
   });
+
+  // Server-side timeout for secret phase (60 seconds)
+  if (room.sayiTahminTimer) clearTimeout(room.sayiTahminTimer);
+  room.sayiTahminTimer = setTimeout(() => {
+    autoSubmitSayiTahminSecret(roomId);
+  }, 63000);
 }
 
 function startSayiTahminGuessPhase(roomId) {
@@ -2463,6 +2696,39 @@ function startSayiTahminGuessPhase(roomId) {
     roundTime: room.roundTime,
     digitCount: room.sayiTahminDigitCount || 4,
   });
+
+  // Server-side timeout for guess phase (90 seconds per guess round)
+  if (room.sayiTahminTimer) clearTimeout(room.sayiTahminTimer);
+  room.sayiTahminTimer = setTimeout(() => {
+    autoSubmitSayiTahminGuess(roomId);
+  }, 93000);
+}
+
+function autoSubmitSayiTahminSecret(roomId) {
+  const room = rooms[roomId];
+  if (!room || room.gameStatus !== "playing" || room.gameType !== "sayiTahmin") return;
+  const pair = room.pairs[room.currentPairIndex];
+  if (!pair) return;
+  const pairKey = pair.id;
+  if (!room.sayiTahminSecrets[pairKey]) room.sayiTahminSecrets[pairKey] = {};
+  const dc = room.sayiTahminDigitCount || 4;
+  // Generate random unique-digit numbers for players who didn't submit
+  function randomUniqueDigits(n) {
+    const digits = [0,1,2,3,4,5,6,7,8,9];
+    for (let i = digits.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [digits[i], digits[j]] = [digits[j], digits[i]]; }
+    return digits.slice(0, n).join("");
+  }
+  if (!room.sayiTahminSecrets[pairKey][pair.p1.id]) room.sayiTahminSecrets[pairKey][pair.p1.id] = randomUniqueDigits(dc);
+  if (!room.sayiTahminSecrets[pairKey][pair.p2.id]) room.sayiTahminSecrets[pairKey][pair.p2.id] = randomUniqueDigits(dc);
+  room.sayiTahminGuesses[pairKey] = { p1: [], p2: [] };
+  setTimeout(() => { startSayiTahminGuessPhase(roomId); }, 1000);
+}
+
+function autoSubmitSayiTahminGuess(roomId) {
+  const room = rooms[roomId];
+  if (!room || room.gameStatus !== "playing" || room.gameType !== "sayiTahmin") return;
+  // If a player hasn't guessed, skip to next pair
+  nextSayiTahminStep(roomId);
 }
 
 function nextSayiTahminStep(roomId) {

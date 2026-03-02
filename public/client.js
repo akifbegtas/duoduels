@@ -644,6 +644,27 @@ socket.on("rejoinSuccess", (data) => {
   hideConnectionStatus();
   currentRoom = data.roomId;
   sessionStorage.setItem("duoduels_room", data.roomId);
+  // Restore game screen if game is in progress
+  if (data.gameStatus === "playing" && data.gameType) {
+    const screenMap = {
+      telepati: "game",
+      isimSehir: "isimSehir",
+      pictionary: "pictionary",
+      tabu: "tabu",
+      imposter: "imposter",
+      sayiTahmin: "sayiTahmin",
+    };
+    const screen = screenMap[data.gameType];
+    if (screen) {
+      window._currentGameType = data.gameType;
+      window._roundTime = data.roundTime || 10;
+      window._totalRounds = data.roundCount || 5;
+      showScreen(screen);
+    }
+  } else if (data.gameStatus === "waiting") {
+    showScreen("waiting");
+    document.getElementById("displayRoomCode").innerText = data.roomId;
+  }
 });
 socket.on("rejoinFailed", () => {
   hideConnectionStatus();
@@ -928,33 +949,35 @@ socket.on("spectatorUpdate", (res) => {
   div.className = res.match ? "log-item log-success" : "log-item log-fail";
   div.innerHTML = `${escapeHtml(res.p1Word)} - ${escapeHtml(res.p2Word)} ${res.match ? "✅" : "❌"}`;
 
-
-  {
-    document.getElementById("game-log").prepend(div);
-    const lName = document.getElementById("leftName").innerText;
-    const rName = document.getElementById("rightName").innerText;
-    const myWord = window._iamP2 ? res.p2Word : res.p1Word;
-    const partnerWord = window._iamP2 ? res.p1Word : res.p2Word;
-    if (!amIPlaying) {
-      document.getElementById("spectator-view-left").innerText = res.p1Word;
-      document.getElementById("spectator-view-right").innerText = res.p2Word;
-      showMatchOverlay(lName, rName, res.p1Word, res.p2Word, res.match);
-    } else {
-      document.getElementById("left-status").innerText = myWord;
-      document.getElementById("right-status").innerText = partnerWord;
-      showMatchOverlay(lName, rName, myWord, partnerWord, res.match, () => {
-        if (!res.match) {
-          const inp = document.getElementById("wordInput");
-          inp.value = "";
-          inp.disabled = false;
-          document.getElementById("sendWordBtn").disabled = false;
-          inp.focus();
-          document.getElementById("left-status").innerText = "Tekrar...";
-          document.getElementById("right-status").innerText = "Yazıyor...";
-          startTimer(window._roundTime);
-        }
-      });
-    }
+  document.getElementById("game-log").prepend(div);
+  const lName = document.getElementById("leftName").innerText;
+  const rName = document.getElementById("rightName").innerText;
+  const myWord = window._iamP2 ? res.p2Word : res.p1Word;
+  const partnerWord = window._iamP2 ? res.p1Word : res.p2Word;
+  if (!amIPlaying) {
+    document.getElementById("spectator-view-left").innerText = res.p1Word;
+    document.getElementById("spectator-view-right").innerText = res.p2Word;
+    showMatchOverlay(lName, rName, res.p1Word, res.p2Word, res.match, () => {
+      // Restart timer for spectators on mismatch
+      if (!res.match) {
+        startTimer(window._roundTime);
+      }
+    });
+  } else {
+    document.getElementById("left-status").innerText = myWord;
+    document.getElementById("right-status").innerText = partnerWord;
+    showMatchOverlay(lName, rName, myWord, partnerWord, res.match, () => {
+      if (!res.match) {
+        const inp = document.getElementById("wordInput");
+        inp.value = "";
+        inp.disabled = false;
+        document.getElementById("sendWordBtn").disabled = false;
+        inp.focus();
+        document.getElementById("left-status").innerText = "Tekrar...";
+        document.getElementById("right-status").innerText = "Yazıyor...";
+        startTimer(window._roundTime);
+      }
+    });
   }
 });
 
@@ -1123,13 +1146,14 @@ socket.on("isimSehirStart", (data) => {
 socket.on("letterSelected", (data) => {
   letterAnimationDone = false;
   currentTargetLetter = data.letter;
-  pendingCategoryData = null;
+  // Don't clear pendingCategoryData here - it may have arrived before letterSelected
 
   animateLetter(data.letter, () => {
     letterAnimationDone = true;
     // categoryStart/allCategoriesStart zaten geldiyse timer'ı şimdi başlat
     if (pendingCategoryData) {
       startTimer(window._roundTime, "is-timer");
+      pendingCategoryData = null;
     }
   });
 
@@ -1285,11 +1309,17 @@ let picShapeStartX = 0,
   picShapeStartY = 0;
 let picSnapshotData = null; // canvas snapshot for shape preview
 
+let _pictionaryCanvasInitialized = false;
 function initPictionaryCanvas() {
   const canvas = document.getElementById("pic-canvas");
+  if (!canvas) return;
   picCtx = canvas.getContext("2d");
   picCtx.lineCap = "round";
   picCtx.lineJoin = "round";
+
+  // Only add event listeners once
+  if (_pictionaryCanvasInitialized) return;
+  _pictionaryCanvasInitialized = true;
 
   // Color picker
   document.querySelectorAll(".pic-color").forEach((el) => {
@@ -1691,6 +1721,7 @@ socket.on("drawData", (data) => {
   // Ensure picCtx is initialized for spectators
   if (!picCtx) {
     const canvas = document.getElementById("pic-canvas");
+    if (!canvas) return;
     picCtx = canvas.getContext("2d");
     picCtx.lineCap = "round";
     picCtx.lineJoin = "round";
@@ -1972,6 +2003,11 @@ socket.on("tabuTurnEnd", (data) => {
   document.getElementById("tabu-card").classList.add("hidden");
   document.getElementById("tabu-clue-area").classList.add("hidden");
   document.getElementById("tabu-guess-area").classList.add("hidden");
+  // Disable inputs to prevent sending after turn ends
+  document.getElementById("tabu-clue-input").disabled = true;
+  document.getElementById("tabu-clue-btn").disabled = true;
+  document.getElementById("tabu-guess-input").disabled = true;
+  document.getElementById("tabu-guess-btn").disabled = true;
 });
 
 socket.on("tabuGameOver", (msg) => {
@@ -2058,7 +2094,7 @@ socket.on("imposterStart", (data) => {
 });
 
 socket.on("imposterRound", (data) => {
-  amIPlaying = true;
+  amIPlaying = !data.isSpectator;
   imposterIsMe = data.isImposter;
   document.getElementById("imposter-round-display").innerText =
     `Tur: ${data.currentRound} / ${data.totalRounds}`;
@@ -2080,6 +2116,19 @@ socket.on("imposterRound", (data) => {
   phaseLabel.innerText = "1. Yazma Turu";
 
   const hintEl = document.getElementById("imposter-hint");
+
+  if (data.isSpectator) {
+    document.getElementById("imposter-turn-info").innerText =
+      "İzliyorsunuz...";
+    document.getElementById("imposter-turn-info").style.backgroundColor = "#34495e";
+    document.getElementById("imposter-title").innerText = "Kelime";
+    document.getElementById("imposter-main-word").innerText = data.word || "???";
+    document.getElementById("imposter-hint").classList.add("hidden");
+    document.getElementById("imposter-input-area").classList.add("hidden");
+    document.getElementById("imposter-screen").style.background = "";
+    startTimer(data.roundTime, "imposter-timer");
+    return;
+  }
 
   if (data.isImposter) {
     document.getElementById("imposter-turn-info").innerText =
@@ -2264,8 +2313,27 @@ socket.on("imposterVoteResult", (data) => {
   }
 });
 
-socket.on("imposterGameOver", (msg) => {
-  Swal.fire({ title: "BİTTİ", text: msg });
+socket.on("imposterGameOver", (data) => {
+  if (typeof data === 'string') {
+    Swal.fire({ title: "BİTTİ", text: data });
+    return;
+  }
+  let scoresHtml = '';
+  if (data.scores) {
+    scoresHtml = data.scores.map(s =>
+      `<div style="display:flex;justify-content:space-between;padding:6px 12px;margin:4px 0;background:rgba(255,255,255,0.05);border-radius:8px">
+        <span>${escapeHtml(s.username)}</span>
+        <span style="font-weight:bold">${s.score} puan</span>
+      </div>`
+    ).join('');
+  }
+  Swal.fire({
+    title: "OYUN BİTTİ! 🏆",
+    html: `<div style="padding:10px 0">
+      <div style="font-size:1.1rem;margin-bottom:12px">${escapeHtml(data.message)}</div>
+      ${scoresHtml}
+    </div>`,
+  });
 });
 
 // --- SAYI TAHMİN ---
@@ -2284,6 +2352,11 @@ function sendSecretNumber() {
   const regex = new RegExp(`^\\d{${dc}}$`);
   if (!regex.test(val)) {
     document.getElementById("st-secret-status").innerText = "Sadece rakam gir!";
+    return;
+  }
+  // Check for repeated digits
+  if (new Set(val.split("")).size !== dc) {
+    document.getElementById("st-secret-status").innerText = "Tekrarlı rakam kullanılamaz!";
     return;
   }
   _stSecretSubmitted = true;
