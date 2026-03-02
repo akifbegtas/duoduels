@@ -430,8 +430,8 @@ function goToMainMenu() {
   }
   currentRoom = null;
   sessionStorage.removeItem("duoduels_room");
-  pendingRoomData = null;
-  showScreen("lobby");
+  // Keep pendingRoomData so player doesn't have to re-enter their name and gender
+  showScreen("gameSelect");
 }
 
 function joinTeamSlot(idx, slot) {

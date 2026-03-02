@@ -6,7 +6,7 @@ const config: CapacitorConfig = {
   webDir: 'public',
   server: {
     // Production'da bunu kaldır, sadece local test için
-    // url: 'http://localhost:3000',
+    url: 'http://localhost:3000',
     cleartext: true
   },
   plugins: {

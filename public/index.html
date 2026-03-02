@@ -1,878 +1,736 @@
 <!doctype html>
 <html lang="tr">
-  <head>
-    <meta charset="UTF-8" />
-    <meta
-      name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content"
-    />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="format-detection" content="telephone=no" />
-    <title>DuoDuels</title>
-    <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
-    <link rel="apple-touch-icon" href="apple-touch-icon.png" />
-    <link
-      href="https://fonts.googleapis.com/css2?family=Pacifico&family=Poppins:wght@400;600;800&display=swap"
-      rel="stylesheet"
-    />
 
-    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
-    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport"
+    content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover, interactive-widget=resizes-content" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="format-detection" content="telephone=no" />
+  <title>DuoDuels</title>
+  <link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <link href="https://fonts.googleapis.com/css2?family=Pacifico&family=Poppins:wght@400;600;800&display=swap"
+    rel="stylesheet" />
 
-    <link rel="stylesheet" href="style.css?v=32" />
-  </head>
-  <body>
-    <!-- Dinamik Premium Arkaplan -->
-    <div id="bg-pattern" class="premium-bg">
-      <div class="mesh-gradient"></div>
-      <div class="noise-overlay"></div>
-      <div class="floating-orbs">
-        <div class="orb orb-1"></div>
-        <div class="orb orb-2"></div>
-        <div class="orb orb-3"></div>
-        <div class="orb orb-4"></div>
-      </div>
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+
+  <link rel="stylesheet" href="style.css?v=32" />
+</head>
+
+<body>
+  <!-- Dinamik Premium Arkaplan -->
+  <div id="bg-pattern" class="premium-bg">
+    <div class="mesh-gradient"></div>
+    <div class="noise-overlay"></div>
+    <div class="floating-orbs">
+      <div class="orb orb-1"></div>
+      <div class="orb orb-2"></div>
+      <div class="orb orb-3"></div>
+      <div class="orb orb-4"></div>
     </div>
-    <div id="connection-status" class="connection-status" style="display:none"></div>
-    <!-- Animasyonlu Splash Screen -->
-    <div id="app-splash" class="splash-screen-bg">
-      <img src="apple-touch-icon.png" alt="DuoDuels" class="splash-logo" />
-      <div class="splash-title">DuoDuels</div>
-      <div class="splash-dots"><span></span><span></span><span></span></div>
-    </div>
+  </div>
+  <div id="connection-status" class="connection-status" style="display:none"></div>
+  <!-- Animasyonlu Splash Screen -->
+  <div id="app-splash" class="splash-screen-bg">
+    <img src="apple-touch-icon.png" alt="DuoDuels" class="splash-logo" />
+    <div class="splash-title">DuoDuels</div>
+    <div class="splash-dots"><span></span><span></span><span></span></div>
+  </div>
 
-    <div id="scoreboard-panel" class="scoreboard-panel">
-      <h3 id="scoreboard-title">📊 SKORLAR</h3>
-      <div id="scoreboard-list"></div>
-      <div id="score-note-text" class="score-note">20 Hata = ELENİR! 💀</div>
-    </div>
+  <div id="scoreboard-panel" class="scoreboard-panel">
+    <h3 id="scoreboard-title">📊 SKORLAR</h3>
+    <div id="scoreboard-list"></div>
+    <div id="score-note-text" class="score-note">20 Hata = ELENİR! 💀</div>
+  </div>
 
-    <div class="main-container">
-      <header>
-        <h1 class="game-title">
-          DuoDuels <span id="interactive-heart">💖</span>
-        </h1>
-      </header>
+  <div class="main-container">
+    <header>
+      <h1 class="game-title">
+        DuoDuels <span id="interactive-heart">💖</span>
+      </h1>
+    </header>
 
-      <div id="lobby-screen" class="screen active">
-        <div class="card lobby-card">
-          <h2>Giriş Yap</h2>
+    <div id="lobby-screen" class="screen active">
+      <div class="card lobby-card">
+        <h2>Giriş Yap</h2>
 
-          <div class="username-row">
-            <input
-              type="text"
-              id="username"
-              placeholder="İsminiz"
-              maxlength="12"
-              oninput="hideHint()"
-            />
-            <span id="input-hint" class="input-hint hidden"></span>
-          </div>
-          <div class="gender-selection">
-            <label class="gender-option male"
-              ><input
-                type="radio"
-                name="gender"
-                value="male"
-                onchange="hideHint()"
-              /><span>Erkek 💙</span></label
-            >
-            <label class="gender-option female"
-              ><input
-                type="radio"
-                name="gender"
-                value="female"
-                onchange="hideHint()"
-              /><span>Kadın 🩷</span></label
-            >
-            <span id="gender-hint" class="input-hint hidden"></span>
-          </div>
+        <div class="username-row">
+          <input type="text" id="username" placeholder="İsminiz" maxlength="12" oninput="hideHint()" />
+          <span id="input-hint" class="input-hint hidden"></span>
+        </div>
+        <div class="gender-selection">
+          <label class="gender-option male"><input type="radio" name="gender" value="male"
+              onchange="hideHint()" /><span>Erkek 💙</span></label>
+          <label class="gender-option female"><input type="radio" name="gender" value="female"
+              onchange="hideHint()" /><span>Kadın 🩷</span></label>
+          <span id="gender-hint" class="input-hint hidden"></span>
+        </div>
 
-          <div class="tab-container">
-            <button class="tab-btn active" onclick="switchTab('create')">
-              Oyun Seç
-            </button>
-            <button class="tab-btn" onclick="switchTab('join')">
-              Odaya Katıl
-            </button>
-          </div>
+        <div class="tab-container">
+          <button class="tab-btn active" onclick="switchTab('create')">
+            Oyun Seç
+          </button>
+          <button class="tab-btn" onclick="switchTab('join')">
+            Odaya Katıl
+          </button>
+        </div>
 
-          <div class="forms-window">
-            <div id="forms-slider" class="forms-slider">
-              <div class="slide-section">
-                <button class="btn-primary" onclick="createRoom()">
-                  Oyun Seç
+        <div class="forms-window">
+          <div id="forms-slider" class="forms-slider">
+            <div class="slide-section">
+              <button class="btn-primary" onclick="createRoom()">
+                Oyun Seç
+              </button>
+            </div>
+
+            <div class="slide-section">
+              <div class="join-content">
+                <label>Oda Kodunu Giriniz:</label>
+                <input type="text" id="roomCodeInput" placeholder="ODA KODU" maxlength="6" class="big-input" />
+                <button class="btn-secondary" onclick="joinRoom()">
+                  Katıl
                 </button>
               </div>
-
-              <div class="slide-section">
-                <div class="join-content">
-                  <label>Oda Kodunu Giriniz:</label>
-                  <input
-                    type="text"
-                    id="roomCodeInput"
-                    placeholder="ODA KODU"
-                    maxlength="6"
-                    class="big-input"
-                  />
-                  <button class="btn-secondary" onclick="joinRoom()">
-                    Katıl
-                  </button>
-                </div>
-              </div>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div id="waiting-screen" class="screen">
-        <div class="waiting-header">
-          <div class="wh-room-code">
-            <span class="wh-label">Oda Kodu</span>
-            <div class="wh-code-row">
-              <span id="displayRoomCode" class="highlight-code" onclick="copyRoomCode()" title="Kopyalamak için dokun"></span>
-              <span class="share-btn" onclick="shareWhatsApp()" title="WhatsApp ile paylaş">
-                <svg class="whatsapp-icon" viewBox="0 0 24 24" fill="#25D366" width="28" height="28">
-                  <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-                </svg>
-              </span>
-            </div>
-          </div>
-          <div class="wh-actions">
-            <div id="host-controls" class="hidden">
-              <button class="btn-start" onclick="startGame()">OYUNU BAŞLAT 🚀</button>
-            </div>
-            <div id="member-message" class="hidden">
-              <p>Kurucunun oyunu başlatması bekleniyor...</p>
-            </div>
-            <button class="btn-back-subtle" onclick="goToMainMenu()">Ana Menü</button>
-          </div>
-        </div>
-        <div id="teams-container" class="teams-grid"></div>
-        <div class="spectators-area">
-          <h3>👥 Lobidekiler (Takım Seçin)</h3>
-          <div id="spectator-list" class="spectator-list"></div>
-        </div>
-      </div>
-
-      <!-- OYUN SEÇİM EKRANI -->
-      <div id="game-select-screen" class="screen">
-        <div class="game-select-container">
-          <button class="btn-back-corner" onclick="goToMainMenu()">Geri</button>
-          <h2 class="select-title">Oyun Seç</h2>
-          <div class="mode-toggle-container" id="mode-toggle">
-            <button
-              class="mode-btn active"
-              id="mode-btn-cift"
-              onclick="selectMode('cift')"
-            >
-              Çiftler
-            </button>
-            <button
-              class="mode-btn"
-              id="mode-btn-duo"
-              onclick="selectMode('duo')"
-            >
-              Başbaşa
-            </button>
-            <button
-              class="mode-btn"
-              id="mode-btn-tek"
-              onclick="selectMode('tek')"
-            >
-              Herkes Tek
-            </button>
-          </div>
-          <div class="mode-viewport">
-            <div class="mode-track" id="modeTrack">
-              <!-- Panel 0: Çiftler -->
-              <div class="mode-panel" id="panel-cift">
-                <div class="player-count-wrapper">
-                  <label class="player-count-label">Çift Sayısı</label>
-                  <select id="ciftCountSelect" class="premium-select">
-                    <option value="" disabled selected>Çift Sayısını Seçiniz</option>
-                    <option value="2">2 Çift (4 Kişi)</option>
-                    <option value="3">3 Çift (6 Kişi)</option>
-                    <option value="4">4 Çift (8 Kişi)</option>
-                    <option value="5">5 Çift (10 Kişi)</option>
-                  </select>
-                </div>
-                <div class="game-cards">
-                  <div class="game-card" id="card-telepati-cift" onclick="selectGame('telepati')">
-                    <div class="game-card-icon">🧠</div>
-                    <h3>Telepati</h3>
-                    <p>Aynı kelimeyi yazmaya çalışın!</p>
-                  </div>
-                  <div class="game-card" id="card-isimSehir-cift" onclick="selectGame('isimSehir')">
-                    <div class="game-card-icon">🔤</div>
-                    <h3>İsim Şehir</h3>
-                    <p>Harf gelir, kategori gelir, eşleşin!</p>
-                  </div>
-                  <div class="game-card" id="card-pictionary-cift" onclick="selectGame('pictionary')">
-                    <div class="game-card-icon">🎨</div>
-                    <h3>Resim Çiz</h3>
-                    <p>Çiz, tahmin et, puan topla!</p>
-                  </div>
-                  <div class="game-card" id="card-tabu" onclick="selectGame('tabu')">
-                    <div class="game-card-icon">🚫</div>
-                    <h3>Tabu</h3>
-                    <p>Yasaklı kelime kullanmadan anlat!</p>
-                  </div>
-                </div>
-              </div>
-              <!-- Panel 1: Başbaşa -->
-              <div class="mode-panel" id="panel-duo">
-                <div class="player-count-wrapper">
-                  <label class="player-count-label">Çift Sayısı</label>
-                  <select disabled class="premium-select" style="opacity:0.7">
-                    <option selected>1 Çift (2 Kişi)</option>
-                  </select>
-                </div>
-                <div class="game-cards">
-                  <div class="game-card" id="card-telepati-duo" onclick="selectGame('telepati')">
-                    <div class="game-card-icon">🧠</div>
-                    <h3>Telepati</h3>
-                    <p>Aynı kelimeyi yazmaya çalışın!</p>
-                  </div>
-                  <div class="game-card" id="card-isimSehir-duo" onclick="selectGame('isimSehir')">
-                    <div class="game-card-icon">🔤</div>
-                    <h3>İsim Şehir</h3>
-                    <p>Harf gelir, kategori gelir, eşleşin!</p>
-                  </div>
-                  <div class="game-card" id="card-pictionary-duo" onclick="selectGame('pictionary')">
-                    <div class="game-card-icon">🎨</div>
-                    <h3>Resim Çiz</h3>
-                    <p>Çiz, tahmin et, puan topla!</p>
-                  </div>
-                  <div class="game-card" id="card-sayiTahmin" onclick="selectGame('sayiTahmin')">
-                    <div class="game-card-icon">🔢</div>
-                    <h3>Sayı Tahmin</h3>
-                    <p>4 haneli sayıyı tahmin et!</p>
-                  </div>
-                </div>
-              </div>
-              <!-- Panel 2: Herkes Tek -->
-              <div class="mode-panel" id="panel-tek">
-                <div class="player-count-wrapper">
-                  <label class="player-count-label">Kişi Sayısı</label>
-                  <select id="tekCountSelect" class="premium-select">
-                    <option value="" disabled selected>Kişi Sayısını Seçiniz</option>
-                    <option value="2" id="tekCount2">2 Kişi</option>
-                    <option value="3">3 Kişi</option>
-                    <option value="4">4 Kişi</option>
-                    <option value="5">5 Kişi</option>
-                    <option value="6">6 Kişi</option>
-                    <option value="7">7 Kişi</option>
-                    <option value="8">8 Kişi</option>
-                    <option value="9">9 Kişi</option>
-                    <option value="10">10 Kişi</option>
-                  </select>
-                </div>
-                <div class="game-cards">
-                  <div class="game-card" id="card-pictionary-tek" onclick="selectGame('pictionary')">
-                    <div class="game-card-icon">🎨</div>
-                    <h3>Resim Çiz</h3>
-                    <p>Çiz, tahmin et, puan topla!</p>
-                  </div>
-                  <div class="game-card" id="card-imposter" onclick="selectGame('imposter')">
-                    <div class="game-card-icon">🕵️‍♂️</div>
-                    <h3>Imposter</h3>
-                    <p>Bir kişi impostor! Herkes ne yazdı gözükecek.</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div id="select-players-container" class="select-players-container hidden">
-            <h3>Lobideki Oyuncular</h3>
-            <div id="select-players-box" class="select-players-box"></div>
-          </div>
-        </div>
-      </div>
-
-      <!-- OYUN AYARLARI EKRANI -->
-      <div id="game-settings-screen" class="screen">
-        <div class="game-select-container card" style="max-width:400px; margin:0 auto;">
-          <h2 class="select-title" id="settings-game-title">Oyun Ayarları</h2>
-          <div class="row-inputs" style="max-width: 300px; margin: 20px auto">
-            <div class="half-input">
-              <label style="color: #fff">Tur Sayısı</label>
-              <input
-                type="number"
-                id="roundCountInput"
-                min="1"
-                max="20"
-                value="5"
-                style="
-                  padding: 10px;
-                  border-radius: 8px;
-                  border: none;
-                  font-size: 1rem;
-                  width: 100%;
-                  text-align: center;
-                "
-              />
-            </div>
-            <div class="half-input">
-              <label style="color: #fff">Süre (sn)</label>
-              <select
-                id="roundTimeInput"
-                style="
-                  padding: 10px;
-                  border-radius: 8px;
-                  border: none;
-                  font-size: 1rem;
-                  width: 100%;
-                  text-align: center;
-                "
-              >
-                <option value="10">10</option>
-                <option value="15">15</option>
-                <option value="20">20</option>
-                <option value="25">25</option>
-                <option value="30">30</option>
-                <option value="35">35</option>
-                <option value="40">40</option>
-                <option value="45">45</option>
-                <option value="50">50</option>
-                <option value="55">55</option>
-                <option value="60">60</option>
-              </select>
-            </div>
-          </div>
-          <div id="digitCountRow" class="row-inputs" style="max-width: 300px; margin: 10px auto; display:none">
-            <div class="half-input" style="flex:1">
-              <label style="color: #fff">Basamak Sayısı</label>
-              <select
-                id="digitCountInput"
-                style="
-                  padding: 10px;
-                  border-radius: 8px;
-                  border: none;
-                  font-size: 1rem;
-                  width: 100%;
-                  text-align: center;
-                "
-              >
-                <option value="3">3 basamak</option>
-                <option value="4" selected>4 basamak</option>
-                <option value="5">5 basamak</option>
-                <option value="6">6 basamak</option>
-              </select>
-            </div>
-          </div>
-          <div style="display:flex; gap:10px; justify-content:center; margin-top:10px">
-            <button
-              class="btn-back"
-              onclick="goBackToGameSelect()"
-            >
-              Geri
-            </button>
-            <button
-              class="btn-primary"
-              onclick="confirmGameSettings()"
-              style="width:auto; padding:12px 40px"
-            >
-              Odayı Kur
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <!-- İSİM ŞEHİR EKRANI -->
-      <div id="isimSehir-screen" class="screen">
-        <div id="isimSehir-turn-info" class="turn-info">Sıradaki Çift...</div>
-
-        <div id="letter-display" class="letter-display">
-          <div class="letter-wheel-container">
-            <span id="spinning-letter" class="spinning-letter">A</span>
-          </div>
-        </div>
-
-        <div class="category-tabs">
-          <span id="cat-isim" class="cat-tab">İSİM</span>
-          <span id="cat-sehir" class="cat-tab">ŞEHİR</span>
-          <span id="cat-hayvan" class="cat-tab">HAYVAN</span>
-        </div>
-
-        <div id="is-all-inputs" class="is-all-inputs">
-          <div class="is-input-row">
-            <label>İSİM</label>
-            <input type="text" id="isInput-isim" placeholder="İsim..." autocomplete="off" />
-          </div>
-          <div class="is-input-row">
-            <label>ŞEHİR</label>
-            <input type="text" id="isInput-sehir" placeholder="Şehir..." autocomplete="off" />
-          </div>
-          <div class="is-input-row">
-            <label>HAYVAN</label>
-            <input type="text" id="isInput-hayvan" placeholder="Hayvan..." autocomplete="off" />
-          </div>
-          <button id="isSendAllBtn" class="btn-primary" onclick="sendAllIsimSehir()">GÖNDER</button>
-          <div id="is-left-status" class="status-text">...</div>
-        </div>
-
-        <div id="is-spectator-area" class="game-split-container hidden">
-          <div id="is-left-panel" class="game-panel">
-            <div class="panel-header"><h3 id="isLeftName">Oyuncu 1</h3></div>
-            <div class="panel-content">
-              <div id="is-spectator-left" class="spectator-text">🤔</div>
-            </div>
-          </div>
-          <div id="is-right-panel" class="game-panel">
-            <div class="panel-header"><h3 id="isRightName">Oyuncu 2</h3></div>
-            <div class="panel-content center-content">
-              <div id="is-right-status" class="partner-waiting-animation">Yazıyor...</div>
-              <div id="is-spectator-right" class="spectator-text hidden">🤔</div>
-            </div>
-          </div>
-        </div>
-
-        <div id="is-timer" class="timer-countdown"></div>
-
-        <div class="game-footer">
-          <div
-            id="is-round-display"
-            style="font-size: 1.2rem; margin-bottom: 5px"
-          ></div>
-          <div id="is-game-log" class="log-container"></div>
-        </div>
-      </div>
-
-      <!-- RESİM ÇİZ (PICTIONARY) EKRANI -->
-      <div id="pictionary-screen" class="screen">
-        <div id="pic-turn-info" class="turn-info">Resim Çiz Başlıyor...</div>
-
-        <div id="pic-word-display" class="pic-word-display hidden"></div>
-
-        <div class="pic-draw-area">
-          <!-- Sol Araç Çubuğu -->
-          <div id="pic-left-tools" class="pic-left-tools hidden">
-            <button class="pic-tool-icon active" data-tool="pen" title="Kalem">
-              &#9998;
-            </button>
-            <button class="pic-tool-icon" data-tool="eraser" title="Silgi">
-              &#9003;
-            </button>
-            <button class="pic-tool-icon" data-tool="square" title="Kare">
-              &#9634;
-            </button>
-            <button
-              class="pic-tool-icon"
-              data-tool="rectangle"
-              title="Dikdörtgen"
-            >
-              &#9645;
-            </button>
-            <button class="pic-tool-icon" data-tool="triangle" title="Üçgen">
-              &#9651;
-            </button>
-            <button class="pic-tool-icon" data-tool="circle" title="Daire">
-              &#9675;
-            </button>
-            <button
-              class="pic-tool-icon"
-              data-tool="clear"
-              title="Temizle"
-              onclick="clearCanvas()"
-            >
-              &#10060;
-            </button>
-            <input
-              type="range"
-              id="pic-thickness"
-              min="2"
-              max="20"
-              value="4"
-              class="pic-thickness-slider"
-              title="Kalınlık"
-            />
-          </div>
-
-          <!-- Canvas -->
-          <div class="pic-canvas-container">
-            <canvas id="pic-canvas" width="500" height="450"></canvas>
-          </div>
-        </div>
-
-        <!-- Alt Renk Çubuğu -->
-        <div id="pic-color-bar" class="pic-color-bar hidden">
-          <div class="pic-color-row">
-            <span
-              class="pic-color active"
-              data-color="#000000"
-              style="background: #000000"
-              title="Siyah"
-            ></span>
-            <span
-              class="pic-color"
-              data-color="#ffffff"
-              style="background: #ffffff"
-              title="Beyaz"
-            ></span>
-            <span
-              class="pic-color"
-              data-color="#e74c3c"
-              style="background: #e74c3c"
-              title="Kırmızı"
-            ></span>
-            <span
-              class="pic-color"
-              data-color="#3498db"
-              style="background: #3498db"
-              title="Mavi"
-            ></span>
-            <span
-              class="pic-color"
-              data-color="#2ecc71"
-              style="background: #2ecc71"
-              title="Yeşil"
-            ></span>
-            <span
-              class="pic-color"
-              data-color="#f1c40f"
-              style="background: #f1c40f"
-              title="Sarı"
-            ></span>
-            <span
-              class="pic-color"
-              data-color="#e67e22"
-              style="background: #e67e22"
-              title="Turuncu"
-            ></span>
-            <span
-              class="pic-color"
-              data-color="#e91e63"
-              style="background: #e91e63"
-              title="Pembe"
-            ></span>
-          </div>
-          <div class="pic-color-row">
-            <span
-              class="pic-color"
-              data-color="#7f8c8d"
-              style="background: #7f8c8d"
-              title="Gri"
-            ></span>
-            <span
-              class="pic-color"
-              data-color="#8e44ad"
-              style="background: #8e44ad"
-              title="Mor"
-            ></span>
-            <span
-              class="pic-color"
-              data-color="#1abc9c"
-              style="background: #1abc9c"
-              title="Turkuaz"
-            ></span>
-            <span
-              class="pic-color"
-              data-color="#2c3e50"
-              style="background: #2c3e50"
-              title="Lacivert"
-            ></span>
-            <span
-              class="pic-color"
-              data-color="#d35400"
-              style="background: #d35400"
-              title="Koyu Turuncu"
-            ></span>
-            <span
-              class="pic-color"
-              data-color="#a0522d"
-              style="background: #a0522d"
-              title="Kahverengi"
-            ></span>
-            <span
-              class="pic-color"
-              data-color="#00bcd4"
-              style="background: #00bcd4"
-              title="Cyan"
-            ></span>
-            <span
-              class="pic-color"
-              data-color="#cddc39"
-              style="background: #cddc39"
-              title="Lime"
-            ></span>
-          </div>
-        </div>
-
-        <div id="pic-guess-area" class="pic-guess-area hidden">
-          <input
-            type="text"
-            id="pic-guess-input"
-            placeholder="Tahmin yaz..."
-            autocomplete="off"
-          />
-          <button id="pic-guess-btn" onclick="sendPictionaryGuess()">
-            TAHMİN
-          </button>
-        </div>
-
-        <div id="pic-timer" class="timer-countdown"></div>
-
-        <div class="game-footer">
-          <div
-            id="pic-round-display"
-            style="font-size: 1.2rem; margin-bottom: 5px"
-          ></div>
-          <div id="pic-game-log" class="log-container"></div>
-        </div>
-      </div>
-
-      <!-- TABU EKRANI -->
-      <div id="tabu-screen" class="screen">
-        <div id="tabu-turn-info" class="turn-info">Tabu Başlıyor...</div>
-
-        <!-- Anlatıcı Kelime Kartı -->
-        <div id="tabu-card" class="tabu-card hidden">
-          <div id="tabu-main-word" class="tabu-main-word">KELİME</div>
-          <div class="tabu-forbidden-list">
-            <div class="tabu-forbidden-item" id="tabu-f1">---</div>
-            <div class="tabu-forbidden-item" id="tabu-f2">---</div>
-            <div class="tabu-forbidden-item" id="tabu-f3">---</div>
-            <div class="tabu-forbidden-item" id="tabu-f4">---</div>
-            <div class="tabu-forbidden-item" id="tabu-f5">---</div>
-          </div>
-        </div>
-
-        <!-- Forbidden Alert -->
-        <div id="tabu-forbidden-alert" class="tabu-forbidden-alert hidden">
-          YASAKLI KELİME! 🚫
-        </div>
-
-        <!-- Chat Alanı -->
-        <div class="tabu-chat" id="tabu-chat"></div>
-
-        <!-- Anlatıcı Input -->
-        <div id="tabu-clue-area" class="tabu-input-area hidden">
-          <input
-            type="text"
-            id="tabu-clue-input"
-            placeholder="İpucu yaz..."
-            autocomplete="off"
-          />
-          <button id="tabu-clue-btn" onclick="sendTabuClue()">GÖNDER</button>
-          <button class="btn-pass" onclick="sendTabuPass()">PAS ⏭</button>
-        </div>
-
-        <!-- Tahmin Eden Input -->
-        <div id="tabu-guess-area" class="tabu-input-area hidden">
-          <input
-            type="text"
-            id="tabu-guess-input"
-            placeholder="Tahmin yaz..."
-            autocomplete="off"
-          />
-          <button id="tabu-guess-btn" onclick="sendTabuGuess()">TAHMİN</button>
-        </div>
-
-        <div id="tabu-timer" class="timer-countdown"></div>
-
-        <div class="game-footer">
-          <div
-            id="tabu-round-display"
-            style="font-size: 1.2rem; margin-bottom: 5px"
-          ></div>
-          <div id="tabu-game-log" class="log-container"></div>
-        </div>
-      </div>
-
-      <div id="game-screen" class="screen">
-        <div id="turn-info-bar" class="turn-info">
-          Sıradaki Çift Yarışıyor...
-        </div>
-
-        <div class="game-split-container">
-          <div id="left-panel" class="game-panel">
-            <div class="panel-header"><h3 id="leftName">Oyuncu 1</h3></div>
-            <div class="panel-content">
-              <div id="input-area-left" class="input-wrapper">
-                <input
-                  type="text"
-                  id="wordInput"
-                  placeholder="Kelime..."
-                  autocomplete="off"
-                />
-                <button id="sendWordBtn" onclick="sendWord()">GÖNDER</button>
-              </div>
-              <div id="spectator-view-left" class="spectator-text hidden">
-                🤔
-              </div>
-              <div id="left-status" class="status-text">...</div>
-            </div>
-          </div>
-          <div id="right-panel" class="game-panel">
-            <div class="panel-header"><h3 id="rightName">Oyuncu 2</h3></div>
-            <div class="panel-content center-content">
-              <div id="right-status" class="partner-waiting-animation">
-                Yazıyor...
-              </div>
-              <div id="spectator-view-right" class="spectator-text hidden">
-                🤔
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div id="timer-countdown" class="timer-countdown"></div>
-
-        <div class="game-footer">
-          <div
-            id="attempts-display"
-            style="font-size: 1.2rem; margin-bottom: 5px"
-          ></div>
-          <div id="game-log" class="log-container"></div>
-        </div>
-      </div>
-
-      <!-- SAYI TAHMİN EKRANI -->
-      <div id="sayiTahmin-screen" class="screen">
-        <div id="st-turn-info" class="turn-info">Sayı Tahmin Başlıyor...</div>
-
-        <div id="st-phase-label" class="st-phase-label hidden"></div>
-
-        <!-- Sayı Giriş Alanı (başlangıçta gizli sayı girmek için) -->
-        <div id="st-secret-area" class="st-secret-area hidden">
-          <h3 style="color:#fff; margin-bottom:12px;">Gizli Sayını Gir</h3>
-          <p style="color:rgba(255,255,255,0.6); font-size:0.85rem; margin-bottom:10px;">0-9 arası rakamlarla gizli sayını seç</p>
-          <div class="st-input-row">
-            <input type="tel" id="st-secret-input" placeholder="Sayı gir..." maxlength="4" autocomplete="off" class="st-big-input" />
-            <button id="st-secret-btn" onclick="sendSecretNumber()">ONAYLA</button>
-          </div>
-          <div id="st-secret-status" class="status-text"></div>
-        </div>
-
-        <!-- Tahmin Alanı -->
-        <div id="st-guess-area" class="st-guess-area hidden">
-          <div id="st-target-label" class="st-target-label"></div>
-          <div class="st-input-row">
-            <input type="tel" id="st-guess-input" placeholder="Tahmin gir..." maxlength="4" autocomplete="off" class="st-big-input" />
-            <button id="st-guess-btn" onclick="sendNumberGuess()">TAHMİN</button>
-          </div>
-        </div>
-
-        <!-- Tahmin Geçmişi (iki sütun) -->
-        <div id="st-history" class="st-history hidden">
-          <div class="st-history-columns">
-            <div class="st-history-col">
-              <h4 id="st-history-left-title" class="st-col-title">Ben</h4>
-              <div id="st-history-left" class="st-history-list"></div>
-            </div>
-            <div class="st-history-col">
-              <h4 id="st-history-right-title" class="st-col-title">Rakip</h4>
-              <div id="st-history-right" class="st-history-list"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Bekleme Alanı (seyirci / karşı taraf bekliyor) -->
-        <div id="st-wait-area" class="st-wait-area hidden">
-          <div class="st-wait-text">Rakip tahmin ediyor...</div>
-        </div>
-
-        <div id="st-timer" class="timer-countdown"></div>
-
-        <div class="game-footer">
-          <div id="st-round-display" style="font-size: 1.2rem; margin-bottom: 5px"></div>
-          <div id="st-game-log" class="log-container hidden"></div>
-        </div>
-      </div>
-
-      <!-- IMPOSTER EKRANI -->
-      <div id="imposter-screen" class="screen">
-        <div class="turn-info" id="imposter-turn-info">
-          Imposter Başlıyor...
-        </div>
-        <div class="imposter-card">
-          <h2 id="imposter-title">Kelime</h2>
-          <div id="imposter-main-word" class="highlight-code">---</div>
-          <div id="imposter-hint" class="imposter-hint hidden"></div>
-        </div>
-
-        <div id="imposter-phase-label" class="imposter-phase-label hidden"></div>
-
-        <div id="imposter-answers" class="imposter-answers hidden"></div>
-
-        <div id="imposter-input-area" class="input-wrapper">
-          <input
-            type="text"
-            id="imposterWordInput"
-            placeholder="Kelimeyle ilgili bir şey yaz..."
-            autocomplete="off"
-          />
-          <button id="imposterSendBtn" onclick="sendImposterWord()">
-            GÖNDER
-          </button>
-        </div>
-
-        <div id="imposter-submitted-list" class="imposter-submitted-list hidden"></div>
-
-        <div id="imposter-vote-area" class="imposter-vote-area hidden">
-          <h3 style="color:#fff; margin-bottom:12px;">Imposter kim? Oy ver!</h3>
-          <div id="imposter-vote-list"></div>
-        </div>
-
-        <div id="imposter-timer" class="timer-countdown"></div>
-
-        <div class="game-footer">
-          <div
-            id="imposter-round-display"
-            style="font-size: 1.2rem; margin-bottom: 5px"
-          ></div>
-          <div id="imposter-game-log" class="log-container"></div>
         </div>
       </div>
     </div>
-    <script src="socket.io.min.js"></script>
-    <script src="client.js?v=32"></script>
-    <script>
-      // Capacitor plugin'lerini başlat (native ortamda)
-      if (window.Capacitor && window.Capacitor.isNativePlatform()) {
-        document.addEventListener('DOMContentLoaded', async () => {
-          try {
-            const { StatusBar } = window.Capacitor.Plugins;
-            await StatusBar.setStyle({ style: 'LIGHT' });
-            await StatusBar.setBackgroundColor({ color: '#f5f0e8' });
-          } catch (e) {}
 
-          try {
-            const { Keyboard } = window.Capacitor.Plugins;
-            Keyboard.setAccessoryBarVisible({ isVisible: true });
-            Keyboard.setScroll({ isDisabled: false });
-          } catch (e) {}
+    <div id="waiting-screen" class="screen">
+      <div class="waiting-header">
+        <div class="wh-room-code">
+          <span class="wh-label">Oda Kodu</span>
+          <div class="wh-code-row">
+            <span id="displayRoomCode" class="highlight-code" onclick="copyRoomCode()"
+              title="Kopyalamak için dokun"></span>
+            <span class="share-btn" onclick="shareWhatsApp()" title="WhatsApp ile paylaş">
+              <svg class="whatsapp-icon" viewBox="0 0 24 24" fill="#25D366" width="28" height="28">
+                <path
+                  d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+              </svg>
+            </span>
+          </div>
+        </div>
+        <div class="wh-actions">
+          <div id="host-controls" class="hidden">
+            <button class="btn-start" onclick="startGame()">OYUNU BAŞLAT 🚀</button>
+          </div>
+          <div id="member-message" class="hidden">
+            <p>Kurucunun oyunu başlatması bekleniyor...</p>
+          </div>
+          <button class="btn-back-subtle" onclick="goToMainMenu()">Ana Menü</button>
+        </div>
+      </div>
+      <div id="teams-container" class="teams-grid"></div>
+      <div class="spectators-area">
+        <h3>👥 Lobidekiler (Takım Seçin)</h3>
+        <div id="spectator-list" class="spectator-list"></div>
+      </div>
+    </div>
 
-          try {
-            const { SplashScreen } = window.Capacitor.Plugins;
-            await SplashScreen.hide();
-          } catch (e) {}
+    <!-- OYUN SEÇİM EKRANI -->
+    <div id="game-select-screen" class="screen">
+      <div class="game-select-container">
+        <button class="btn-back-corner" onclick="goToMainMenu()">Geri</button>
+        <h2 class="select-title">Oyun Seç</h2>
+        <div class="mode-toggle-container" id="mode-toggle">
+          <button class="mode-btn active" id="mode-btn-cift" onclick="selectMode('cift')">
+            Çiftler
+          </button>
+          <button class="mode-btn" id="mode-btn-duo" onclick="selectMode('duo')">
+            Başbaşa
+          </button>
+          <button class="mode-btn" id="mode-btn-tek" onclick="selectMode('tek')">
+            Herkes Tek
+          </button>
+        </div>
+        <div class="mode-viewport">
+          <div class="mode-track" id="modeTrack">
+            <!-- Panel 0: Çiftler -->
+            <div class="mode-panel" id="panel-cift">
+              <div class="player-count-wrapper">
+                <label class="player-count-label">Çift Sayısı</label>
+                <select id="ciftCountSelect" class="premium-select">
+                  <option value="2" selected>2 Çift (4 Kişi)</option>
+                  <option value="3">3 Çift (6 Kişi)</option>
+                  <option value="4">4 Çift (8 Kişi)</option>
+                  <option value="5">5 Çift (10 Kişi)</option>
+                </select>
+              </div>
+              <div class="game-cards">
+                <div class="game-card" id="card-telepati-cift" onclick="selectGame('telepati')">
+                  <div class="game-card-icon">🧠</div>
+                  <h3>Telepati</h3>
+                  <p>Aynı kelimeyi yazmaya çalışın!</p>
+                </div>
+                <div class="game-card" id="card-isimSehir-cift" onclick="selectGame('isimSehir')">
+                  <div class="game-card-icon">🔤</div>
+                  <h3>İsim Şehir</h3>
+                  <p>Harf gelir, kategori gelir, eşleşin!</p>
+                </div>
+                <div class="game-card" id="card-pictionary-cift" onclick="selectGame('pictionary')">
+                  <div class="game-card-icon">🎨</div>
+                  <h3>Resim Çiz</h3>
+                  <p>Çiz, tahmin et, puan topla!</p>
+                </div>
+                <div class="game-card" id="card-tabu" onclick="selectGame('tabu')">
+                  <div class="game-card-icon">🚫</div>
+                  <h3>Tabu</h3>
+                  <p>Yasaklı kelime kullanmadan anlat!</p>
+                </div>
+                <div class="game-card" id="card-sayiTahmin-cift" onclick="selectGame('sayiTahmin')">
+                  <div class="game-card-icon">🔢</div>
+                  <h3>Sayı Tahmin</h3>
+                  <p>4 haneli sayıyı tahmin et!</p>
+                </div>
+                <div class="game-card" id="card-imposter-cift" onclick="selectGame('imposter')">
+                  <div class="game-card-icon">🕵️‍♂️</div>
+                  <h3>Imposter</h3>
+                  <p>Bir kişi impostor! Herkes ne yazdı gözükecek.</p>
+                </div>
+              </div>
+            </div>
+            <!-- Panel 1: Başbaşa -->
+            <div class="mode-panel" id="panel-duo">
+              <div class="player-count-wrapper">
+                <label class="player-count-label">Kişi Sayısı</label>
+                <select disabled class="premium-select" style="opacity:0.7">
+                  <option selected>2 Kişi (1v1)</option>
+                </select>
+              </div>
+              <div class="game-cards">
+                <div class="game-card" id="card-telepati-duo" onclick="selectGame('telepati')">
+                  <div class="game-card-icon">🧠</div>
+                  <h3>Telepati</h3>
+                  <p>Aynı kelimeyi yazmaya çalışın!</p>
+                </div>
+                <div class="game-card" id="card-isimSehir-duo" onclick="selectGame('isimSehir')">
+                  <div class="game-card-icon">🔤</div>
+                  <h3>İsim Şehir</h3>
+                  <p>Harf gelir, kategori gelir, eşleşin!</p>
+                </div>
+                <div class="game-card" id="card-pictionary-duo" onclick="selectGame('pictionary')">
+                  <div class="game-card-icon">🎨</div>
+                  <h3>Resim Çiz</h3>
+                  <p>Çiz, tahmin et, puan topla!</p>
+                </div>
+                <div class="game-card" id="card-sayiTahmin-duo" onclick="selectGame('sayiTahmin')">
+                  <div class="game-card-icon">🔢</div>
+                  <h3>Sayı Tahmin</h3>
+                  <p>4 haneli sayıyı tahmin et!</p>
+                </div>
+                <div class="game-card" id="card-tabu-duo" onclick="selectGame('tabu')">
+                  <div class="game-card-icon">🚫</div>
+                  <h3>Tabu</h3>
+                  <p>Yasaklı kelime kullanmadan anlat!</p>
+                </div>
+                <div class="game-card" id="card-imposter-duo" onclick="selectGame('imposter')">
+                  <div class="game-card-icon">🕵️‍♂️</div>
+                  <h3>Imposter</h3>
+                  <p>Bir kişi impostor! Herkes ne yazdı gözükecek.</p>
+                </div>
+              </div>
+            </div>
+            <!-- Panel 2: Herkes Tek -->
+            <div class="mode-panel" id="panel-tek">
+              <div class="player-count-wrapper">
+                <label class="player-count-label">Kişi Sayısı</label>
+                <select id="tekCountSelect" class="premium-select">
+                  <option value="2" id="tekCount2">2 Kişi</option>
+                  <option value="3" selected>3 Kişi</option>
+                  <option value="4">4 Kişi</option>
+                  <option value="5">5 Kişi</option>
+                  <option value="6">6 Kişi</option>
+                  <option value="7">7 Kişi</option>
+                  <option value="8">8 Kişi</option>
+                  <option value="9">9 Kişi</option>
+                  <option value="10">10 Kişi</option>
+                </select>
+              </div>
+              <div class="game-cards">
+                <div class="game-card" id="card-telepati-tek" onclick="selectGame('telepati')">
+                  <div class="game-card-icon">🧠</div>
+                  <h3>Telepati</h3>
+                  <p>Aynı kelimeyi yazmaya çalışın!</p>
+                </div>
+                <div class="game-card" id="card-isimSehir-tek" onclick="selectGame('isimSehir')">
+                  <div class="game-card-icon">🔤</div>
+                  <h3>İsim Şehir</h3>
+                  <p>Harf gelir, kategori gelir, eşleşin!</p>
+                </div>
+                <div class="game-card" id="card-pictionary-tek" onclick="selectGame('pictionary')">
+                  <div class="game-card-icon">🎨</div>
+                  <h3>Resim Çiz</h3>
+                  <p>Çiz, tahmin et, puan topla!</p>
+                </div>
+                <div class="game-card" id="card-sayiTahmin-tek" onclick="selectGame('sayiTahmin')">
+                  <div class="game-card-icon">🔢</div>
+                  <h3>Sayı Tahmin</h3>
+                  <p>4 haneli sayıyı tahmin et!</p>
+                </div>
+                <div class="game-card" id="card-tabu-tek" onclick="selectGame('tabu')">
+                  <div class="game-card-icon">🚫</div>
+                  <h3>Tabu</h3>
+                  <p>Yasaklı kelime kullanmadan anlat!</p>
+                </div>
+                <div class="game-card" id="card-imposter-tek" onclick="selectGame('imposter')">
+                  <div class="game-card-icon">🕵️‍♂️</div>
+                  <h3>Imposter</h3>
+                  <p>Bir kişi impostor! Herkes ne yazdı gözükecek.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div id="select-players-container" class="select-players-container hidden">
+          <h3>Lobideki Oyuncular</h3>
+          <div id="select-players-box" class="select-players-box"></div>
+        </div>
+      </div>
+    </div>
 
-          // Animasyonlu splash'i 2.5sn sonra kaldır
-          setTimeout(() => {
-            const splash = document.getElementById('app-splash');
-            if (splash) {
-              splash.classList.add('splash-hide');
-              setTimeout(() => { splash.remove(); document.body.style.backgroundColor = '#f5f0e8'; }, 600);
-            }
-          }, 2500);
-        });
-      } else {
-        // Web ortamında da splash göster
-        document.addEventListener('DOMContentLoaded', () => {
-          setTimeout(() => {
-            const splash = document.getElementById('app-splash');
-            if (splash) {
-              splash.classList.add('splash-hide');
-              setTimeout(() => { splash.remove(); document.body.style.backgroundColor = '#f5f0e8'; }, 600);
-            }
-          }, 2000);
-        });
-      }
-    </script>
-  </body>
+    <!-- OYUN AYARLARI EKRANI -->
+    <div id="game-settings-screen" class="screen">
+      <div class="game-select-container card" style="max-width:400px; margin:0 auto;">
+        <h2 class="select-title" id="settings-game-title">Oyun Ayarları</h2>
+        <div class="row-inputs" style="max-width: 300px; margin: 20px auto">
+          <div class="half-input">
+            <label style="color: #fff">Tur Sayısı</label>
+            <input type="number" id="roundCountInput" min="1" max="20" value="5" style="
+                  padding: 10px;
+                  border-radius: 8px;
+                  border: none;
+                  font-size: 1rem;
+                  width: 100%;
+                  text-align: center;
+                " />
+          </div>
+          <div class="half-input">
+            <label style="color: #fff">Süre (sn)</label>
+            <select id="roundTimeInput" style="
+                  padding: 10px;
+                  border-radius: 8px;
+                  border: none;
+                  font-size: 1rem;
+                  width: 100%;
+                  text-align: center;
+                ">
+              <option value="10">10</option>
+              <option value="15">15</option>
+              <option value="20">20</option>
+              <option value="25">25</option>
+              <option value="30">30</option>
+              <option value="35">35</option>
+              <option value="40">40</option>
+              <option value="45">45</option>
+              <option value="50">50</option>
+              <option value="55">55</option>
+              <option value="60">60</option>
+            </select>
+          </div>
+        </div>
+        <div id="digitCountRow" class="row-inputs" style="max-width: 300px; margin: 10px auto; display:none">
+          <div class="half-input" style="flex:1">
+            <label style="color: #fff">Basamak Sayısı</label>
+            <select id="digitCountInput" style="
+                  padding: 10px;
+                  border-radius: 8px;
+                  border: none;
+                  font-size: 1rem;
+                  width: 100%;
+                  text-align: center;
+                ">
+              <option value="3">3 basamak</option>
+              <option value="4" selected>4 basamak</option>
+              <option value="5">5 basamak</option>
+              <option value="6">6 basamak</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex; gap:10px; justify-content:center; margin-top:10px">
+          <button class="btn-back" onclick="goBackToGameSelect()">
+            Geri
+          </button>
+          <button class="btn-primary" onclick="confirmGameSettings()" style="width:auto; padding:12px 40px">
+            Odayı Kur
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- İSİM ŞEHİR EKRANI -->
+    <div id="isimSehir-screen" class="screen">
+      <div id="isimSehir-turn-info" class="turn-info">Sıradaki Çift...</div>
+
+      <div id="letter-display" class="letter-display">
+        <div class="letter-wheel-container">
+          <span id="spinning-letter" class="spinning-letter">A</span>
+        </div>
+      </div>
+
+      <div class="category-tabs">
+        <span id="cat-isim" class="cat-tab">İSİM</span>
+        <span id="cat-sehir" class="cat-tab">ŞEHİR</span>
+        <span id="cat-hayvan" class="cat-tab">HAYVAN</span>
+      </div>
+
+      <div id="is-all-inputs" class="is-all-inputs">
+        <div class="is-input-row">
+          <label>İSİM</label>
+          <input type="text" id="isInput-isim" placeholder="İsim..." autocomplete="off" />
+        </div>
+        <div class="is-input-row">
+          <label>ŞEHİR</label>
+          <input type="text" id="isInput-sehir" placeholder="Şehir..." autocomplete="off" />
+        </div>
+        <div class="is-input-row">
+          <label>HAYVAN</label>
+          <input type="text" id="isInput-hayvan" placeholder="Hayvan..." autocomplete="off" />
+        </div>
+        <button id="isSendAllBtn" class="btn-primary" onclick="sendAllIsimSehir()">GÖNDER</button>
+        <div id="is-left-status" class="status-text">...</div>
+      </div>
+
+      <div id="is-spectator-area" class="game-split-container hidden">
+        <div id="is-left-panel" class="game-panel">
+          <div class="panel-header">
+            <h3 id="isLeftName">Oyuncu 1</h3>
+          </div>
+          <div class="panel-content">
+            <div id="is-spectator-left" class="spectator-text">🤔</div>
+          </div>
+        </div>
+        <div id="is-right-panel" class="game-panel">
+          <div class="panel-header">
+            <h3 id="isRightName">Oyuncu 2</h3>
+          </div>
+          <div class="panel-content center-content">
+            <div id="is-right-status" class="partner-waiting-animation">Yazıyor...</div>
+            <div id="is-spectator-right" class="spectator-text hidden">🤔</div>
+          </div>
+        </div>
+      </div>
+
+      <div id="is-timer" class="timer-countdown"></div>
+
+      <div class="game-footer">
+        <div id="is-round-display" style="font-size: 1.2rem; margin-bottom: 5px"></div>
+        <div id="is-game-log" class="log-container"></div>
+      </div>
+    </div>
+
+    <!-- RESİM ÇİZ (PICTIONARY) EKRANI -->
+    <div id="pictionary-screen" class="screen">
+      <div id="pic-turn-info" class="turn-info">Resim Çiz Başlıyor...</div>
+
+      <div id="pic-word-display" class="pic-word-display hidden"></div>
+
+      <div class="pic-draw-area">
+        <!-- Sol Araç Çubuğu -->
+        <div id="pic-left-tools" class="pic-left-tools hidden">
+          <button class="pic-tool-icon active" data-tool="pen" title="Kalem">
+            &#9998;
+          </button>
+          <button class="pic-tool-icon" data-tool="eraser" title="Silgi">
+            &#9003;
+          </button>
+          <button class="pic-tool-icon" data-tool="square" title="Kare">
+            &#9634;
+          </button>
+          <button class="pic-tool-icon" data-tool="rectangle" title="Dikdörtgen">
+            &#9645;
+          </button>
+          <button class="pic-tool-icon" data-tool="triangle" title="Üçgen">
+            &#9651;
+          </button>
+          <button class="pic-tool-icon" data-tool="circle" title="Daire">
+            &#9675;
+          </button>
+          <button class="pic-tool-icon" data-tool="clear" title="Temizle" onclick="clearCanvas()">
+            &#10060;
+          </button>
+          <input type="range" id="pic-thickness" min="2" max="20" value="4" class="pic-thickness-slider"
+            title="Kalınlık" />
+        </div>
+
+        <!-- Canvas -->
+        <div class="pic-canvas-container">
+          <canvas id="pic-canvas" width="500" height="450"></canvas>
+        </div>
+      </div>
+
+      <!-- Alt Renk Çubuğu -->
+      <div id="pic-color-bar" class="pic-color-bar hidden">
+        <div class="pic-color-row">
+          <span class="pic-color active" data-color="#000000" style="background: #000000" title="Siyah"></span>
+          <span class="pic-color" data-color="#ffffff" style="background: #ffffff" title="Beyaz"></span>
+          <span class="pic-color" data-color="#e74c3c" style="background: #e74c3c" title="Kırmızı"></span>
+          <span class="pic-color" data-color="#3498db" style="background: #3498db" title="Mavi"></span>
+          <span class="pic-color" data-color="#2ecc71" style="background: #2ecc71" title="Yeşil"></span>
+          <span class="pic-color" data-color="#f1c40f" style="background: #f1c40f" title="Sarı"></span>
+          <span class="pic-color" data-color="#e67e22" style="background: #e67e22" title="Turuncu"></span>
+          <span class="pic-color" data-color="#e91e63" style="background: #e91e63" title="Pembe"></span>
+        </div>
+        <div class="pic-color-row">
+          <span class="pic-color" data-color="#7f8c8d" style="background: #7f8c8d" title="Gri"></span>
+          <span class="pic-color" data-color="#8e44ad" style="background: #8e44ad" title="Mor"></span>
+          <span class="pic-color" data-color="#1abc9c" style="background: #1abc9c" title="Turkuaz"></span>
+          <span class="pic-color" data-color="#2c3e50" style="background: #2c3e50" title="Lacivert"></span>
+          <span class="pic-color" data-color="#d35400" style="background: #d35400" title="Koyu Turuncu"></span>
+          <span class="pic-color" data-color="#a0522d" style="background: #a0522d" title="Kahverengi"></span>
+          <span class="pic-color" data-color="#00bcd4" style="background: #00bcd4" title="Cyan"></span>
+          <span class="pic-color" data-color="#cddc39" style="background: #cddc39" title="Lime"></span>
+        </div>
+      </div>
+
+      <div id="pic-guess-area" class="pic-guess-area hidden">
+        <input type="text" id="pic-guess-input" placeholder="Tahmin yaz..." autocomplete="off" />
+        <button id="pic-guess-btn" onclick="sendPictionaryGuess()">
+          TAHMİN
+        </button>
+      </div>
+
+      <div id="pic-timer" class="timer-countdown"></div>
+
+      <div class="game-footer">
+        <div id="pic-round-display" style="font-size: 1.2rem; margin-bottom: 5px"></div>
+        <div id="pic-game-log" class="log-container"></div>
+      </div>
+    </div>
+
+    <!-- TABU EKRANI -->
+    <div id="tabu-screen" class="screen">
+      <div id="tabu-turn-info" class="turn-info">Tabu Başlıyor...</div>
+
+      <!-- Anlatıcı Kelime Kartı -->
+      <div id="tabu-card" class="tabu-card hidden">
+        <div id="tabu-main-word" class="tabu-main-word">KELİME</div>
+        <div class="tabu-forbidden-list">
+          <div class="tabu-forbidden-item" id="tabu-f1">---</div>
+          <div class="tabu-forbidden-item" id="tabu-f2">---</div>
+          <div class="tabu-forbidden-item" id="tabu-f3">---</div>
+          <div class="tabu-forbidden-item" id="tabu-f4">---</div>
+          <div class="tabu-forbidden-item" id="tabu-f5">---</div>
+        </div>
+      </div>
+
+      <!-- Forbidden Alert -->
+      <div id="tabu-forbidden-alert" class="tabu-forbidden-alert hidden">
+        YASAKLI KELİME! 🚫
+      </div>
+
+      <!-- Chat Alanı -->
+      <div class="tabu-chat" id="tabu-chat"></div>
+
+      <!-- Anlatıcı Input -->
+      <div id="tabu-clue-area" class="tabu-input-area hidden">
+        <input type="text" id="tabu-clue-input" placeholder="İpucu yaz..." autocomplete="off" />
+        <button id="tabu-clue-btn" onclick="sendTabuClue()">GÖNDER</button>
+        <button class="btn-pass" onclick="sendTabuPass()">PAS ⏭</button>
+      </div>
+
+      <!-- Tahmin Eden Input -->
+      <div id="tabu-guess-area" class="tabu-input-area hidden">
+        <input type="text" id="tabu-guess-input" placeholder="Tahmin yaz..." autocomplete="off" />
+        <button id="tabu-guess-btn" onclick="sendTabuGuess()">TAHMİN</button>
+      </div>
+
+      <div id="tabu-timer" class="timer-countdown"></div>
+
+      <div class="game-footer">
+        <div id="tabu-round-display" style="font-size: 1.2rem; margin-bottom: 5px"></div>
+        <div id="tabu-game-log" class="log-container"></div>
+      </div>
+    </div>
+
+    <div id="game-screen" class="screen">
+      <div id="turn-info-bar" class="turn-info">
+        Sıradaki Çift Yarışıyor...
+      </div>
+
+      <div class="game-split-container">
+        <div id="left-panel" class="game-panel">
+          <div class="panel-header">
+            <h3 id="leftName">Oyuncu 1</h3>
+          </div>
+          <div class="panel-content">
+            <div id="input-area-left" class="input-wrapper">
+              <input type="text" id="wordInput" placeholder="Kelime..." autocomplete="off" />
+              <button id="sendWordBtn" onclick="sendWord()">GÖNDER</button>
+            </div>
+            <div id="spectator-view-left" class="spectator-text hidden">
+              🤔
+            </div>
+            <div id="left-status" class="status-text">...</div>
+          </div>
+        </div>
+        <div id="right-panel" class="game-panel">
+          <div class="panel-header">
+            <h3 id="rightName">Oyuncu 2</h3>
+          </div>
+          <div class="panel-content center-content">
+            <div id="right-status" class="partner-waiting-animation">
+              Yazıyor...
+            </div>
+            <div id="spectator-view-right" class="spectator-text hidden">
+              🤔
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div id="timer-countdown" class="timer-countdown"></div>
+
+      <div class="game-footer">
+        <div id="attempts-display" style="font-size: 1.2rem; margin-bottom: 5px"></div>
+        <div id="game-log" class="log-container"></div>
+      </div>
+    </div>
+
+    <!-- SAYI TAHMİN EKRANI -->
+    <div id="sayiTahmin-screen" class="screen">
+      <div id="st-turn-info" class="turn-info">Sayı Tahmin Başlıyor...</div>
+
+      <div id="st-phase-label" class="st-phase-label hidden"></div>
+
+      <!-- Sayı Giriş Alanı (başlangıçta gizli sayı girmek için) -->
+      <div id="st-secret-area" class="st-secret-area hidden">
+        <h3 style="color:#fff; margin-bottom:12px;">Gizli Sayını Gir</h3>
+        <p style="color:rgba(255,255,255,0.6); font-size:0.85rem; margin-bottom:10px;">0-9 arası rakamlarla gizli sayını
+          seç</p>
+        <div class="st-input-row">
+          <input type="tel" id="st-secret-input" placeholder="Sayı gir..." maxlength="4" autocomplete="off"
+            class="st-big-input" />
+          <button id="st-secret-btn" onclick="sendSecretNumber()">ONAYLA</button>
+        </div>
+        <div id="st-secret-status" class="status-text"></div>
+      </div>
+
+      <!-- Tahmin Alanı -->
+      <div id="st-guess-area" class="st-guess-area hidden">
+        <div id="st-target-label" class="st-target-label"></div>
+        <div class="st-input-row">
+          <input type="tel" id="st-guess-input" placeholder="Tahmin gir..." maxlength="4" autocomplete="off"
+            class="st-big-input" />
+          <button id="st-guess-btn" onclick="sendNumberGuess()">TAHMİN</button>
+        </div>
+      </div>
+
+      <!-- Tahmin Geçmişi (iki sütun) -->
+      <div id="st-history" class="st-history hidden">
+        <div class="st-history-columns">
+          <div class="st-history-col">
+            <h4 id="st-history-left-title" class="st-col-title">Ben</h4>
+            <div id="st-history-left" class="st-history-list"></div>
+          </div>
+          <div class="st-history-col">
+            <h4 id="st-history-right-title" class="st-col-title">Rakip</h4>
+            <div id="st-history-right" class="st-history-list"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Bekleme Alanı (seyirci / karşı taraf bekliyor) -->
+      <div id="st-wait-area" class="st-wait-area hidden">
+        <div class="st-wait-text">Rakip tahmin ediyor...</div>
+      </div>
+
+      <div id="st-timer" class="timer-countdown"></div>
+
+      <div class="game-footer">
+        <div id="st-round-display" style="font-size: 1.2rem; margin-bottom: 5px"></div>
+        <div id="st-game-log" class="log-container hidden"></div>
+      </div>
+    </div>
+
+    <!-- IMPOSTER EKRANI -->
+    <div id="imposter-screen" class="screen">
+      <div class="turn-info" id="imposter-turn-info">
+        Imposter Başlıyor...
+      </div>
+      <div class="imposter-card">
+        <h2 id="imposter-title">Kelime</h2>
+        <div id="imposter-main-word" class="highlight-code">---</div>
+        <div id="imposter-hint" class="imposter-hint hidden"></div>
+      </div>
+
+      <div id="imposter-phase-label" class="imposter-phase-label hidden"></div>
+
+      <div id="imposter-answers" class="imposter-answers hidden"></div>
+
+      <div id="imposter-input-area" class="input-wrapper">
+        <input type="text" id="imposterWordInput" placeholder="Kelimeyle ilgili bir şey yaz..." autocomplete="off" />
+        <button id="imposterSendBtn" onclick="sendImposterWord()">
+          GÖNDER
+        </button>
+      </div>
+
+      <div id="imposter-submitted-list" class="imposter-submitted-list hidden"></div>
+
+      <div id="imposter-vote-area" class="imposter-vote-area hidden">
+        <h3 style="color:#fff; margin-bottom:12px;">Imposter kim? Oy ver!</h3>
+        <div id="imposter-vote-list"></div>
+      </div>
+
+      <div id="imposter-timer" class="timer-countdown"></div>
+
+      <div class="game-footer">
+        <div id="imposter-round-display" style="font-size: 1.2rem; margin-bottom: 5px"></div>
+        <div id="imposter-game-log" class="log-container"></div>
+      </div>
+    </div>
+  </div>
+  <script src="socket.io.min.js"></script>
+  <script src="client.js?v=32"></script>
+  <script>
+    // Capacitor plugin'lerini başlat (native ortamda)
+    if (window.Capacitor && window.Capacitor.isNativePlatform()) {
+      document.addEventListener('DOMContentLoaded', async () => {
+        try {
+          const { StatusBar } = window.Capacitor.Plugins;
+          await StatusBar.setStyle({ style: 'LIGHT' });
+          await StatusBar.setBackgroundColor({ color: '#f5f0e8' });
+        } catch (e) { }
+
+        try {
+          const { Keyboard } = window.Capacitor.Plugins;
+          Keyboard.setAccessoryBarVisible({ isVisible: true });
+          Keyboard.setScroll({ isDisabled: false });
+        } catch (e) { }
+
+        try {
+          const { SplashScreen } = window.Capacitor.Plugins;
+          await SplashScreen.hide();
+        } catch (e) { }
+
+        // Animasyonlu splash'i 2.5sn sonra kaldır
+        setTimeout(() => {
+          const splash = document.getElementById('app-splash');
+          if (splash) {
+            splash.classList.add('splash-hide');
+            setTimeout(() => { splash.remove(); document.body.style.backgroundColor = '#f5f0e8'; }, 600);
+          }
+        }, 2500);
+      });
+    } else {
+      // Web ortamında da splash göster
+      document.addEventListener('DOMContentLoaded', () => {
+        setTimeout(() => {
+          const splash = document.getElementById('app-splash');
+          if (splash) {
+            splash.classList.add('splash-hide');
+            setTimeout(() => { splash.remove(); document.body.style.backgroundColor = '#f5f0e8'; }, 600);
+          }
+        }, 2000);
+      });
+    }
+  </script>
+</body>
+
 </html>
