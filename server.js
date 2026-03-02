@@ -432,6 +432,8 @@ const IMPOSTER_WORDS = [
 ];
 
 io.on("connection", (socket) => {
+  const origin = socket.handshake.headers.origin || socket.handshake.headers.referer || 'unknown';
+  console.log(`Yeni bağlantı: socketId=${socket.id} origin=${origin} transport=${socket.conn.transport.name}`);
   let playerId = null;
 
   socket.on("registerPlayer", (pid) => {

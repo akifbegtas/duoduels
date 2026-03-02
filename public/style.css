@@ -677,16 +677,21 @@ body.keyboard-open #lobby-screen.active {
 .game-panel {
   flex: 1;
   padding: 20px;
-  border-radius: 16px;
+  border-radius: 18px;
   text-align: center;
   color: white;
-  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.08);
 }
 .panel-male {
   background: linear-gradient(160deg, #2980b9, #1a5276);
+  border-color: rgba(41, 128, 185, 0.3);
 }
 .panel-female {
   background: linear-gradient(160deg, #e91e63, #880e4f);
+  border-color: rgba(233, 30, 99, 0.3);
 }
 .panel-header h3 {
   margin: 0 0 10px 0;
@@ -701,23 +706,26 @@ body.keyboard-open #lobby-screen.active {
 }
 
 .turn-info {
-  padding: 14px;
+  padding: 14px 18px;
   text-align: center;
   color: white;
-  border-radius: 14px;
-  margin-bottom: 12px;
-  font-weight: bold;
+  border-radius: 16px;
+  margin-bottom: 14px;
+  font-weight: 700;
   font-size: 1.05rem;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+  letter-spacing: 0.5px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.1);
 }
 .timer-countdown {
   font-size: 3.5rem;
   text-align: center;
   font-weight: 800;
-  color: #fff;
-  text-shadow:
-    0 0 30px rgba(74, 144, 217, 0.5),
-    0 2px 8px rgba(0, 0, 0, 0.4);
+  background: var(--theme-title-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 2px 8px rgba(0, 0, 0, 0.3));
   margin: 12px 0;
 }
 
@@ -756,14 +764,19 @@ body.keyboard-open #lobby-screen.active {
 
 /* ======= GAME FOOTER ======= */
 .game-footer {
-  padding: 15px;
-  margin-top: 12px;
+  padding: 16px 18px;
+  margin-top: 14px;
   text-align: center;
   color: #fff;
 }
 .game-footer [id$="-round-display"] {
-  color: var(--theme-primary);
-  font-weight: 700;
+  background: var(--theme-gradient);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-weight: 800;
+  font-size: 1.25rem;
+  letter-spacing: 0.5px;
 }
 .log-container {
   max-height: 150px;
@@ -873,20 +886,47 @@ button:active {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
+  background: linear-gradient(145deg, rgba(20, 18, 50, 0.92), rgba(10, 8, 35, 0.95));
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  border: 1px solid var(--theme-border);
+  border-radius: 20px;
+  padding: 18px 16px;
+  margin: 10px 0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), 0 0 0 1px rgba(255, 255, 255, 0.05);
 }
 .input-wrapper input {
   width: 90%;
-  background: rgba(255, 255, 255, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
   color: #fff;
+  font-size: 1.05rem;
+  padding: 14px 16px;
+  border-radius: 14px;
+  transition: all 0.3s ease;
+}
+.input-wrapper input:focus {
+  border-color: var(--theme-primary);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 20px var(--theme-glow), inset 0 0 12px rgba(255, 255, 255, 0.03);
 }
 .input-wrapper input::placeholder {
-  color: rgba(255, 255, 255, 0.5);
+  color: rgba(255, 255, 255, 0.4);
 }
 .input-wrapper button {
-  background: linear-gradient(135deg, #27ae60, #2ecc71);
-  box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
+  background: var(--theme-gradient);
+  box-shadow: 0 4px 20px var(--theme-glow), 0 0 0 1px var(--theme-border);
+  padding: 12px 32px;
+  border-radius: 14px;
+  font-size: 1rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  transition: all 0.3s ease;
+}
+.input-wrapper button:active {
+  transform: scale(0.96);
+  box-shadow: 0 2px 12px var(--theme-glow);
 }
 
 /* ======= OYUN SEÇİM EKRANI ======= */
@@ -1019,15 +1059,16 @@ button:active {
 
 /* ======= İSİM ŞEHİR 3'LÜ INPUT ======= */
 .is-all-inputs {
-  background: rgba(255, 255, 255, 0.12);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 16px;
-  padding: 16px;
+  background: linear-gradient(145deg, rgba(20, 18, 50, 0.92), rgba(10, 8, 35, 0.95));
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  border: 1px solid var(--theme-border);
+  border-radius: 20px;
+  padding: 18px;
   display: flex;
   flex-direction: column;
   gap: 10px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 .is-input-row {
   display: flex;
@@ -1268,18 +1309,40 @@ button:active {
 
 .pic-guess-area {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   justify-content: center;
   align-items: center;
-  margin: 10px 0;
+  margin: 12px 0;
+  background: linear-gradient(145deg, rgba(20, 18, 50, 0.92), rgba(10, 8, 35, 0.95));
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  border: 1px solid var(--theme-border);
+  border-radius: 20px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
 .pic-guess-area input {
   width: 60%;
   margin-bottom: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 1rem;
+}
+.pic-guess-area input:focus {
+  border-color: var(--theme-primary);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 20px var(--theme-glow);
 }
 .pic-guess-area button {
-  background: linear-gradient(135deg, #27ae60, #2ecc71);
-  box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
+  background: var(--theme-gradient);
+  box-shadow: 0 4px 18px var(--theme-glow);
+  padding: 12px 24px;
+  border-radius: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
 }
 .pic-guess-wrong {
   animation: shakeInput 0.4s ease;
@@ -1299,16 +1362,19 @@ button:active {
 
 /* ======= TABU ======= */
 .tabu-card {
-  background: rgba(30, 30, 50, 0.9);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 2px solid rgba(74, 144, 217, 0.5);
-  border-radius: 20px;
-  padding: 20px;
-  margin: 10px auto;
-  max-width: 320px;
+  background: linear-gradient(145deg, rgba(20, 18, 50, 0.95), rgba(10, 8, 35, 0.97));
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  border: 1.5px solid var(--theme-border);
+  border-radius: 22px;
+  padding: 22px;
+  margin: 12px auto;
+  max-width: 340px;
   text-align: center;
-  box-shadow: 0 8px 35px rgba(74, 144, 217, 0.25);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.25),
+    0 4px 16px var(--theme-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 .tabu-main-word {
   font-size: 2rem;
@@ -1398,18 +1464,40 @@ button:active {
 }
 .tabu-input-area {
   display: flex;
-  gap: 8px;
+  gap: 10px;
   justify-content: center;
   align-items: center;
-  margin: 10px 0;
+  margin: 12px 0;
+  background: linear-gradient(145deg, rgba(20, 18, 50, 0.92), rgba(10, 8, 35, 0.95));
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+  border: 1px solid var(--theme-border);
+  border-radius: 20px;
+  padding: 14px 16px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
 }
 .tabu-input-area input {
   width: 50%;
   margin-bottom: 0;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1.5px solid rgba(255, 255, 255, 0.15);
+  color: #fff;
+  padding: 12px 14px;
+  border-radius: 14px;
+  font-size: 1rem;
+}
+.tabu-input-area input:focus {
+  border-color: var(--theme-primary);
+  background: rgba(255, 255, 255, 0.12);
+  box-shadow: 0 0 20px var(--theme-glow);
 }
 .tabu-input-area button {
-  background: linear-gradient(135deg, #27ae60, #2ecc71);
-  box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
+  background: var(--theme-gradient);
+  box-shadow: 0 4px 18px var(--theme-glow);
+  padding: 12px 20px;
+  border-radius: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
 }
 .btn-pass {
   background: linear-gradient(135deg, #e67e22, #d35400) !important;
@@ -1570,16 +1658,19 @@ button:active {
 
 /* ======= IMPOSTER ======= */
 .imposter-card {
-  background: rgba(30, 30, 50, 0.9);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  border-radius: 20px;
-  padding: 25px;
+  background: linear-gradient(145deg, rgba(20, 18, 50, 0.95), rgba(10, 8, 35, 0.97));
+  backdrop-filter: blur(24px) saturate(1.3);
+  -webkit-backdrop-filter: blur(24px) saturate(1.3);
+  border: 1.5px solid var(--theme-border);
+  border-radius: 22px;
+  padding: 28px 24px;
   margin: 15px auto;
   max-width: 350px;
   text-align: center;
-  box-shadow: 0 8px 35px rgba(0, 0, 0, 0.3);
+  box-shadow:
+    0 12px 40px rgba(0, 0, 0, 0.3),
+    0 4px 16px var(--theme-shadow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 .imposter-hint {
   margin-top: 12px;
@@ -1593,11 +1684,15 @@ button:active {
 }
 .imposter-phase-label {
   text-align: center;
-  font-size: 1rem;
+  font-size: 1.05rem;
   font-weight: 700;
-  color: #f39c12;
-  margin: 8px 0;
-  letter-spacing: 1px;
+  background: linear-gradient(135deg, #f39c12, #e74c3c);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin: 10px 0;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
 }
 .imposter-submitted-list {
   max-width: 350px;
@@ -1619,26 +1714,35 @@ button:active {
 .imposter-answers {
   max-width: 400px;
   margin: 10px auto;
-  background: rgba(255, 255, 255, 0.08);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 16px;
-  padding: 14px;
+  background: linear-gradient(145deg, rgba(20, 18, 50, 0.9), rgba(10, 8, 35, 0.93));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--theme-border);
+  border-radius: 18px;
+  padding: 16px;
   max-height: 250px;
   overflow-y: auto;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.2);
 }
 .imposter-answers h4 {
-  color: #f39c12;
-  font-size: 0.9rem;
-  margin-bottom: 8px;
+  background: linear-gradient(135deg, #f39c12, #e67e22);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  font-size: 0.95rem;
+  font-weight: 700;
+  margin-bottom: 10px;
 }
 .imposter-answer-item {
-  padding: 6px 12px;
-  margin: 4px 0;
+  padding: 8px 14px;
+  margin: 5px 0;
   background: rgba(255, 255, 255, 0.06);
-  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
   color: #eee;
   font-size: 0.9rem;
   font-weight: 500;
+  transition: background 0.2s;
 }
 .imposter-vote-area {
   max-width: 350px;
@@ -2174,8 +2278,12 @@ button:active {
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 .st-input-row button {
-  background: linear-gradient(135deg, #27ae60, #2ecc71);
-  box-shadow: 0 4px 15px rgba(39, 174, 96, 0.4);
+  background: var(--theme-gradient);
+  box-shadow: 0 4px 18px var(--theme-glow), 0 0 0 1px var(--theme-border);
+  padding: 12px 24px;
+  border-radius: 14px;
+  font-weight: 700;
+  letter-spacing: 1px;
 }
 .st-guess-area {
   background: linear-gradient(145deg, rgba(20, 18, 50, 0.92), rgba(10, 8, 35, 0.95));

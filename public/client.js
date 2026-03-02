@@ -250,6 +250,31 @@ function selectGame(type) {
     pendingRoomData.maxPlayers = tekVal;
   }
 
+  // Imposter en az 3 kişi gerektirir - 2 kişi seçiliyse sıfırla
+  const tekCount2 = document.getElementById("tekCount2");
+  if (tekCount2) {
+    if (type === "imposter") {
+      tekCount2.disabled = true;
+      tekCount2.style.display = "none";
+      const sel = document.getElementById("tekCountSelect");
+      if (sel && sel.value === "2") {
+        sel.value = "";
+        Swal.fire({
+          html: `<div style="font-size:3rem;margin-bottom:10px">🕵️</div>
+                 <div style="font-size:1.2rem;font-weight:700;color:#fff;margin-bottom:6px">Imposter en az 3 kişi gerektirir!</div>
+                 <div style="font-size:0.9rem;color:rgba(255,255,255,0.7)">Lütfen en az 3 kişi seçin</div>`,
+          confirmButtonText: 'Tamam',
+          timer: 3000,
+          timerProgressBar: true,
+        });
+        return;
+      }
+    } else {
+      tekCount2.disabled = false;
+      tekCount2.style.display = "";
+    }
+  }
+
   pendingRoomData.gameType = type;
   pendingRoomData.gameMode = selectedMode;
 
