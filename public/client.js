@@ -380,11 +380,107 @@ function switchTab(mode) {
   if (mode === "create") {
     slider.style.transform = "translateX(0)";
     btns[0].classList.add("active");
-  } else {
-    slider.style.transform = "translateX(-50%)";
+  } else if (mode === "join") {
+    slider.style.transform = "translateX(-33.333%)";
     btns[1].classList.add("active");
+  } else if (mode === "matchmaking") {
+    slider.style.transform = "translateX(-66.666%)";
+    btns[2].classList.add("active");
   }
 }
+
+// --- MATCHMAKING ---
+let selectedMMMode = "duo";
+
+function selectMMMode(mode) {
+  selectedMMMode = mode;
+  document.querySelectorAll(".mm-mode-btn").forEach(b => b.classList.remove("active"));
+  document.querySelector('.mm-mode-btn[data-mode="' + mode + '"]').classList.add("active");
+}
+
+function toggleMMGame(checkbox) {
+  const chip = checkbox.closest(".mm-game-chip");
+  if (checkbox.checked) {
+    chip.classList.add("selected");
+  } else {
+    chip.classList.remove("selected");
+  }
+}
+
+function findMatch() {
+  const username = document.getElementById("username").value.trim();
+  const genderEl = document.querySelector('input[name="gender"]:checked');
+  if (!username) {
+    showHint("input-hint", "İsim giriniz!");
+    return;
+  }
+  if (!genderEl) {
+    showHint("gender-hint", "Cinsiyet seçiniz!");
+    return;
+  }
+  const selectedGames = [];
+  document.querySelectorAll("#mm-game-grid input[type='checkbox']:checked").forEach(cb => {
+    selectedGames.push(cb.value);
+  });
+  if (selectedGames.length === 0) {
+    Swal.fire({ title: "En az 1 oyun seçmelisin!", icon: "warning", customClass: { popup: "swal-premium" }, background: "rgba(15,12,40,0.95)", color: "#fff" });
+    return;
+  }
+  socket.emit("findMatch", {
+    playerId: myPlayerId,
+    username: username,
+    gender: genderEl.value,
+    mode: selectedMMMode,
+    selectedGames: selectedGames
+  });
+  // Bekleme ekranına geç
+  showScreen("matchmaking-screen");
+}
+
+function cancelMatchmaking() {
+  socket.emit("cancelMatchmaking", { playerId: myPlayerId });
+  resetMatchmakingScreen();
+  showScreen("lobby");
+}
+
+function resetMatchmakingScreen() {
+  var wtitle = document.querySelector(".mm-waiting-title");
+  var wsub = document.getElementById("mm-waiting-text");
+  var wcancelBtn = document.querySelector(".mm-cancel-btn");
+  if (wtitle) wtitle.textContent = "Oyuncu Aranıyor...";
+  if (wsub) wsub.textContent = "Karşı cinsten bir oyuncu bekleniyor";
+  if (wcancelBtn) wcancelBtn.style.display = "";
+}
+
+// Matchmaking socket listeners
+socket.on("matchSearching", function(data) {
+  const txt = document.getElementById("mm-waiting-text");
+  if (txt && data.message) txt.textContent = data.message;
+});
+
+socket.on("matchFound", function(data) {
+  // Eşleşme bulundu — odaya katıl
+  currentRoom = data.roomId;
+  sessionStorage.setItem("duoduels_room", data.roomId);
+  isHost = data.isHost || false;
+  window._currentGameType = data.gameType;
+  // Bekleme ekranında "Eşleşme bulundu!" göster
+  var wtitle = document.querySelector(".mm-waiting-title");
+  var wsub = document.getElementById("mm-waiting-text");
+  var wcancelBtn = document.querySelector(".mm-cancel-btn");
+  if (wtitle) wtitle.textContent = "Eşleşme Bulundu!";
+  if (wsub) wsub.textContent = data.players.map(function(p) { return p.username; }).join(" vs ") + " — " + data.gameType;
+  if (wcancelBtn) wcancelBtn.style.display = "none";
+});
+
+socket.on("matchCancelled", function() {
+  showScreen("lobby");
+});
+
+socket.on("autoStartGame", function(roomId) {
+  // Matchmaking sonrası otomatik oyun başlat
+  socket.emit("startGame", roomId);
+});
 
 function copyRoomCode() {
   const el = document.getElementById("displayRoomCode");
@@ -584,6 +680,12 @@ function hideConnectionStatus() {
     document.body.classList.add("keyboard-open");
     document.documentElement.classList.add("keyboard-open");
     document.documentElement.style.setProperty("--keyboard-height", keyboardHeight + "px");
+    // Klavye açıkken visible alanı zorla ayarla
+    const visibleHeight = window.innerHeight;
+    document.body.style.height = visibleHeight + "px";
+    document.body.style.maxHeight = visibleHeight + "px";
+    document.querySelector(".main-container").style.minHeight = visibleHeight + "px";
+    document.querySelector(".main-container").style.maxHeight = visibleHeight + "px";
     scrollToActiveInput();
   }
 
@@ -592,6 +694,11 @@ function hideConnectionStatus() {
     document.body.classList.remove("keyboard-open");
     document.documentElement.classList.remove("keyboard-open");
     document.documentElement.style.removeProperty("--keyboard-height");
+    // Yükseklik override'larını temizle
+    document.body.style.height = "";
+    document.body.style.maxHeight = "";
+    document.querySelector(".main-container").style.minHeight = "";
+    document.querySelector(".main-container").style.maxHeight = "";
     // iOS'ta blur sonrası viewport fix
     window.scrollTo(0, 0);
   }
@@ -2046,6 +2153,7 @@ socket.on("tabuGameOver", (msg) => {
 const screens = {
   lobby: document.getElementById("lobby-screen"),
   waiting: document.getElementById("waiting-screen"),
+  "matchmaking-screen": document.getElementById("matchmaking-screen"),
   game: document.getElementById("game-screen"),
   gameSelect: document.getElementById("game-select-screen"),
   gameSettings: document.getElementById("game-settings-screen"),

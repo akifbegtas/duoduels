@@ -101,6 +101,188 @@ io.use((socket, next) => {
 
 const rooms = {};
 
+// --- Matchmaking Queue ---
+const matchmakingQueue = {
+  duo: { male: [], female: [] },
+  cift: { male: [], female: [] },
+  tek: { male: [], female: [] }
+};
+
+function removeFromMatchmaking(pid) {
+  for (const mode of ['duo', 'cift', 'tek']) {
+    for (const gender of ['male', 'female']) {
+      const idx = matchmakingQueue[mode][gender].findIndex(p => p.playerId === pid);
+      if (idx !== -1) matchmakingQueue[mode][gender].splice(idx, 1);
+    }
+  }
+}
+
+function checkForMatch(mode) {
+  const males = matchmakingQueue[mode].male;
+  const females = matchmakingQueue[mode].female;
+
+  if (mode === 'duo' || mode === 'tek') {
+    // 1 erkek + 1 kadın
+    if (males.length >= 1 && females.length >= 1) {
+      const male = males.shift();
+      const female = females.shift();
+      createMatchRoom(mode, [male, female]);
+    }
+  } else if (mode === 'cift') {
+    // 2 erkek + 2 kadın = 2 çift
+    if (males.length >= 2 && females.length >= 2) {
+      const m1 = males.shift();
+      const m2 = males.shift();
+      const f1 = females.shift();
+      const f2 = females.shift();
+      createMatchRoom(mode, [m1, f1, m2, f2]);
+    }
+  }
+}
+
+function createMatchRoom(mode, players) {
+  // Ortak oyun bul
+  const allGames = players.map(p => p.selectedGames);
+  let commonGames = allGames[0].filter(g => allGames.every(a => a.includes(g)));
+  let chosenGame;
+  if (commonGames.length > 0) {
+    chosenGame = commonGames[Math.floor(Math.random() * commonGames.length)];
+  } else {
+    // Kesişim yok — tüm seçimlerden rastgele
+    const allSelected = [...new Set(allGames.flat())];
+    chosenGame = allSelected[Math.floor(Math.random() * allSelected.length)];
+  }
+
+  const roomId = generateRoomId();
+  const defaultTimes = { telepati: 10, isimSehir: 20, pictionary: 45, tabu: 60, sayiTahmin: 60, imposter: 60 };
+
+  let teams = [];
+  let roomPlayers = [];
+  let maxPlayers = 0;
+
+  if (mode === 'duo') {
+    teams = [{ id: 0, name: 'Takım 1', p1: null, p2: null }];
+    teams[0].p1 = { id: players[0].playerId, socketId: players[0].socketId, username: players[0].username, gender: players[0].gender, isHost: true };
+    teams[0].p2 = { id: players[1].playerId, socketId: players[1].socketId, username: players[1].username, gender: players[1].gender, isHost: false };
+  } else if (mode === 'cift') {
+    teams = [
+      { id: 0, name: 'Takım 1', p1: null, p2: null },
+      { id: 1, name: 'Takım 2', p1: null, p2: null }
+    ];
+    teams[0].p1 = { id: players[0].playerId, socketId: players[0].socketId, username: players[0].username, gender: players[0].gender, isHost: true };
+    teams[0].p2 = { id: players[1].playerId, socketId: players[1].socketId, username: players[1].username, gender: players[1].gender, isHost: false };
+    teams[1].p1 = { id: players[2].playerId, socketId: players[2].socketId, username: players[2].username, gender: players[2].gender, isHost: false };
+    teams[1].p2 = { id: players[3].playerId, socketId: players[3].socketId, username: players[3].username, gender: players[3].gender, isHost: false };
+  } else if (mode === 'tek') {
+    roomPlayers = players.map((p, i) => ({
+      id: p.playerId, socketId: p.socketId, username: p.username, gender: p.gender, isHost: i === 0
+    }));
+    maxPlayers = players.length;
+  }
+
+  rooms[roomId] = {
+    id: roomId,
+    gameMode: mode,
+    teams: teams,
+    players: roomPlayers,
+    maxPlayers: maxPlayers,
+    spectators: [],
+    gameStatus: "waiting",
+    gameType: chosenGame,
+    currentPairIndex: 0,
+    roundCount: 5,
+    roundTime: defaultTimes[chosenGame] || 10,
+    currentRound: 1,
+    pairs: [],
+    moves: {},
+    telepatiTimer: null,
+    soloPlayers: [],
+    currentDrawerIndex: 0,
+    pictionaryScores: {},
+    pictionaryUsedWords: [],
+    pictionaryDrawerToggle: 0,
+    pictionaryGuessOrder: [],
+    pictionaryTimer: null,
+    currentLetter: null,
+    currentCategory: null,
+    categoryIndex: 0,
+    isimSehirScores: {},
+    usedLetters: [],
+    isimSehirTimer: null,
+    tabuScores: {},
+    tabuUsedWords: [],
+    tabuTimer: null,
+    tabuCurrentWord: null,
+    tabuDescriberId: null,
+    tabuGuesserId: null,
+    tabuClues: [],
+    tabuDescriberToggle: 0,
+    sayiTahminSecrets: {},
+    sayiTahminGuesses: {},
+    sayiTahminCurrentTurn: null,
+    sayiTahminRound: 1,
+    sayiTahminDigitCount: 4,
+    sayiTahminTimer: null,
+    sayiTahminTieCount: 0,
+    isMatchmaking: true
+  };
+
+  console.log(`Matchmaking Oda: ${roomId} | Mod: ${mode} | Oyun: ${chosenGame} | Oyuncular: ${players.map(p => p.username).join(', ')}`);
+
+  // Tüm oyuncuları odaya sok ve bilgilendir
+  players.forEach(p => {
+    const sock = io.sockets.sockets.get(p.socketId);
+    if (sock) {
+      sock.join(roomId);
+      sock.emit("matchFound", {
+        roomId: roomId,
+        gameType: chosenGame,
+        gameMode: mode,
+        isHost: p === players[0],
+        players: players.map(pl => ({ username: pl.username, gender: pl.gender }))
+      });
+    }
+  });
+
+  // 2 saniye sonra oyunu otomatik başlat
+  setTimeout(() => {
+    const room = rooms[roomId];
+    if (!room) return;
+    autoStartGame(roomId);
+  }, 2000);
+}
+
+function autoStartGame(roomId) {
+  const room = rooms[roomId];
+  if (!room) return;
+
+  room.gameStatus = "playing";
+
+  if (room.gameType === 'telepati' || room.gameType === 'isimSehir' || room.gameType === 'sayiTahmin' || room.gameType === 'tabu') {
+    if (room.gameMode === 'tek') {
+      // Tek mod — şimdilik sadece pictionary destekli, diğerleri duo/cift gibi çalışsın
+    }
+    // Duo/Cift modlarında pairs oluştur ve ilk round'u başlat
+    // startGame event'ini simüle et — host'un socketId'sini bulup startGame emit edelim
+    const hostSocket = findHostSocket(room);
+    if (hostSocket) {
+      hostSocket.emit("autoStartGame", roomId);
+    }
+  }
+}
+
+function findHostSocket(room) {
+  let hostId;
+  if (room.gameMode === 'tek' && room.players.length > 0) {
+    const host = room.players.find(p => p.isHost);
+    if (host) hostId = host.socketId;
+  } else if (room.teams.length > 0 && room.teams[0].p1) {
+    hostId = room.teams[0].p1.socketId;
+  }
+  if (hostId) return io.sockets.sockets.get(hostId);
+  return null;
+}
+
 // --- Player Identity ---
 const playerSockets = {}; // playerId -> socketId
 
@@ -441,6 +623,50 @@ io.on("connection", (socket) => {
       playerId = pid;
       playerSockets[pid] = socket.id;
     }
+  });
+
+  // --- MATCHMAKING ---
+  socket.on("findMatch", (data) => {
+    const pid = playerId || socket.id;
+    const username = sanitizeString(data.username, 12) || "Oyuncu";
+    const gender = VALID_GENDERS.includes(data.gender) ? data.gender : null;
+    const mode = VALID_GAME_MODES.includes(data.mode) ? data.mode : null;
+
+    if (!gender || !mode) {
+      socket.emit("matchCancelled");
+      return;
+    }
+
+    const selectedGames = Array.isArray(data.selectedGames)
+      ? data.selectedGames.filter(g => VALID_GAME_TYPES.includes(g))
+      : [];
+
+    if (selectedGames.length === 0) {
+      socket.emit("matchCancelled");
+      return;
+    }
+
+    // Önce eski kuyruklardan temizle
+    removeFromMatchmaking(pid);
+
+    matchmakingQueue[mode][gender].push({
+      playerId: pid,
+      socketId: socket.id,
+      username: username,
+      gender: gender,
+      selectedGames: selectedGames
+    });
+
+    socket.emit("matchSearching", { message: "Karşı cinsten oyuncu aranıyor..." });
+    console.log(`Matchmaking: ${username} (${gender}) ${mode} modunda arıyor. Kuyruk: E:${matchmakingQueue[mode].male.length} K:${matchmakingQueue[mode].female.length}`);
+
+    checkForMatch(mode);
+  });
+
+  socket.on("cancelMatchmaking", () => {
+    const pid = playerId || socket.id;
+    removeFromMatchmaking(pid);
+    socket.emit("matchCancelled");
   });
 
   // --- ODA OLUŞTURMA ---
@@ -1591,6 +1817,8 @@ io.on("connection", (socket) => {
   // --- DISCONNECT ---
   socket.on("disconnect", () => {
     const pid = playerId || socket.id;
+    // Matchmaking kuyruğundan çıkar
+    removeFromMatchmaking(pid);
     for (const roomId of Object.keys(rooms)) {
       const room = rooms[roomId];
       const player = findPlayerInRoom(room, pid);

@@ -399,6 +399,7 @@ body.keyboard-open #lobby-screen.active {
   align-items: flex-start;
   justify-content: flex-start;
   padding-top: 20px;
+  min-height: auto;
 }
 
 @keyframes fadeSlideUp {
@@ -514,12 +515,12 @@ body.keyboard-open #lobby-screen.active {
 
 .forms-slider {
   display: flex;
-  width: 200%;
+  width: 300%;
   transition: 0.4s ease;
 }
 
 .slide-section {
-  width: 50%;
+  width: 33.333%;
   padding: 10px 5px;
 }
 
@@ -3085,6 +3086,7 @@ body.keyboard-open textarea:focus {
   left: 0;
   width: 100vw;
   height: 100vh;
+  height: 100lvh;
   z-index: 0;
   pointer-events: none;
   background-color: var(--bg-cream);
@@ -3216,4 +3218,183 @@ body.keyboard-open textarea:focus {
   align-items: center;
   justify-content: center;
   gap: 12px;
+}
+
+/* ======= MATCHMAKING ======= */
+.tab-container-3 .tab-btn {
+  font-size: 0.8rem;
+  padding: 8px 4px;
+}
+
+.matchmaking-content {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.matchmaking-content label {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
+
+.mm-mode-btns {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.mm-mode-btn {
+  flex: 1;
+  padding: 8px 4px;
+  border: 1px solid var(--theme-border);
+  background: rgba(255, 255, 255, 0.05);
+  color: rgba(255, 255, 255, 0.6);
+  border-radius: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.mm-mode-btn.active {
+  background: var(--theme-gradient);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 2px 10px var(--theme-glow);
+}
+
+.mm-game-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.mm-game-chip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border: 1px solid var(--theme-border);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 20px;
+  cursor: pointer;
+  transition: all 0.3s;
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.mm-game-chip input[type="checkbox"] {
+  display: none;
+}
+
+.mm-game-chip.selected {
+  background: var(--theme-gradient);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 2px 8px var(--theme-glow);
+}
+
+.mm-search-btn {
+  margin-top: 6px;
+  font-size: 0.95rem;
+}
+
+/* Matchmaking Bekleme Ekranı */
+.mm-waiting-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 80vh;
+  min-height: 80dvh;
+  text-align: center;
+  padding: 20px;
+}
+
+.mm-waiting-anim {
+  position: relative;
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 30px;
+}
+
+.mm-pulse-ring {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border: 2px solid var(--theme-primary);
+  border-radius: 50%;
+  animation: mmPulse 2s ease-out infinite;
+}
+
+.mm-pulse-ring-2 {
+  animation-delay: 1s;
+}
+
+@keyframes mmPulse {
+  0% { transform: scale(0.5); opacity: 1; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+.mm-search-icon {
+  font-size: 3rem;
+  z-index: 1;
+  animation: mmBounce 1.5s ease-in-out infinite;
+}
+
+@keyframes mmBounce {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.15); }
+}
+
+.mm-waiting-title {
+  color: #fff;
+  font-size: 1.4rem;
+  margin-bottom: 8px;
+}
+
+.mm-waiting-sub {
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 0.9rem;
+  margin-bottom: 30px;
+}
+
+.mm-waiting-dots {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+
+.mm-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--theme-primary);
+  animation: mmDotPulse 1.4s ease-in-out infinite;
+}
+
+.mm-dot:nth-child(2) { animation-delay: 0.2s; }
+.mm-dot:nth-child(3) { animation-delay: 0.4s; }
+
+@keyframes mmDotPulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1.2); }
+}
+
+.mm-waiting-tip {
+  color: rgba(255, 255, 255, 0.35);
+  font-size: 0.75rem;
+  margin-bottom: 30px;
+  max-width: 250px;
+  line-height: 1.4;
+}
+
+.mm-cancel-btn {
+  min-width: 180px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
 }

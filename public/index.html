@@ -71,12 +71,15 @@
           <span id="gender-hint" class="input-hint hidden"></span>
         </div>
 
-        <div class="tab-container">
+        <div class="tab-container tab-container-3">
           <button class="tab-btn active" onclick="switchTab('create')">
             Oyun Seç
           </button>
           <button class="tab-btn" onclick="switchTab('join')">
             Odaya Katıl
+          </button>
+          <button class="tab-btn" onclick="switchTab('matchmaking')">
+            Oyun Ara
           </button>
         </div>
 
@@ -97,8 +100,53 @@
                 </button>
               </div>
             </div>
+
+            <div class="slide-section">
+              <div class="matchmaking-content">
+                <div class="mm-mode-select">
+                  <label>Mod Seç</label>
+                  <div class="mm-mode-btns">
+                    <button class="mm-mode-btn active" data-mode="duo" onclick="selectMMMode('duo')">Başbaşa</button>
+                    <button class="mm-mode-btn" data-mode="cift" onclick="selectMMMode('cift')">Çiftler</button>
+                    <button class="mm-mode-btn" data-mode="tek" onclick="selectMMMode('tek')">Herkes Tek</button>
+                  </div>
+                </div>
+                <div class="mm-game-select">
+                  <label>Oyun Seç (birden fazla seçebilirsin)</label>
+                  <div class="mm-game-grid" id="mm-game-grid">
+                    <label class="mm-game-chip selected"><input type="checkbox" value="telepati" checked onchange="toggleMMGame(this)" /><span>🧠 Telepati</span></label>
+                    <label class="mm-game-chip selected"><input type="checkbox" value="isimSehir" checked onchange="toggleMMGame(this)" /><span>🔤 İsim Şehir</span></label>
+                    <label class="mm-game-chip selected"><input type="checkbox" value="pictionary" checked onchange="toggleMMGame(this)" /><span>🎨 Resim Çiz</span></label>
+                    <label class="mm-game-chip selected"><input type="checkbox" value="sayiTahmin" checked onchange="toggleMMGame(this)" /><span>🔢 Sayı Tahmin</span></label>
+                    <label class="mm-game-chip selected"><input type="checkbox" value="tabu" checked onchange="toggleMMGame(this)" /><span>🚫 Tabu</span></label>
+                  </div>
+                </div>
+                <button class="btn-primary mm-search-btn" onclick="findMatch()">
+                  Eşleşme Ara
+                </button>
+              </div>
+            </div>
           </div>
         </div>
+      </div>
+    </div>
+
+    <div id="matchmaking-screen" class="screen">
+      <div class="mm-waiting-container">
+        <div class="mm-waiting-anim">
+          <div class="mm-pulse-ring"></div>
+          <div class="mm-pulse-ring mm-pulse-ring-2"></div>
+          <div class="mm-search-icon">🔍</div>
+        </div>
+        <h2 class="mm-waiting-title">Oyuncu Aranıyor...</h2>
+        <p class="mm-waiting-sub" id="mm-waiting-text">Karşı cinsten bir oyuncu bekleniyor</p>
+        <div class="mm-waiting-dots">
+          <span class="mm-dot"></span>
+          <span class="mm-dot"></span>
+          <span class="mm-dot"></span>
+        </div>
+        <div class="mm-waiting-tip" id="mm-waiting-tip">Eşleşme bulunduğunda oyun otomatik başlayacak</div>
+        <button class="btn-secondary mm-cancel-btn" onclick="cancelMatchmaking()">Aramayı İptal Et</button>
       </div>
     </div>
 
@@ -189,11 +237,6 @@
                   <h3>Sayı Tahmin</h3>
                   <p>4 haneli sayıyı tahmin et!</p>
                 </div>
-                <div class="game-card" id="card-imposter-cift" onclick="selectGame('imposter')">
-                  <div class="game-card-icon">🕵️‍♂️</div>
-                  <h3>Imposter</h3>
-                  <p>Bir kişi impostor! Herkes ne yazdı gözükecek.</p>
-                </div>
               </div>
             </div>
             <!-- Panel 1: Başbaşa -->
@@ -224,16 +267,6 @@
                   <div class="game-card-icon">🔢</div>
                   <h3>Sayı Tahmin</h3>
                   <p>4 haneli sayıyı tahmin et!</p>
-                </div>
-                <div class="game-card" id="card-tabu-duo" onclick="selectGame('tabu')">
-                  <div class="game-card-icon">🚫</div>
-                  <h3>Tabu</h3>
-                  <p>Yasaklı kelime kullanmadan anlat!</p>
-                </div>
-                <div class="game-card" id="card-imposter-duo" onclick="selectGame('imposter')">
-                  <div class="game-card-icon">🕵️‍♂️</div>
-                  <h3>Imposter</h3>
-                  <p>Bir kişi impostor! Herkes ne yazdı gözükecek.</p>
                 </div>
               </div>
             </div>
@@ -273,16 +306,6 @@
                   <div class="game-card-icon">🔢</div>
                   <h3>Sayı Tahmin</h3>
                   <p>4 haneli sayıyı tahmin et!</p>
-                </div>
-                <div class="game-card" id="card-tabu-tek" onclick="selectGame('tabu')">
-                  <div class="game-card-icon">🚫</div>
-                  <h3>Tabu</h3>
-                  <p>Yasaklı kelime kullanmadan anlat!</p>
-                </div>
-                <div class="game-card" id="card-imposter-tek" onclick="selectGame('imposter')">
-                  <div class="game-card-icon">🕵️‍♂️</div>
-                  <h3>Imposter</h3>
-                  <p>Bir kişi impostor! Herkes ne yazdı gözükecek.</p>
                 </div>
               </div>
             </div>
