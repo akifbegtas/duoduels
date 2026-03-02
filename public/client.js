@@ -27,11 +27,14 @@ Swal.fire = function(opts) {
 // Tüm ortamlarda sunucuya bağlan
 const isNative = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform();
 const isLocalDev = !isNative && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+const PRODUCTION_URL = 'https://duoduels-599689373205.europe-west1.run.app';
 const SERVER_URL = isLocalDev
   ? window.location.origin
-  : (window.location.hostname === 'duoduels.com' || window.location.hostname === 'www.duoduels.com' || window.location.hostname.endsWith('.run.app'))
-    ? window.location.origin
-    : 'https://duoduels.onrender.com';
+  : isNative
+    ? PRODUCTION_URL
+    : (window.location.hostname === 'duoduels.com' || window.location.hostname === 'www.duoduels.com' || window.location.hostname.endsWith('.run.app'))
+      ? window.location.origin
+      : PRODUCTION_URL;
 const socket = io(SERVER_URL);
 
 // --- ROUND TRANSITION TOAST ---
