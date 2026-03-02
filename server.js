@@ -14,6 +14,7 @@ const ALLOWED_ORIGINS = [
   'https://duoduels-efwwv7zyia-ew.a.run.app',
   'https://duoduels-599689373205.europe-west1.run.app',
   'capacitor://localhost',
+  'duoduels://localhost',
   'http://localhost',
   'http://localhost:3000',
   'http://127.0.0.1:3000',
@@ -46,7 +47,7 @@ app.use((req, res, next) => {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
     "font-src https://fonts.gstatic.com; " +
     "img-src 'self' data:; " +
-    "connect-src 'self' wss://duoduels.onrender.com wss://duoduels.com wss://www.duoduels.com ws://localhost:3000 ws://127.0.0.1:3000;"
+    "connect-src 'self' wss://duoduels.onrender.com wss://duoduels.com wss://www.duoduels.com wss://duoduels-599689373205.europe-west1.run.app ws://localhost:3000 ws://127.0.0.1:3000;"
   );
   next();
 });
