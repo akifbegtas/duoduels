@@ -59,7 +59,7 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Content-Security-Policy',
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.gstatic.com https://apis.google.com; " +
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.gstatic.com https://apis.google.com; " +
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
     "font-src https://fonts.gstatic.com; " +
     "img-src 'self' data: https://*.googleusercontent.com https://*.facebook.com; " +
@@ -75,6 +75,38 @@ app.use(express.static(path.join(__dirname, "public")));
 const VALID_GAME_TYPES = ['telepati', 'isimSehir', 'pictionary', 'tabu', 'sayiTahmin', 'imposter'];
 const VALID_GENDERS = ['male', 'female'];
 const VALID_GAME_MODES = ['cift', 'duo', 'tek'];
+
+// --- Bot Player Helpers ---
+const BOT_NAMES_FEMALE = ['Zeynep', 'Ayşe', 'Selin', 'Elif', 'Merve'];
+const BOT_NAMES_MALE   = ['Mehmet', 'Emre', 'Burak', 'Can', 'Kaan'];
+const BOT_TELEPATI_WORDS = ['ELMA', 'EV', 'ARABA', 'GÜNEŞ', 'KÖPEK', 'SU', 'AŞK', 'BALIK', 'AĞAÇ', 'GÜL', 'KAT', 'YOL'];
+
+function randomDigits(n) {
+  let result = '';
+  for (let i = 0; i < n; i++) result += Math.floor(Math.random() * 10);
+  return result;
+}
+
+function createBotPlayer(gender, selectedGames) {
+  const names = gender === 'female' ? BOT_NAMES_FEMALE : BOT_NAMES_MALE;
+  return {
+    playerId: 'bot_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+    socketId: '__bot__',
+    username: names[Math.floor(Math.random() * names.length)],
+    gender: gender,
+    isBot: true,
+    selectedGames: selectedGames.length > 0 ? selectedGames : VALID_GAME_TYPES
+  };
+}
+
+function scheduleBotAction(roomId, actionFn, minDelay = 800, maxDelay = 2500) {
+  const delay = minDelay + Math.random() * (maxDelay - minDelay);
+  setTimeout(() => {
+    const room = rooms[roomId];
+    if (!room || room.gameStatus !== 'playing') return;
+    actionFn(room);
+  }, delay);
+}
 
 function sanitizeString(str, maxLength = 50) {
   if (typeof str !== 'string') return '';
@@ -203,8 +235,8 @@ function createMatchRoom(mode, players) {
 
   if (mode === 'duo') {
     teams = [{ id: 0, name: 'Takım 1', p1: null, p2: null }];
-    teams[0].p1 = { id: players[0].playerId, socketId: players[0].socketId, username: players[0].username, gender: players[0].gender, isHost: true };
-    teams[0].p2 = { id: players[1].playerId, socketId: players[1].socketId, username: players[1].username, gender: players[1].gender, isHost: false };
+    teams[0].p1 = { id: players[0].playerId, socketId: players[0].socketId, username: players[0].username, gender: players[0].gender, isHost: true, isBot: !!players[0].isBot };
+    teams[0].p2 = { id: players[1].playerId, socketId: players[1].socketId, username: players[1].username, gender: players[1].gender, isHost: false, isBot: !!players[1].isBot };
   } else if (mode === 'cift') {
     teams = [
       { id: 0, name: 'Takım 1', p1: null, p2: null },
@@ -229,6 +261,8 @@ function createMatchRoom(mode, players) {
     maxPlayers: maxPlayers,
     spectators: [],
     gameStatus: "waiting",
+    createdAt: Date.now(),
+    lastActivity: Date.now(),
     gameType: chosenGame,
     currentPairIndex: 0,
     roundCount: 5,
@@ -696,6 +730,21 @@ io.on("connection", (socket) => {
     console.log(`Matchmaking: ${username} (${gender}) ${mode} modunda arıyor. Kuyruk: E:${matchmakingQueue[mode].male.length} K:${matchmakingQueue[mode].female.length}`);
 
     checkForMatch(mode);
+
+    // 15sn sonra hâlâ bekleniyorsa bot ile eşleştir
+    const botTimer = setTimeout(() => {
+      const stillInQueue = matchmakingQueue[mode][gender].find(p => p.playerId === pid);
+      if (!stillInQueue) return;
+      removeFromMatchmaking(pid);
+      const humanPlayer = { playerId: pid, socketId: socket.id, username, gender, selectedGames };
+      const botGender = gender === 'male' ? 'female' : 'male';
+      const botPlayer = createBotPlayer(botGender, selectedGames);
+      createMatchRoom(mode, [humanPlayer, botPlayer]);
+      console.log(`Bot eşleşmesi: ${username} vs ${botPlayer.username}`);
+    }, 15000);
+
+    socket.once('cancelMatchmaking', () => clearTimeout(botTimer));
+    socket.once('disconnect', () => clearTimeout(botTimer));
   });
 
   socket.on("cancelMatchmaking", () => {
@@ -760,6 +809,8 @@ io.on("connection", (socket) => {
       maxPlayers: maxPlayers,
       spectators: [],
       gameStatus: "waiting",
+      createdAt: Date.now(),
+      lastActivity: Date.now(),
       gameType: gameType,
       currentPairIndex: 0,
       roundCount: rounds,
@@ -802,6 +853,19 @@ io.on("connection", (socket) => {
       sayiTahminTieCount: 0,
     };
 
+    // --- Pass & Play desteği ---
+    if (data.passPlay === true && gameMode === 'duo') {
+      rooms[roomId].passPlay = true;
+      const p2Username = sanitizeString(data.p2Username, 12) || 'Oyuncu 2';
+      const p2Gender = data.p2Gender === 'female' ? 'female' : 'male';
+      const p2Id = 'passplay_' + socket.userId;
+      const p2 = { id: p2Id, socketId: socket.id, username: p2Username, gender: p2Gender, isHost: false };
+      if (!rooms[roomId].teams[0]) rooms[roomId].teams[0] = { id: 0, name: 'Takım 1', p1: null, p2: null };
+      rooms[roomId].teams[0].p2 = p2;
+      playerSockets[p2Id] = socket.id;
+      console.log(`Pass&Play Oda: ${roomId} | P1:${username} P2:${p2Username}`);
+    }
+
     console.log(
       `Oda Kuruldu: ${roomId} | Mod: ${gameMode} | Oyun: ${gameType} | Tur: ${rounds} | Süre: ${time}`,
     );
@@ -818,24 +882,38 @@ io.on("connection", (socket) => {
     const cleanGender = VALID_GENDERS.includes(gender) ? gender : "male";
     console.log(`joinRoom isteği: oda=${cleanRoomId} kullanıcı=${cleanUsername} mevcut=${!!rooms[cleanRoomId]}`);
     const room = rooms[cleanRoomId];
-    if (room && room.gameStatus === "waiting") {
-      const pid = socket.userId;
-      const newPlayer = { id: pid, socketId: socket.id, username: cleanUsername, gender: cleanGender, isHost: false };
-      if (room.gameMode === "tek") {
-        if (room.maxPlayers > 0 && room.players.length >= room.maxPlayers) {
-          socket.emit("gameError", "Oda dolu!");
-          return;
-        }
-        room.players.push(newPlayer);
-      } else {
-        room.spectators.push(newPlayer);
-      }
+    if (!room) {
+      socket.emit("gameError", "Oda bulunamadı!");
+      return;
+    }
+    const pid = socket.userId;
+    // Zaten odada mı?
+    if (findPlayerInRoom(room, pid)) {
       socket.join(cleanRoomId);
       socket.emit("joinedRoom", cleanRoomId);
       emitLobbyUpdate(cleanRoomId);
-    } else {
-      socket.emit("gameError", "Oda bulunamadı!");
+      return;
     }
+    const newPlayer = { id: pid, socketId: socket.id, username: cleanUsername, gender: cleanGender, isHost: false };
+    if (room.gameStatus === "waiting") {
+      if (room.gameMode === "tek") {
+        if (room.maxPlayers > 0 && room.players.length >= room.maxPlayers) {
+          // Oda dolu ama seyirci olarak katılabilir
+          room.spectators.push(newPlayer);
+        } else {
+          room.players.push(newPlayer);
+        }
+      } else {
+        room.spectators.push(newPlayer);
+      }
+    } else {
+      // Oyun devam ederken sadece seyirci olarak katıl
+      room.spectators.push(newPlayer);
+    }
+    playerSockets[pid] = socket.id;
+    socket.join(cleanRoomId);
+    socket.emit("joinedRoom", cleanRoomId);
+    emitLobbyUpdate(cleanRoomId);
   });
 
   // --- TAKIM SEÇME ---
@@ -1041,10 +1119,17 @@ io.on("connection", (socket) => {
   });
 
   // --- TELEPATİ: KELİME GÖNDERME ---
-  socket.on("submitWord", ({ roomId, word }) => {
+  socket.on("submitWord", ({ roomId, word, passPlayActingAs }) => {
     const room = rooms[roomId];
     if (!room || room.gameStatus !== "playing") return socket.emit("gameError", "Oda bulunamadı!");
-    const pid = socket.userId;
+    let pid = socket.userId;
+    // Pass & Play: same socket can submit as P2
+    if (room && room.passPlay && passPlayActingAs) {
+      const cp = room.pairs[room.currentPairIndex];
+      if (cp && passPlayActingAs === cp.p2.id && socket.id === cp.p2.socketId) {
+        pid = passPlayActingAs;
+      }
+    }
 
     const currentPair = room.pairs[room.currentPairIndex];
     if (!currentPair) return;
@@ -1144,7 +1229,7 @@ io.on("connection", (socket) => {
   });
 
   // --- İSİM ŞEHİR: 3 CEVAP BİRDEN GÖNDERME ---
-  socket.on("submitAllIsimSehir", ({ roomId, answers }) => {
+  socket.on("submitAllIsimSehir", ({ roomId, answers, passPlayActingAs }) => {
     const room = rooms[roomId];
     if (!room || room.gameStatus !== "playing") {
       console.log("[IS] REJECTED: room not found or not playing", roomId);
@@ -1157,7 +1242,12 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const pid = socket.userId;
+    let pid = socket.userId;
+    // Pass & Play: same socket can submit as P2
+    if (room.passPlay && passPlayActingAs && passPlayActingAs === currentPair.p2.id && socket.id === currentPair.p2.socketId) {
+      pid = passPlayActingAs;
+    }
+
     if (pid !== currentPair.p1.id && pid !== currentPair.p2.id) {
       console.log("[IS] REJECTED: player not in pair", pid, "p1:", currentPair.p1.id, "p2:", currentPair.p2.id);
       return;
@@ -1533,13 +1623,17 @@ io.on("connection", (socket) => {
   });
 
   // --- SAYI TAHMİN: GİZLİ SAYI GÖNDERME ---
-  socket.on("submitSecretNumber", ({ roomId, number }) => {
+  socket.on("submitSecretNumber", ({ roomId, number, passPlayActingAs }) => {
     const room = rooms[roomId];
     if (!room || room.gameStatus !== "playing" || room.gameType !== "sayiTahmin") return;
 
     const currentPair = room.pairs[room.currentPairIndex];
     if (!currentPair) return;
-    const pid = socket.userId;
+    let pid = socket.userId;
+    // Pass & Play: same socket can submit as P2
+    if (room.passPlay && passPlayActingAs && passPlayActingAs === currentPair.p2.id && socket.id === currentPair.p2.socketId) {
+      pid = passPlayActingAs;
+    }
     if (pid !== currentPair.p1.id && pid !== currentPair.p2.id) return;
 
     // Validate: N digits (dynamic)
@@ -1578,14 +1672,18 @@ io.on("connection", (socket) => {
   });
 
   // --- SAYI TAHMİN: TAHMİN GÖNDERME (senkronize round - ikisi de gönderince sonuçlar açılır) ---
-  socket.on("submitNumberGuess", ({ roomId, guess }) => {
+  socket.on("submitNumberGuess", ({ roomId, guess, passPlayActingAs }) => {
     const room = rooms[roomId];
     if (!room || room.gameStatus !== "playing" || room.gameType !== "sayiTahmin") return;
 
     const currentPair = room.pairs[room.currentPairIndex];
     if (!currentPair) return;
 
-    const pid = socket.userId;
+    let pid = socket.userId;
+    // Pass & Play: same socket can submit as P2
+    if (room.passPlay && passPlayActingAs && passPlayActingAs === currentPair.p2.id && socket.id === currentPair.p2.socketId) {
+      pid = passPlayActingAs;
+    }
     const isP1 = pid === currentPair.p1.id;
     const isP2 = pid === currentPair.p2.id;
     if (!isP1 && !isP2) return;
@@ -1662,133 +1760,7 @@ io.on("connection", (socket) => {
     const pending = room.sayiTahminPendingGuesses[pairKey];
     if (pending.p1 && pending.p2) {
       if (room.sayiTahminTimer) { clearTimeout(room.sayiTahminTimer); room.sayiTahminTimer = null; }
-      const bothPayload = {
-        p1Result: pending.p1,
-        p2Result: pending.p2,
-      };
-
-      // Her iki oyuncuya ve seyircilere gönder
-      io.to(getSocketId(currentPair.p1.id)).emit("sayiTahminBothResults", bothPayload);
-      io.to(getSocketId(currentPair.p2.id)).emit("sayiTahminBothResults", bothPayload);
-      room.spectators.forEach(s => {
-        io.to(getSocketId(s.id)).emit("sayiTahminBothResults", bothPayload);
-      });
-
-      // Pending temizle
-      room.sayiTahminPendingGuesses[pairKey] = {};
-
-      // Biri doğru bildiyse kazanma kontrolü
-      const p1Won = pending.p1.greens === dc;
-      const p2Won = pending.p2.greens === dc;
-
-      if (p1Won || p2Won) {
-        // İkisi de aynı anda ve aynı tahmin sayısıyla bildiyse → berabere, tur tekrar (max 3 kez)
-        if (p1Won && p2Won && pending.p1.guessCount === pending.p2.guessCount) {
-          if (!room.sayiTahminTieCount) room.sayiTahminTieCount = 0;
-          room.sayiTahminTieCount++;
-
-          const p1Secret = room.sayiTahminSecrets[pairKey][currentPair.p1.id];
-          const p2Secret = room.sayiTahminSecrets[pairKey][currentPair.p2.id];
-          io.to(roomId).emit("sayiTahminTie", {
-            p1Name: currentPair.p1.username,
-            p2Name: currentPair.p2.username,
-            p1Secret: p1Secret,
-            p2Secret: p2Secret,
-            guessCount: pending.p1.guessCount,
-            currentRound: room.currentRound,
-            pairId: pairKey,
-            teamName: currentPair.teamName,
-          });
-
-          if (room.sayiTahminTieCount >= 3) {
-            // Max tie limit reached, move to next pair/round
-            room.sayiTahminTieCount = 0;
-            setTimeout(() => { nextSayiTahminStep(roomId); }, 3500);
-          } else {
-            // Tur tekrar - aynı pair için yeni secret phase başlat
-            setTimeout(() => {
-              startSayiTahminSecretPhase(roomId);
-            }, 3500);
-          }
-          return;
-        }
-
-        // Kazanan belirleme
-        let winnerId, winnerName, loserName, winnerGuess, targetSecretForWinner, winnerGuessCount;
-        if (p1Won && p2Won) {
-          // İkisi de doğru bildi ama farklı tahmin sayısı - daha az yapan kazanır
-          if (pending.p1.guessCount < pending.p2.guessCount) {
-            winnerId = currentPair.p1.id;
-            winnerName = currentPair.p1.username;
-            loserName = currentPair.p2.username;
-            winnerGuess = pending.p1.guess;
-            targetSecretForWinner = room.sayiTahminSecrets[pairKey][currentPair.p2.id];
-            winnerGuessCount = pending.p1.guessCount;
-          } else {
-            winnerId = currentPair.p2.id;
-            winnerName = currentPair.p2.username;
-            loserName = currentPair.p1.username;
-            winnerGuess = pending.p2.guess;
-            targetSecretForWinner = room.sayiTahminSecrets[pairKey][currentPair.p1.id];
-            winnerGuessCount = pending.p2.guessCount;
-          }
-        } else if (p1Won) {
-          winnerId = currentPair.p1.id;
-          winnerName = currentPair.p1.username;
-          loserName = currentPair.p2.username;
-          winnerGuess = pending.p1.guess;
-          targetSecretForWinner = room.sayiTahminSecrets[pairKey][currentPair.p2.id];
-          winnerGuessCount = pending.p1.guessCount;
-        } else {
-          winnerId = currentPair.p2.id;
-          winnerName = currentPair.p2.username;
-          loserName = currentPair.p1.username;
-          winnerGuess = pending.p2.guess;
-          targetSecretForWinner = room.sayiTahminSecrets[pairKey][currentPair.p1.id];
-          winnerGuessCount = pending.p2.guessCount;
-        }
-
-        // Reset tie count on resolution
-        room.sayiTahminTieCount = 0;
-
-        // Kazananın skorunu artır
-        if (room.sayiTahminScores) {
-          room.sayiTahminScores[winnerId] = (room.sayiTahminScores[winnerId] || 0) + 1;
-        }
-
-        const winnerSecret = room.sayiTahminSecrets[pairKey][winnerId];
-
-        io.to(roomId).emit("sayiTahminWin", {
-          winnerName: winnerName,
-          winnerId: winnerId,
-          loserName: loserName,
-          guess: winnerGuess,
-          targetSecret: targetSecretForWinner,
-          winnerSecret: winnerSecret,
-          guessCount: winnerGuessCount,
-          pairId: pairKey,
-          teamName: currentPair.teamName,
-        });
-
-        setTimeout(() => {
-          nextSayiTahminStep(roomId);
-        }, 3500);
-        return;
-      }
-
-      // Kimse bilmediyse yeni round başlat (client'ta input tekrar açılacak)
-      setTimeout(() => {
-        io.to(getSocketId(currentPair.p1.id)).emit("sayiTahminNextRoundReady");
-        io.to(getSocketId(currentPair.p2.id)).emit("sayiTahminNextRoundReady");
-        room.spectators.forEach(s => {
-          io.to(getSocketId(s.id)).emit("sayiTahminNextRoundReady");
-        });
-        // Reset server-side timeout for the next guess round
-        if (room.sayiTahminTimer) clearTimeout(room.sayiTahminTimer);
-        room.sayiTahminTimer = setTimeout(() => {
-          autoSubmitSayiTahminGuess(roomId);
-        }, 93000);
-      }, 800);
+      resolveSayiTahminGuessRound(roomId);
     }
   });
 
@@ -2077,6 +2049,51 @@ function startTurn(roomId) {
     totalRounds: room.roundCount,
     totalMistakes: p.totalAttempts || 0,
   });
+
+  // Bot action: schedule telepati word submission
+  const botPlayer = p.p1.isBot ? p.p1 : (p.p2.isBot ? p.p2 : null);
+  if (botPlayer) {
+    const botId = botPlayer.id;
+    scheduleBotAction(roomId, (room) => {
+      const pair = room.pairs[room.currentPairIndex];
+      if (!pair || !room.moves[pair.id]) room.moves[pair.id] = {};
+      if (room.moves[pair.id][botId] !== undefined) return;
+      const word = BOT_TELEPATI_WORDS[Math.floor(Math.random() * BOT_TELEPATI_WORDS.length)];
+      room.moves[pair.id][botId] = word;
+      const humanId = botId === pair.p1.id ? pair.p2.id : pair.p1.id;
+      io.to(getSocketId(humanId)).emit('partnerSubmitted');
+      const who = botId === pair.p1.id ? 'p1' : 'p2';
+      io.to(roomId).emit('revealOneMove', { slot: who, word });
+      const w1 = room.moves[pair.id][pair.p1.id];
+      const w2 = room.moves[pair.id][pair.p2.id];
+      if (w1 !== undefined && w2 !== undefined) {
+        if (room.telepatiTimer) { clearTimeout(room.telepatiTimer); room.telepatiTimer = null; }
+        // Trigger result inline
+        pair.currentTurnAttempts++;
+        const isMatch = w1 === w2 && w1 !== '⏰';
+        if (!isMatch) pair.totalAttempts++;
+        updateLeaderboard(roomId);
+        const result = { pairId: pair.id, p1Word: w1, p2Word: w2, attempts: pair.currentTurnAttempts, totalMistakes: pair.totalAttempts, match: isMatch };
+        if (pair.totalAttempts >= 20 && !pair.isEliminated) {
+          pair.isEliminated = true;
+          io.to(roomId).emit('spectatorUpdate', result);
+          io.to(roomId).emit('gameOver', `${pair.teamName} ELENDİ! 💀`);
+          const alive = room.pairs.filter(x => !x.isEliminated);
+          if (alive.length > 1) setTimeout(() => nextTurn(roomId), 2000);
+          else if (alive.length === 1) {
+            const winner = alive[0];
+            setTimeout(() => { io.to(roomId).emit('telepatiGameOver', { winnerTeam: winner.teamName, winnerP1: winner.p1.username, winnerP2: winner.p2.username, winnerIds: [winner.p1.id, winner.p2.id], winnerScore: winner.totalAttempts, lastStanding: true }); room.gameStatus = 'finished'; setTimeout(() => { room.gameStatus = 'waiting'; emitBackToSelect(roomId); }, 7000); }, 2000);
+          } else { setTimeout(() => { io.to(roomId).emit('gameOver', 'Herkes Elendi! 💀'); room.gameStatus = 'finished'; setTimeout(() => { room.gameStatus = 'waiting'; emitBackToSelect(roomId); }, 5000); }, 2000); }
+          return;
+        }
+        setTimeout(() => {
+          io.to(roomId).emit('spectatorUpdate', result);
+          room.moves[pair.id] = {};
+          if (isMatch) { io.to(getSocketId(pair.p1.id)).to(getSocketId(pair.p2.id)).emit('levelFinished', { success: true }); nextTurn(roomId); }
+        }, 500);
+      }
+    });
+  }
 
   // Server-side timeout: auto-submit for players who don't respond
   if (room.telepatiTimer) clearTimeout(room.telepatiTimer);
@@ -2971,6 +2988,27 @@ function startSayiTahminSecretPhase(roomId) {
     digitCount: room.sayiTahminDigitCount || 4,
   });
 
+  // Bot action: schedule bot secret submission
+  const botInSecretPair = pair.p1.isBot ? pair.p1 : (pair.p2.isBot ? pair.p2 : null);
+  if (botInSecretPair) {
+    const botId = botInSecretPair.id;
+    const capturedPairKey = pairKey;
+    scheduleBotAction(roomId, (room) => {
+      const dc = room.sayiTahminDigitCount || 4;
+      if (!room.sayiTahminSecrets[capturedPairKey]) room.sayiTahminSecrets[capturedPairKey] = {};
+      if (!room.sayiTahminSecrets[capturedPairKey][botId]) {
+        room.sayiTahminSecrets[capturedPairKey][botId] = randomDigits(dc);
+        const s1 = room.sayiTahminSecrets[capturedPairKey][pair.p1.id];
+        const s2 = room.sayiTahminSecrets[capturedPairKey][pair.p2.id];
+        if (s1 && s2) {
+          if (room.sayiTahminTimer) { clearTimeout(room.sayiTahminTimer); room.sayiTahminTimer = null; }
+          room.sayiTahminGuesses[capturedPairKey] = { p1: [], p2: [] };
+          setTimeout(() => startSayiTahminGuessPhase(roomId), 1000);
+        }
+      }
+    });
+  }
+
   // Server-side timeout for secret phase (60 seconds)
   if (room.sayiTahminTimer) clearTimeout(room.sayiTahminTimer);
   room.sayiTahminTimer = setTimeout(() => {
@@ -2997,11 +3035,137 @@ function startSayiTahminGuessPhase(roomId) {
     digitCount: room.sayiTahminDigitCount || 4,
   });
 
+  // Bot action: schedule bot guess submission
+  const botInGuessPair = pair.p1.isBot ? pair.p1 : (pair.p2.isBot ? pair.p2 : null);
+  if (botInGuessPair) {
+    const botId = botInGuessPair.id;
+    const capturedGuessKey = pair.id;
+    scheduleBotAction(roomId, (room) => {
+      if (!room.sayiTahminPendingGuesses) room.sayiTahminPendingGuesses = {};
+      if (!room.sayiTahminPendingGuesses[capturedGuessKey]) room.sayiTahminPendingGuesses[capturedGuessKey] = {};
+      const who = botId === pair.p1.id ? 'p1' : 'p2';
+      if (room.sayiTahminPendingGuesses[capturedGuessKey][who]) return; // already guessed
+      const dc = room.sayiTahminDigitCount || 4;
+      const targetSecret = who === 'p1'
+        ? (room.sayiTahminSecrets[capturedGuessKey] && room.sayiTahminSecrets[capturedGuessKey][pair.p2.id])
+        : (room.sayiTahminSecrets[capturedGuessKey] && room.sayiTahminSecrets[capturedGuessKey][pair.p1.id]);
+      if (!targetSecret) return;
+      const botGuess = randomDigits(dc);
+      const targetDigits = targetSecret.split('');
+      const guessDigits = botGuess.split('');
+      let greens = 0;
+      const digitResults = [];
+      for (let i = 0; i < dc; i++) {
+        const isGreen = guessDigits[i] === targetDigits[i];
+        digitResults.push(isGreen);
+        if (isGreen) greens++;
+      }
+      if (!room.sayiTahminGuesses[capturedGuessKey]) room.sayiTahminGuesses[capturedGuessKey] = { p1: [], p2: [] };
+      room.sayiTahminGuesses[capturedGuessKey][who].push({ guess: botGuess, greens, digitResults });
+      room.sayiTahminPendingGuesses[capturedGuessKey][who] = { who, guesserId: botId, guesserName: botInGuessPair.username, guess: botGuess, greens, digitResults, digitCount: dc, guessCount: room.sayiTahminGuesses[capturedGuessKey][who].length };
+      // Notify human partner
+      const humanId = botId === pair.p1.id ? pair.p2.id : pair.p1.id;
+      io.to(getSocketId(humanId)).emit('sayiTahminPartnerGuessed');
+      // Check if both guessed
+      const p1Pending = room.sayiTahminPendingGuesses[capturedGuessKey]['p1'];
+      const p2Pending = room.sayiTahminPendingGuesses[capturedGuessKey]['p2'];
+      if (p1Pending && p2Pending) {
+        if (room.sayiTahminTimer) { clearTimeout(room.sayiTahminTimer); room.sayiTahminTimer = null; }
+        resolveSayiTahminGuessRound(roomId);
+      }
+    });
+  }
+
   // Server-side timeout for guess phase (90 seconds per guess round)
   if (room.sayiTahminTimer) clearTimeout(room.sayiTahminTimer);
   room.sayiTahminTimer = setTimeout(() => {
     autoSubmitSayiTahminGuess(roomId);
   }, 93000);
+}
+
+function resolveSayiTahminGuessRound(roomId) {
+  const room = rooms[roomId];
+  if (!room) return;
+  const currentPair = room.pairs[room.currentPairIndex];
+  if (!currentPair) return;
+  const pairKey = currentPair.id;
+  const dc = room.sayiTahminDigitCount || 4;
+  if (!room.sayiTahminPendingGuesses) return;
+  const pending = room.sayiTahminPendingGuesses[pairKey];
+  if (!pending || !pending.p1 || !pending.p2) return;
+
+  const bothPayload = { p1Result: pending.p1, p2Result: pending.p2 };
+  io.to(getSocketId(currentPair.p1.id)).emit("sayiTahminBothResults", bothPayload);
+  io.to(getSocketId(currentPair.p2.id)).emit("sayiTahminBothResults", bothPayload);
+  room.spectators.forEach(s => { io.to(getSocketId(s.id)).emit("sayiTahminBothResults", bothPayload); });
+
+  room.sayiTahminPendingGuesses[pairKey] = {};
+
+  const p1Won = pending.p1.greens === dc;
+  const p2Won = pending.p2.greens === dc;
+
+  if (p1Won || p2Won) {
+    if (p1Won && p2Won && pending.p1.guessCount === pending.p2.guessCount) {
+      if (!room.sayiTahminTieCount) room.sayiTahminTieCount = 0;
+      room.sayiTahminTieCount++;
+      const p1Secret = room.sayiTahminSecrets[pairKey][currentPair.p1.id];
+      const p2Secret = room.sayiTahminSecrets[pairKey][currentPair.p2.id];
+      io.to(roomId).emit("sayiTahminTie", { p1Name: currentPair.p1.username, p2Name: currentPair.p2.username, p1Secret, p2Secret, guessCount: pending.p1.guessCount, currentRound: room.currentRound, pairId: pairKey, teamName: currentPair.teamName });
+      if (room.sayiTahminTieCount >= 3) { room.sayiTahminTieCount = 0; setTimeout(() => { nextSayiTahminStep(roomId); }, 3500); }
+      else { setTimeout(() => { startSayiTahminSecretPhase(roomId); }, 3500); }
+      return;
+    }
+    let winnerId, winnerName, loserName, winnerGuess, targetSecretForWinner, winnerGuessCount;
+    if (p1Won && p2Won) {
+      if (pending.p1.guessCount < pending.p2.guessCount) { winnerId = currentPair.p1.id; winnerName = currentPair.p1.username; loserName = currentPair.p2.username; winnerGuess = pending.p1.guess; targetSecretForWinner = room.sayiTahminSecrets[pairKey][currentPair.p2.id]; winnerGuessCount = pending.p1.guessCount; }
+      else { winnerId = currentPair.p2.id; winnerName = currentPair.p2.username; loserName = currentPair.p1.username; winnerGuess = pending.p2.guess; targetSecretForWinner = room.sayiTahminSecrets[pairKey][currentPair.p1.id]; winnerGuessCount = pending.p2.guessCount; }
+    } else if (p1Won) {
+      winnerId = currentPair.p1.id; winnerName = currentPair.p1.username; loserName = currentPair.p2.username; winnerGuess = pending.p1.guess; targetSecretForWinner = room.sayiTahminSecrets[pairKey][currentPair.p2.id]; winnerGuessCount = pending.p1.guessCount;
+    } else {
+      winnerId = currentPair.p2.id; winnerName = currentPair.p2.username; loserName = currentPair.p1.username; winnerGuess = pending.p2.guess; targetSecretForWinner = room.sayiTahminSecrets[pairKey][currentPair.p1.id]; winnerGuessCount = pending.p2.guessCount;
+    }
+    room.sayiTahminTieCount = 0;
+    if (room.sayiTahminScores) room.sayiTahminScores[winnerId] = (room.sayiTahminScores[winnerId] || 0) + 1;
+    const winnerSecret = room.sayiTahminSecrets[pairKey][winnerId];
+    io.to(roomId).emit("sayiTahminWin", { winnerName, winnerId, loserName, guess: winnerGuess, targetSecret: targetSecretForWinner, winnerSecret, guessCount: winnerGuessCount, pairId: pairKey, teamName: currentPair.teamName });
+    setTimeout(() => { nextSayiTahminStep(roomId); }, 3500);
+    return;
+  }
+
+  // Kimse bilmediyse yeni round başlat
+  setTimeout(() => {
+    io.to(getSocketId(currentPair.p1.id)).emit("sayiTahminNextRoundReady");
+    io.to(getSocketId(currentPair.p2.id)).emit("sayiTahminNextRoundReady");
+    room.spectators.forEach(s => { io.to(getSocketId(s.id)).emit("sayiTahminNextRoundReady"); });
+    if (room.sayiTahminTimer) clearTimeout(room.sayiTahminTimer);
+    room.sayiTahminTimer = setTimeout(() => { autoSubmitSayiTahminGuess(roomId); }, 93000);
+    // Bot: schedule next guess if bot in pair
+    const botP = currentPair.p1.isBot ? currentPair.p1 : (currentPair.p2.isBot ? currentPair.p2 : null);
+    if (botP) {
+      const botId2 = botP.id;
+      const capturedKey = pairKey;
+      scheduleBotAction(roomId, (room) => {
+        if (!room.sayiTahminPendingGuesses) room.sayiTahminPendingGuesses = {};
+        if (!room.sayiTahminPendingGuesses[capturedKey]) room.sayiTahminPendingGuesses[capturedKey] = {};
+        const who2 = botId2 === currentPair.p1.id ? 'p1' : 'p2';
+        if (room.sayiTahminPendingGuesses[capturedKey][who2]) return;
+        const dc2 = room.sayiTahminDigitCount || 4;
+        const tSec = who2 === 'p1' ? (room.sayiTahminSecrets[capturedKey] && room.sayiTahminSecrets[capturedKey][currentPair.p2.id]) : (room.sayiTahminSecrets[capturedKey] && room.sayiTahminSecrets[capturedKey][currentPair.p1.id]);
+        if (!tSec) return;
+        const bg = randomDigits(dc2);
+        const tDigs = tSec.split(''), gDigs = bg.split('');
+        let gr = 0; const dr = [];
+        for (let i = 0; i < dc2; i++) { const g = gDigs[i] === tDigs[i]; dr.push(g); if (g) gr++; }
+        if (!room.sayiTahminGuesses[capturedKey]) room.sayiTahminGuesses[capturedKey] = { p1: [], p2: [] };
+        room.sayiTahminGuesses[capturedKey][who2].push({ guess: bg, greens: gr, digitResults: dr });
+        room.sayiTahminPendingGuesses[capturedKey][who2] = { who: who2, guesserId: botId2, guesserName: botP.username, guess: bg, greens: gr, digitResults: dr, digitCount: dc2, guessCount: room.sayiTahminGuesses[capturedKey][who2].length };
+        const hId = botId2 === currentPair.p1.id ? currentPair.p2.id : currentPair.p1.id;
+        io.to(getSocketId(hId)).emit('sayiTahminPartnerGuessed');
+        const pnd = room.sayiTahminPendingGuesses[capturedKey];
+        if (pnd.p1 && pnd.p2) { if (room.sayiTahminTimer) { clearTimeout(room.sayiTahminTimer); room.sayiTahminTimer = null; } resolveSayiTahminGuessRound(roomId); }
+      });
+    }
+  }, 800);
 }
 
 function autoSubmitSayiTahminSecret(roomId) {
@@ -3012,12 +3176,6 @@ function autoSubmitSayiTahminSecret(roomId) {
   const pairKey = pair.id;
   if (!room.sayiTahminSecrets[pairKey]) room.sayiTahminSecrets[pairKey] = {};
   const dc = room.sayiTahminDigitCount || 4;
-  // Generate random number for players who didn't submit
-  function randomDigits(n) {
-    let result = '';
-    for (let i = 0; i < n; i++) result += Math.floor(Math.random() * 10);
-    return result;
-  }
   if (!room.sayiTahminSecrets[pairKey][pair.p1.id]) room.sayiTahminSecrets[pairKey][pair.p1.id] = randomDigits(dc);
   if (!room.sayiTahminSecrets[pairKey][pair.p2.id]) room.sayiTahminSecrets[pairKey][pair.p2.id] = randomDigits(dc);
   room.sayiTahminGuesses[pairKey] = { p1: [], p2: [] };
@@ -3150,6 +3308,7 @@ function emitBackToSelect(roomId) {
 function emitLobbyUpdate(roomId) {
   const room = rooms[roomId];
   if (!room) return;
+  room.lastActivity = Date.now();
   let hostId = null;
   if (room.gameMode === "tek") {
     const host = room.players.find(p => p.isHost);
@@ -3175,6 +3334,35 @@ function emitLobbyUpdate(roomId) {
     hostId: hostId,
   });
 }
+
+// ============ INACTIVE ROOM CLEANUP ============
+// Her 5 dakikada bir hareketsiz odaları temizle
+const ROOM_TIMEOUTS = {
+  waiting: 30 * 60 * 1000,   // 30 dakika bekleme
+  playing: 3 * 60 * 60 * 1000, // 3 saat oyun
+  finished: 15 * 60 * 1000,  // 15 dakika bitti
+};
+
+setInterval(() => {
+  const now = Date.now();
+  let cleaned = 0;
+  for (const roomId of Object.keys(rooms)) {
+    const room = rooms[roomId];
+    const age = now - (room.lastActivity || room.createdAt || now);
+    const limit = ROOM_TIMEOUTS[room.gameStatus] || ROOM_TIMEOUTS.waiting;
+
+    if (age > limit) {
+      clearAllRoomTimers(room);
+      io.to(roomId).emit("gameError", "Oda hareketsizlik nedeniyle kapatıldı.");
+      delete rooms[roomId];
+      cleaned++;
+      console.log(`Oda temizlendi (hareketsiz, ${Math.round(age / 60000)}dk): ${roomId}`);
+    }
+  }
+  if (cleaned > 0) {
+    console.log(`Oda temizliği: ${cleaned} oda silindi. Aktif odalar: ${Object.keys(rooms).length}`);
+  }
+}, 5 * 60 * 1000);
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Sunucu ${PORT} portunda!`));

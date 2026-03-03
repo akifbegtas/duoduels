@@ -35,7 +35,42 @@ const SERVER_URL = isLocalDev
     : (window.location.hostname === 'duoduels.com' || window.location.hostname === 'www.duoduels.com' || window.location.hostname.endsWith('.run.app'))
       ? window.location.origin
       : PRODUCTION_URL;
-const socket = io(SERVER_URL);
+
+// Lazy socket - auth sonrası connectSocket() ile bağlanır
+let socket = null;
+let _socketListenersAttached = false;
+
+function connectSocket() {
+  if (socket && socket.connected) return;
+
+  // Dev modda (localhost) Firebase token olmadan fallbackUserId ile bağlan
+  const devUid = isLocalDev && !authIdToken && typeof _getOrCreateDevUid === 'function'
+    ? _getOrCreateDevUid()
+    : null;
+
+  if (!authIdToken && !devUid) {
+    console.warn("connectSocket: authIdToken yok, bağlanılamıyor");
+    return;
+  }
+
+  const authPayload = authIdToken
+    ? { token: authIdToken }
+    : { fallbackUserId: devUid };
+
+  if (socket) {
+    // Mevcut socket varsa auth güncelle ve yeniden bağlan
+    socket.auth = authPayload;
+    socket.connect();
+    return;
+  }
+
+  socket = io(SERVER_URL, {
+    auth: authPayload,
+    autoConnect: true
+  });
+
+  setupSocketListeners();
+}
 
 // --- ROUND TRANSITION TOAST ---
 function showRoundToast(roundNum) {
@@ -79,12 +114,8 @@ function escapeHtml(str) {
 }
 
 let currentRoom = null;
-// sessionStorage: her sekme farklı player ID alır (aynı sekme yenilemede korunur)
-let myPlayerId = sessionStorage.getItem('duoduels_playerId');
-if (!myPlayerId) {
-  myPlayerId = 'p_' + Math.random().toString(36).substr(2, 9) + Date.now().toString(36);
-  sessionStorage.setItem('duoduels_playerId', myPlayerId);
-}
+// myPlayerId artık Firebase Auth UID'si (auth.js'deki getMyPlayerId() fonksiyonu)
+let myPlayerId = null; // connectSocket sonrası set edilir
 let amIPlaying = false;
 let timerInterval = null;
 let pendingRoomData = null;
@@ -93,6 +124,35 @@ let pendingCategoryData = null;
 let currentTargetLetter = null;
 let selectedMode = "cift";
 let _listenersAttached = {};
+
+// --- EKRANLAR (global — auth.js de kullanır) ---
+const screens = {
+  auth: document.getElementById("auth-screen"),
+  profileSetup: document.getElementById("profile-setup-screen"),
+  lobby: document.getElementById("lobby-screen"),
+  settings: document.getElementById("settings-screen"),
+  passplaySetup: document.getElementById("passplay-setup-screen"),
+  waiting: document.getElementById("waiting-screen"),
+  "matchmaking-screen": document.getElementById("matchmaking-screen"),
+  game: document.getElementById("game-screen"),
+  gameSelect: document.getElementById("game-select-screen"),
+  gameSettings: document.getElementById("game-settings-screen"),
+  isimSehir: document.getElementById("isimSehir-screen"),
+  pictionary: document.getElementById("pictionary-screen"),
+  tabu: document.getElementById("tabu-screen"),
+  imposter: document.getElementById("imposter-screen"),
+  sayiTahmin: document.getElementById("sayiTahmin-screen"),
+};
+function showScreen(name) {
+  Object.values(screens).forEach((s) => s.classList.remove("active"));
+  screens[name].classList.add("active");
+  const gameScreens = ["game", "isimSehir", "pictionary", "tabu", "imposter", "sayiTahmin"];
+  if (gameScreens.includes(name)) {
+    document.body.classList.add("game-active");
+  } else {
+    document.body.classList.remove("game-active");
+  }
+}
 
 // --- TEMA DEĞİŞTİRME (cinsiyet seçimine göre) ---
 function applyGenderTheme(gender) {
@@ -136,7 +196,8 @@ document.addEventListener("DOMContentLoaded", () => {
   // Başlangıçta nötr tema (gri) - body'de hiç class yok
   updateSvgColors(null);
 
-  const genderRadios = document.querySelectorAll('input[name="gender"]');
+  // Profile setup ekranındaki cinsiyet seçimi
+  const genderRadios = document.querySelectorAll('input[name="setup-gender"]');
   genderRadios.forEach(radio => {
     radio.addEventListener("change", (e) => {
       applyGenderTheme(e.target.value);
@@ -179,15 +240,130 @@ function showWarning(msg) { showHint(msg); }
 function hideWarning() { hideHint(); }
 
 // --- GİRİŞ ---
+
+// Pass & Play state
+let passPlayActive = false;
+let passPlayP1Name = '';
+let passPlayP2Name = '';
+let passPlayP2Id = null;
+let _ppCurrentPlayer = 'p1'; // 'p1' | 'p2'
+let _ppSecretDoneP1 = false;
+
+function goToPassPlay() {
+  if (!userProfile) return;
+  showScreen('passplaySetup');
+}
+
+function goToPrivateRoom() {
+  if (!userProfile) return;
+  pendingRoomData = { username: userProfile.username, gender: userProfile.gender };
+  showScreen("gameSelect");
+  selectMode("duo");
+}
+
+function selectPassPlayGame(gameType) {
+  if (!userProfile) return;
+  const p1Name = (document.getElementById('pp-p1-name').value || '').trim() || userProfile.username;
+  const p2Name = (document.getElementById('pp-p2-name').value || '').trim() || 'Oyuncu 2';
+  if (p1Name.length > 12 || p2Name.length > 12) {
+    Swal.fire({ title: 'Uyarı', text: 'İsimler en fazla 12 karakter olabilir', icon: 'warning' });
+    return;
+  }
+  const p1Gender = document.querySelector('input[name="pp-p1-gender"]:checked')?.value || userProfile.gender;
+  const p2Gender = document.querySelector('input[name="pp-p2-gender"]:checked')?.value || 'female';
+  const rounds = parseInt(document.getElementById('pp-round-count').value) || 5;
+
+  passPlayP1Name = p1Name;
+  passPlayP2Name = p2Name;
+  passPlayActive = true;
+  _ppCurrentPlayer = 'p1';
+  _ppSecretDoneP1 = false;
+
+  const data = {
+    username: p1Name, gender: p1Gender,
+    gameType: gameType, gameMode: 'duo',
+    coupleCount: 1, roundCount: rounds, roundTime: 30,
+    passPlay: true, p2Username: p2Name, p2Gender: p2Gender
+  };
+  passPlayP2Id = 'passplay_' + (typeof getMyPlayerId === 'function' ? getMyPlayerId() : (socket && socket.userId ? socket.userId : ''));
+
+  function doEmit() {
+    socket.emit('createRoom', data);
+  }
+  if (!socket || !socket.connected) {
+    connectSocket();
+    socket.once('connect', doEmit);
+    return;
+  }
+  doEmit();
+}
+
+function passPlaySwitch(nextPlayerName, onUnlock) {
+  document.getElementById('pp-lock-title').textContent = 'Telefonu ' + nextPlayerName + "'e ver";
+  document.getElementById('passplay-lock').style.display = 'flex';
+  window._ppUnlockCallback = onUnlock;
+}
+
+function passPlayUnlock() {
+  document.getElementById('passplay-lock').style.display = 'none';
+  if (window._ppUnlockCallback) window._ppUnlockCallback();
+}
+
+function openQrScanner() {
+  if (typeof Html5Qrcode === 'undefined') {
+    Swal.fire({ title: 'QR Tarayıcı Yüklenemedi', text: 'Lütfen internet bağlantınızı kontrol edin.', icon: 'error' });
+    return;
+  }
+  const modal = document.createElement('div');
+  modal.id = 'qr-scanner-modal';
+  modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
+  modal.innerHTML = '<div id="qr-reader" style="width:280px;border-radius:12px;overflow:hidden"></div><button style="background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:10px;padding:10px 28px;font-size:1rem;cursor:pointer" onclick="closeQrScanner()">İptal</button>';
+  document.body.appendChild(modal);
+
+  const html5Qrcode = new Html5Qrcode('qr-reader');
+  window._html5QrcodeInstance = html5Qrcode;
+
+  html5Qrcode.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 220, height: 220 } },
+    (decodedText) => {
+      html5Qrcode.stop().catch(() => {});
+      closeQrScanner();
+      // Extract join param from URL
+      try {
+        const url = new URL(decodedText);
+        const joinCode = url.searchParams.get('join');
+        if (joinCode) {
+          document.getElementById('roomCodeInput').value = joinCode.toUpperCase();
+          joinRoom();
+        } else {
+          document.getElementById('roomCodeInput').value = decodedText.toUpperCase().trim().substring(0, 6);
+          joinRoom();
+        }
+      } catch (e) {
+        document.getElementById('roomCodeInput').value = decodedText.toUpperCase().trim().substring(0, 6);
+        joinRoom();
+      }
+    },
+    () => {}
+  ).catch((err) => {
+    closeQrScanner();
+    Swal.fire({ title: 'Kamera Açılamadı', text: err, icon: 'error' });
+  });
+}
+
+function closeQrScanner() {
+  if (window._html5QrcodeInstance) {
+    window._html5QrcodeInstance.stop().catch(() => {});
+    window._html5QrcodeInstance = null;
+  }
+  const modal = document.getElementById('qr-scanner-modal');
+  if (modal) modal.remove();
+}
+
 function createRoom() {
-  const username = document.getElementById("username").value;
-  const genderEl = document.querySelector('input[name="gender"]:checked');
-
-  if (!username) return showHint("Adınızı giriniz", "username");
-  if (!genderEl) return showHint("Cinsiyetinizi seçiniz", "gender");
-
-  hideHint();
-  pendingRoomData = { username, gender: genderEl.value };
+  if (!userProfile) return;
+  pendingRoomData = { username: userProfile.username, gender: userProfile.gender };
   showScreen("gameSelect");
   selectMode("cift");
 }
@@ -347,8 +523,8 @@ function confirmGameSettings() {
     }
   }
 
-  if (!socket.connected) {
-    socket.connect();
+  if (!socket || !socket.connected) {
+    connectSocket();
     socket.once("connect", doEmit);
     return;
   }
@@ -356,37 +532,30 @@ function confirmGameSettings() {
 }
 
 function joinRoom() {
-  const username = document.getElementById("username").value;
-  const genderEl = document.querySelector('input[name="gender"]:checked');
+  if (!userProfile) return;
   const code = document.getElementById("roomCodeInput").value.trim();
-  if (!username) return showHint("Adınızı giriniz", "username");
-  if (!genderEl) return showHint("Cinsiyetinizi seçiniz", "gender");
-  if (!code) return showHint("Oda kodunu giriniz", "username");
-  hideHint();
-  if (!socket.connected) {
-    socket.connect();
+  if (!code) {
+    Swal.fire({ title: "Uyarı", text: "Oda kodunu giriniz", icon: "warning" });
+    return;
+  }
+  if (!socket || !socket.connected) {
+    connectSocket();
     socket.once("connect", () => {
-      socket.emit("joinRoom", { roomId: code.toUpperCase(), username, gender: genderEl.value });
+      socket.emit("joinRoom", { roomId: code.toUpperCase(), username: userProfile.username, gender: userProfile.gender });
     });
     return;
   }
-  socket.emit("joinRoom", { roomId: code.toUpperCase(), username, gender: genderEl.value });
+  socket.emit("joinRoom", { roomId: code.toUpperCase(), username: userProfile.username, gender: userProfile.gender });
 }
 
-function switchTab(mode) {
-  const slider = document.getElementById("forms-slider");
-  const btns = document.querySelectorAll(".tab-btn");
-  btns.forEach((b) => b.classList.remove("active"));
-  if (mode === "create") {
-    slider.style.transform = "translateX(0)";
-    btns[0].classList.add("active");
-  } else if (mode === "join") {
-    slider.style.transform = "translateX(-33.333%)";
-    btns[1].classList.add("active");
-  } else if (mode === "matchmaking") {
-    slider.style.transform = "translateX(-66.666%)";
-    btns[2].classList.add("active");
-  }
+function goToMatchmaking() {
+  if (!userProfile) return;
+  // Seçim aşamasını göster, bekleme aşamasını gizle
+  var selectPhase = document.getElementById("mm-select-phase");
+  var waitingPhase = document.getElementById("mm-waiting-phase");
+  if (selectPhase) selectPhase.style.display = "";
+  if (waitingPhase) waitingPhase.style.display = "none";
+  showScreen("matchmaking-screen");
 }
 
 // --- MATCHMAKING ---
@@ -408,16 +577,9 @@ function toggleMMGame(checkbox) {
 }
 
 function findMatch() {
-  const username = document.getElementById("username").value.trim();
-  const genderEl = document.querySelector('input[name="gender"]:checked');
-  if (!username) {
-    showHint("input-hint", "İsim giriniz!");
-    return;
-  }
-  if (!genderEl) {
-    showHint("gender-hint", "Cinsiyet seçiniz!");
-    return;
-  }
+  if (!userProfile) return;
+  const username = userProfile.username;
+  const gender = userProfile.gender;
   const selectedGames = [];
   document.querySelectorAll("#mm-game-grid input[type='checkbox']:checked").forEach(cb => {
     selectedGames.push(cb.value);
@@ -427,20 +589,26 @@ function findMatch() {
     return;
   }
   socket.emit("findMatch", {
-    playerId: myPlayerId,
     username: username,
-    gender: genderEl.value,
+    gender: gender,
     mode: selectedMMMode,
     selectedGames: selectedGames
   });
-  // Bekleme ekranına geç
-  showScreen("matchmaking-screen");
+  // Seçim aşamasını gizle, bekleme aşamasını göster
+  var selectPhase = document.getElementById("mm-select-phase");
+  var waitingPhase = document.getElementById("mm-waiting-phase");
+  if (selectPhase) selectPhase.style.display = "none";
+  if (waitingPhase) waitingPhase.style.display = "";
 }
 
 function cancelMatchmaking() {
-  socket.emit("cancelMatchmaking", { playerId: myPlayerId });
+  if (socket) socket.emit("cancelMatchmaking");
   resetMatchmakingScreen();
-  showScreen("lobby");
+  // Seçim aşamasına geri dön
+  var selectPhase = document.getElementById("mm-select-phase");
+  var waitingPhase = document.getElementById("mm-waiting-phase");
+  if (selectPhase) selectPhase.style.display = "";
+  if (waitingPhase) waitingPhase.style.display = "none";
 }
 
 function resetMatchmakingScreen() {
@@ -452,7 +620,12 @@ function resetMatchmakingScreen() {
   if (wcancelBtn) wcancelBtn.style.display = "";
 }
 
-// Matchmaking socket listeners
+// Matchmaking socket listeners - tüm listener'lar setupSocketListeners() içinde
+
+function setupSocketListeners() {
+  if (_socketListenersAttached) return;
+  _socketListenersAttached = true;
+
 socket.on("matchSearching", function(data) {
   const txt = document.getElementById("mm-waiting-text");
   if (txt && data.message) txt.textContent = data.message;
@@ -521,13 +694,13 @@ async function shareWhatsApp() {
 }
 
 function goToMainMenu() {
-  if (currentRoom) {
+  if (currentRoom && socket) {
     socket.emit("leaveRoom", currentRoom);
   }
   currentRoom = null;
   sessionStorage.removeItem("duoduels_room");
-  // Keep pendingRoomData so player doesn't have to re-enter their name and gender
-  showScreen("gameSelect");
+  pendingRoomData = null;
+  showScreen("lobby");
 }
 
 function joinTeamSlot(idx, slot) {
@@ -544,7 +717,9 @@ function sendWord(auto) {
   let val = inp.value;
   if (auto && !val) val = "⏰";
   if (val) {
-    socket.emit("submitWord", { roomId: currentRoom, word: val });
+    const payload = { roomId: currentRoom, word: val };
+    if (passPlayActive && _ppCurrentPlayer === 'p2') payload.passPlayActingAs = passPlayP2Id;
+    socket.emit("submitWord", payload);
     inp.value = "";
     inp.disabled = true;
     document.getElementById("sendWordBtn").disabled = true;
@@ -609,7 +784,9 @@ function sendAllIsimSehir(auto) {
   });
 
   _isimSehirSubmitted = true;
-  socket.emit("submitAllIsimSehir", { roomId: currentRoom, answers: answers });
+  const payload = { roomId: currentRoom, answers: answers };
+  if (passPlayActive && _ppCurrentPlayer === 'p2') payload.passPlayActingAs = passPlayP2Id;
+  socket.emit("submitAllIsimSehir", payload);
   document.getElementById("isSendAllBtn").disabled = true;
   document.getElementById("is-left-status").innerText = "Gönderildi!";
   clearInterval(timerInterval);
@@ -762,17 +939,41 @@ function hideConnectionStatus() {
 
 // --- SOCKET ---
 socket.on("connect", () => {
-  socket.emit("registerPlayer", myPlayerId);
+  myPlayerId = getMyPlayerId();
+  // Saved room varsa recover et
+  const savedRoom = sessionStorage.getItem("duoduels_room");
+  if (!currentRoom && savedRoom) currentRoom = savedRoom;
   if (currentRoom) {
-    socket.emit("rejoinRoom", { roomId: currentRoom, playerId: myPlayerId });
+    socket.emit("rejoinRoom", { roomId: currentRoom });
     showConnectionStatus("reconnecting");
   } else {
     hideConnectionStatus();
+    // URL ?join= parametresi ile auto-join
+    const joinParam = new URLSearchParams(location.search).get('join');
+    if (joinParam && userProfile) {
+      const code = joinParam.toUpperCase().trim().substring(0, 6);
+      const codeInput = document.getElementById('roomCodeInput');
+      if (codeInput) codeInput.value = code;
+      setTimeout(() => joinRoom(), 300);
+    }
   }
 });
 socket.on("disconnect", () => {
   if (currentRoom) {
     showConnectionStatus("disconnected");
+  }
+});
+socket.on("connect_error", async (err) => {
+  console.error("Socket connect_error:", err.message);
+  if (err.message === 'Invalid auth token' && currentUser) {
+    // Token expired - yenile ve tekrar bağlan
+    try {
+      authIdToken = await currentUser.getIdToken(true);
+      socket.auth.token = authIdToken;
+      socket.connect();
+    } catch (e) {
+      console.error("Token refresh failed:", e);
+    }
   }
 });
 socket.on("rejoinSuccess", (data) => {
@@ -816,6 +1017,27 @@ socket.on("roomCreated", (id) => {
   sessionStorage.setItem("duoduels_room", id);
   showScreen("waiting");
   document.getElementById("displayRoomCode").innerText = id;
+
+  // Generate QR code for the room join URL
+  const qrCanvas = document.getElementById('room-qr-canvas');
+  const qrSection = document.getElementById('room-qr-section');
+  if (qrCanvas && typeof QRCode !== 'undefined') {
+    const joinUrl = location.origin + '?join=' + id;
+    QRCode.toCanvas(qrCanvas, joinUrl, { width: 160, margin: 1 }, (err) => {
+      if (!err && qrSection) qrSection.style.display = '';
+    });
+  }
+
+  // Pass & Play: auto-start game since both players are ready
+  if (passPlayActive) {
+    // Update passPlayP2Id with the actual socket userId
+    const myId = typeof getMyPlayerId === 'function' ? getMyPlayerId() : socket.userId;
+    passPlayP2Id = 'passplay_' + myId;
+    // Host can start immediately
+    setTimeout(() => {
+      if (currentRoom) socket.emit('startGame', currentRoom);
+    }, 500);
+  }
 });
 socket.on("joinedRoom", (id) => {
   currentRoom = id;
@@ -862,15 +1084,32 @@ socket.on("hostLeft", () => {
 });
 
 socket.on("updateLobby", (data) => {
-  const isHost = myPlayerId === data.hostId;
+  const pid = getMyPlayerId();
+  const isHost = pid === data.hostId;
   const hostEl = document.getElementById("host-controls");
   const memberEl = document.getElementById("member-message");
+
+  // Mevcut oyuncu spectator listesinde mi?
+  const iAmSpectator = data.spectators && data.spectators.some(s => s.id === pid);
+  // Takımda veya oyuncu listesinde mi?
+  const iAmPlayer = data.teams
+    ? data.teams.some(t => (t.p1 && t.p1.id === pid) || (t.p2 && t.p2.id === pid))
+    : (data.players || []).some(p => p.id === pid);
+  // Seyirciyse amIPlaying'i sıfırla
+  if (iAmSpectator && !iAmPlayer) amIPlaying = false;
+
   if (isHost) {
     hostEl.classList.remove("hidden");
     memberEl.classList.add("hidden");
   } else {
     hostEl.classList.add("hidden");
-    memberEl.classList.remove("hidden");
+    if (iAmSpectator && !iAmPlayer) {
+      memberEl.classList.remove("hidden");
+      memberEl.innerHTML = '<span style="opacity:0.7;font-size:0.9em">👁 Seyirci olarak izliyorsunuz. Boş slota tıklayın.</span>';
+    } else {
+      memberEl.classList.remove("hidden");
+      memberEl.innerHTML = memberEl.dataset.defaultText || "Kurucunun oyunu başlatması bekleniyor...";
+    }
   }
 
   const div = document.getElementById("teams-container");
@@ -915,7 +1154,8 @@ socket.on("updateLobby", (data) => {
     .map((p) => {
       const icon = p.gender === "female" ? "👩" : "👨";
       const cls = p.gender === "female" ? "spec-female" : "spec-male";
-      return `<span class="${cls}">${icon} ${escapeHtml(p.username)}</span>`;
+      const isMe = p.id === pid ? ' style="outline:2px solid var(--theme-color);border-radius:6px;padding:2px 4px;" title="Sen"' : '';
+      return `<span class="${cls}"${isMe}>${icon} ${escapeHtml(p.username)}</span>`;
     })
     .join("");
   document.getElementById("spectator-list").innerHTML = specs;
@@ -958,6 +1198,9 @@ socket.on("gameInit", (data) => {
 socket.on("turnStarted", (data) => {
   const curR = data.currentRound || 1;
   const totR = data.totalRounds || window._totalRounds || 5;
+
+  // Pass & Play: reset to P1 at start of each telepati turn
+  if (passPlayActive) _ppCurrentPlayer = 'p1';
 
   document.getElementById("attempts-display").innerText =
     `Tur: ${curR} / ${totR}`;
@@ -1023,6 +1266,41 @@ socket.on("turnStarted", (data) => {
 });
 
 socket.on("partnerSubmitted", () => {
+  // In pass & play, "partnerSubmitted" fires when P1 submits (server notifies P2=same socket).
+  // Show lock screen so P2 can write without seeing P1's word.
+  if (passPlayActive && _ppCurrentPlayer === 'p1') {
+    _ppCurrentPlayer = 'p2';
+    const gameType = window._currentGameType;
+    passPlaySwitch(passPlayP2Name, () => {
+      if (gameType === 'isimSehir') {
+        // Re-enable isimSehir inputs for P2
+        _isimSehirSubmitted = false;
+        ["isim", "sehir", "hayvan"].forEach(c => {
+          const inp = document.getElementById("isInput-" + c);
+          if (inp) { inp.disabled = false; inp.value = ""; }
+        });
+        const btn = document.getElementById("isSendAllBtn");
+        if (btn) btn.disabled = false;
+        document.getElementById("is-left-status").innerText = "...";
+        const nameEl = document.getElementById("isLeftName");
+        if (nameEl) nameEl.innerText = passPlayP2Name;
+        startTimer(window._roundTime, "is-timer");
+      } else {
+        // Telepati — re-enable word input for P2
+        const inp = document.getElementById("wordInput");
+        if (inp) { inp.disabled = false; inp.value = ""; inp.focus(); }
+        const btn = document.getElementById("sendWordBtn");
+        if (btn) btn.disabled = false;
+        document.getElementById("left-status").innerText = "...";
+        document.getElementById("right-status").innerText = "Yazıyor...";
+        const nameEl = document.getElementById("leftName");
+        if (nameEl) nameEl.innerText = passPlayP2Name;
+        startTimer(window._roundTime);
+      }
+    });
+    return;
+  }
+
   if (amIPlaying) {
     if (window._currentGameType === "isimSehir") {
       document.getElementById("is-right-status").innerText = "YAZDI!";
@@ -1193,11 +1471,9 @@ socket.on("backToSelect", (data) => {
     // Kurucu: oyun seçim ekranına git
     showScreen("gameSelect");
 
-    const username = document.getElementById("username").value;
-    const genderEl = document.querySelector('input[name="gender"]:checked');
     pendingRoomData = {
-      username: username || "Kurucu",
-      gender: genderEl ? genderEl.value : "male",
+      username: userProfile ? userProfile.username : "Kurucu",
+      gender: userProfile ? userProfile.gender : "male",
     };
 
     if (data.gameMode) {
@@ -1307,6 +1583,8 @@ socket.on("categoryStart", (data) => {
 socket.on("allCategoriesStart", (data) => {
   pendingCategoryData = data;
   _isimSehirSubmitted = false; // yeni tur, tekrar gönderebilir
+  // Pass & Play: reset to P1 at start of each isimSehir round
+  if (passPlayActive) _ppCurrentPlayer = 'p1';
 
   const iamP1 = myPlayerId === data.p1.id;
   const iamP2 = myPlayerId === data.p2.id;
@@ -2149,32 +2427,6 @@ socket.on("tabuGameOver", (msg) => {
   Swal.fire({ title: "BİTTİ", text: msg });
 });
 
-// --- EKRANLAR ---
-const screens = {
-  lobby: document.getElementById("lobby-screen"),
-  waiting: document.getElementById("waiting-screen"),
-  "matchmaking-screen": document.getElementById("matchmaking-screen"),
-  game: document.getElementById("game-screen"),
-  gameSelect: document.getElementById("game-select-screen"),
-  gameSettings: document.getElementById("game-settings-screen"),
-  isimSehir: document.getElementById("isimSehir-screen"),
-  pictionary: document.getElementById("pictionary-screen"),
-  tabu: document.getElementById("tabu-screen"),
-  imposter: document.getElementById("imposter-screen"),
-  sayiTahmin: document.getElementById("sayiTahmin-screen"),
-};
-function showScreen(name) {
-  Object.values(screens).forEach((s) => s.classList.remove("active"));
-  screens[name].classList.add("active");
-  // Oyun ekranlarında header'ı gizle (mobil yer kazanımı)
-  const gameScreens = ["game", "isimSehir", "pictionary", "tabu", "imposter", "sayiTahmin"];
-  if (gameScreens.includes(name)) {
-    document.body.classList.add("game-active");
-  } else {
-    document.body.classList.remove("game-active");
-  }
-}
-
 // --- İMPOSTOR ---
 let imposterIsMe = false;
 
@@ -2490,13 +2742,14 @@ function sendSecretNumber() {
     document.getElementById("st-secret-status").innerText = "Sadece rakam gir!";
     return;
   }
-  // Check for repeated digits
-  if (new Set(val.split("")).size !== dc) {
-    document.getElementById("st-secret-status").innerText = "Tekrarlı rakam kullanılamaz!";
+  if (new Set(val.split("")).size === 1) {
+    document.getElementById("st-secret-status").innerText = "Tüm rakamlar aynı olamaz!";
     return;
   }
   _stSecretSubmitted = true;
-  socket.emit("submitSecretNumber", { roomId: currentRoom, number: val });
+  const secretPayload = { roomId: currentRoom, number: val };
+  if (passPlayActive && _ppCurrentPlayer === 'p2') secretPayload.passPlayActingAs = passPlayP2Id;
+  socket.emit("submitSecretNumber", secretPayload);
   inp.disabled = true;
   document.getElementById("st-secret-btn").disabled = true;
   document.getElementById("st-secret-status").innerHTML = '<div class="st-waiting-spinner"><span class="hourglass">⏳</span> Rakip bekleniyor...</div>';
@@ -2509,7 +2762,10 @@ function sendNumberGuess() {
   if (!val || val.length !== dc) return;
   const regex = new RegExp(`^\\d{${dc}}$`);
   if (!regex.test(val)) return;
-  socket.emit("submitNumberGuess", { roomId: currentRoom, guess: val });
+  if (new Set(val.split("")).size === 1) return;
+  const guessPayload = { roomId: currentRoom, guess: val };
+  if (passPlayActive && _ppCurrentPlayer === 'p2') guessPayload.passPlayActingAs = passPlayP2Id;
+  socket.emit("submitNumberGuess", guessPayload);
   // Tahmin gönderildi, input'u kapat - rakip bekleniyor
   inp.value = "";
   inp.disabled = true;
@@ -2552,8 +2808,14 @@ socket.on("sayiTahminSecretPhase", (data) => {
   _stSecretSubmitted = false;
   const dc = data.digitCount || _stDigitCount;
   _stDigitCount = dc;
-  const iamP1 = myPlayerId === data.p1.id;
-  const iamP2 = myPlayerId === data.p2.id;
+  let iamP1 = myPlayerId === data.p1.id;
+  let iamP2 = myPlayerId === data.p2.id;
+  // Pass & Play: both players on same device
+  if (passPlayActive && iamP1) {
+    iamP2 = false; // start with P1
+    _ppCurrentPlayer = 'p1';
+    _ppSecretDoneP1 = false;
+  }
   amIPlaying = iamP1 || iamP2;
 
   // Tur geçiş bildirimi (ilk tur hariç)
@@ -2618,6 +2880,28 @@ socket.on("sayiTahminSecretPhase", (data) => {
 
 socket.on("secretSubmitted", () => {
   if (amIPlaying) {
+    if (passPlayActive && _ppCurrentPlayer === 'p1') {
+      // P1 submitted — show lock screen for P2
+      _ppCurrentPlayer = 'p2';
+      _stSecretSubmitted = false;
+      passPlaySwitch(passPlayP2Name, () => {
+        // Show secret input for P2
+        const dc = _stDigitCount;
+        const secretArea = document.getElementById("st-secret-area");
+        const infoBar = document.getElementById("st-turn-info");
+        infoBar.innerText = "GİZLİ SAYINI GİR! 🔒";
+        secretArea.classList.remove("hidden");
+        const inp = document.getElementById("st-secret-input");
+        inp.value = "";
+        inp.disabled = false;
+        inp.maxLength = dc;
+        inp.placeholder = `Örn: ${"0123456789".slice(0, dc)}`;
+        document.getElementById("st-secret-btn").disabled = false;
+        document.getElementById("st-secret-status").innerHTML = "";
+        inp.focus();
+      });
+      return;
+    }
     document.getElementById("st-secret-status").innerHTML = '<div class="st-waiting-spinner"><span class="hourglass">⏳</span> Rakip bekleniyor...</div>';
   }
 });
@@ -2631,8 +2915,13 @@ socket.on("partnerSecretSubmitted", () => {
 });
 
 socket.on("sayiTahminGuessStart", (data) => {
-  const iamP1 = myPlayerId === data.p1.id;
-  const iamP2 = myPlayerId === data.p2.id;
+  let iamP1 = myPlayerId === data.p1.id;
+  let iamP2 = myPlayerId === data.p2.id;
+  // Pass & Play: start with P1's guess
+  if (passPlayActive && iamP1) {
+    iamP2 = false;
+    _ppCurrentPlayer = 'p1';
+  }
   amIPlaying = iamP1 || iamP2;
 
   const infoBar = document.getElementById("st-turn-info");
@@ -2701,6 +2990,28 @@ socket.on("sayiTahminGuessStart", (data) => {
 // Tahmin gönderildi, rakip bekleniyor
 socket.on("sayiTahminGuessWaiting", () => {
   if (!amIPlaying) return;
+
+  // Pass & Play: after P1 guesses, show lock screen for P2
+  if (passPlayActive && _ppCurrentPlayer === 'p1') {
+    _ppCurrentPlayer = 'p2';
+    passPlaySwitch(passPlayP2Name, () => {
+      // Show guess input for P2
+      const dc = _stDigitCount;
+      const guessArea = document.getElementById("st-guess-area");
+      const infoBar = document.getElementById("st-turn-info");
+      infoBar.innerText = `P1'in sayısını tahmin et! 🎯`;
+      guessArea.classList.remove("hidden");
+      const inp = document.getElementById("st-guess-input");
+      inp.value = "";
+      inp.disabled = false;
+      inp.maxLength = dc;
+      inp.placeholder = `${dc} haneli tahmin...`;
+      document.getElementById("st-guess-btn").disabled = false;
+      inp.focus();
+    });
+    return;
+  }
+
   const infoBar = document.getElementById("st-turn-info");
   infoBar.innerHTML = '<span class="hourglass" style="font-size:1.1rem">⏳</span> Rakip bekleniyor...';
   infoBar.style.background = "var(--theme-gradient-hover)";
@@ -2764,6 +3075,23 @@ function _addGuessToHistory(result, dc) {
 // Yeni round: input tekrar açılıyor
 socket.on("sayiTahminNextRoundReady", () => {
   if (!amIPlaying) return;
+
+  // Pass & Play: reset to P1 first
+  if (passPlayActive) {
+    _ppCurrentPlayer = 'p1';
+    passPlaySwitch(passPlayP1Name, () => {
+      const inp = document.getElementById("st-guess-input");
+      inp.disabled = false;
+      inp.value = "";
+      inp.focus();
+      document.getElementById("st-guess-btn").disabled = false;
+      const infoBar = document.getElementById("st-turn-info");
+      infoBar.innerText = "🎯 Yeni tahmin gir!";
+      infoBar.style.background = "var(--theme-gradient)";
+    });
+    return;
+  }
+
   const inp = document.getElementById("st-guess-input");
   inp.disabled = false;
   inp.value = "";
@@ -2885,14 +3213,50 @@ socket.on("sayiTahminGameOver", (data) => {
   });
 });
 
+  // Expose onclick-callable functions to global scope
+  window.goToMainMenu     = goToMainMenu;
+  window.startGame        = startGame;
+  window.joinTeamSlot     = joinTeamSlot;
+  window.copyRoomCode     = copyRoomCode;
+  window.shareWhatsApp    = shareWhatsApp;
+  window.sendWord         = sendWord;
+  window.sendAllIsimSehir = sendAllIsimSehir;
+  window.sendIsimSehirWord= sendIsimSehirWord;
+  window.sendPictionaryGuess = sendPictionaryGuess;
+  window.sendTabuClue     = sendTabuClue;
+  window.sendTabuGuess    = sendTabuGuess;
+  window.sendTabuPass     = sendTabuPass;
+  window.sendImposterWord = sendImposterWord;
+  window.sendImposterVote = sendImposterVote;
+  window.sendSecretNumber = sendSecretNumber;
+  window.sendNumberGuess  = sendNumberGuess;
+  window.clearCanvas      = clearCanvas;
+  window.passPlayUnlock   = passPlayUnlock;
+
+} // end setupSocketListeners
+
+// --- GLOBAL EXPORTS (HTML onclick handlers) ---
+// openSettings, handleAvatarChange → auth.js global
+// setLanguage → translations.js global
+window.goToPassPlay       = goToPassPlay;
+window.goToPrivateRoom    = goToPrivateRoom;
+window.selectPassPlayGame = selectPassPlayGame;
+window.openQrScanner      = openQrScanner;
+window.closeQrScanner     = closeQrScanner;
+window.passPlayUnlock     = passPlayUnlock;
+window.createRoom         = createRoom;
+window.joinRoom           = joinRoom;
+window.goToMatchmaking    = goToMatchmaking;
+window.findMatch          = findMatch;
+window.cancelMatchmaking  = cancelMatchmaking;
+window.selectMode         = selectMode;
+window.selectGame         = selectGame;
+window.selectMMMode       = selectMMMode;
+window.toggleMMGame       = toggleMMGame;
+window.goBackToGameSelect = goBackToGameSelect;
+window.confirmGameSettings= confirmGameSettings;
+window.showScreen         = showScreen;
+
 // --- SESSION RECOVERY ---
-(function() {
-  const savedRoom = sessionStorage.getItem("duoduels_room");
-  if (savedRoom && socket.connected) {
-    socket.emit("rejoinRoom", { roomId: savedRoom, playerId: myPlayerId });
-  } else if (savedRoom) {
-    socket.once("connect", () => {
-      socket.emit("rejoinRoom", { roomId: savedRoom, playerId: myPlayerId });
-    });
-  }
-})();
+// Session recovery artık auth.js'deki onAuthStateChanged ve connectSocket tarafından yönetiliyor
+// Saved room varsa connect sonrası otomatik rejoin yapılıyor (connect handler'da)
