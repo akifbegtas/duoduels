@@ -4,11 +4,14 @@ const config: CapacitorConfig = {
   appId: 'com.duoduels.app',
   appName: 'DuoDuels',
   webDir: 'public',
-  server: {
-    // Production'da bunu kaldır, sadece local test için
-    url: 'http://localhost:3000',
-    cleartext: true
-  },
+  ...(process.env.CAP_SERVER_URL
+    ? {
+        server: {
+          url: process.env.CAP_SERVER_URL,
+          cleartext: process.env.CAP_SERVER_URL.startsWith('http://')
+        }
+      }
+    : {}),
   plugins: {
     SplashScreen: {
       launchAutoHide: false,

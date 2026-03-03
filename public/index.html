@@ -19,7 +19,12 @@
   <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
   <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
 
-  <link rel="stylesheet" href="style.css?v=32" />
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+  <link rel="stylesheet" href="style.css?v=34" />
 </head>
 
 <body>
@@ -55,84 +60,138 @@
       </h1>
     </header>
 
-    <div id="lobby-screen" class="screen active">
+    <!-- AUTH EKRANI -->
+    <div id="auth-screen" class="screen active">
+      <div class="card auth-card">
+        <div class="auth-logo-container">
+          <img src="apple-touch-icon.png" alt="DuoDuels" class="auth-logo" />
+        </div>
+        <h2 class="auth-title">DuoDuels</h2>
+        <p class="auth-subtitle">Oynamak için giriş yap</p>
+
+        <div class="auth-buttons">
+          <button class="auth-btn auth-btn-google" onclick="signInWithGoogle()">
+            <svg class="auth-btn-icon" viewBox="0 0 24 24" width="20" height="20">
+              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
+              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
+              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+            </svg>
+            <span>Google ile Giriş Yap</span>
+          </button>
+
+          <button class="auth-btn auth-btn-facebook" onclick="signInWithFacebook()">
+            <svg class="auth-btn-icon" viewBox="0 0 24 24" width="20" height="20" fill="#ffffff">
+              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+            </svg>
+            <span>Facebook ile Giriş Yap</span>
+          </button>
+
+          <button class="auth-btn auth-btn-apple" onclick="signInWithApple()">
+            <svg class="auth-btn-icon" viewBox="0 0 24 24" width="20" height="20" fill="#ffffff">
+              <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
+            </svg>
+            <span>Apple ile Giriş Yap</span>
+          </button>
+
+          <button class="auth-btn auth-btn-guest" onclick="signInAsGuest()">
+            <span>Misafir Olarak Devam Et</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- PROFİL SETUP EKRANI -->
+    <div id="profile-setup-screen" class="screen">
+      <div class="card auth-card">
+        <h2 class="auth-title">Profilini Oluştur</h2>
+        <p class="auth-subtitle">Oyunlarda kullanılacak bilgilerini gir</p>
+
+        <div class="profile-setup-form">
+          <div class="username-row">
+            <input type="text" id="setup-username" placeholder="Kullanıcı Adı" maxlength="12" />
+          </div>
+          <div class="gender-selection">
+            <label class="gender-option male">
+              <input type="radio" name="setup-gender" value="male" />
+              <span>Erkek 💙</span>
+            </label>
+            <label class="gender-option female">
+              <input type="radio" name="setup-gender" value="female" />
+              <span>Kadın 🩷</span>
+            </label>
+          </div>
+
+          <button class="btn-primary" onclick="saveProfile()" style="margin-top: 16px;">
+            Devam Et
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- LOBİ EKRANI -->
+    <div id="lobby-screen" class="screen">
       <div class="card lobby-card">
-        <h2>Giriş Yap</h2>
-
-        <div class="username-row">
-          <input type="text" id="username" placeholder="İsminiz" maxlength="12" oninput="hideHint()" />
-          <span id="input-hint" class="input-hint hidden"></span>
-        </div>
-        <div class="gender-selection">
-          <label class="gender-option male"><input type="radio" name="gender" value="male"
-              onchange="hideHint()" /><span>Erkek 💙</span></label>
-          <label class="gender-option female"><input type="radio" name="gender" value="female"
-              onchange="hideHint()" /><span>Kadın 🩷</span></label>
-          <span id="gender-hint" class="input-hint hidden"></span>
+        <div class="lobby-header">
+          <h2>Hoşgeldin, <span id="lobby-username-greeting"></span></h2>
+          <button class="btn-signout" onclick="signOut()" title="Çıkış Yap">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+            </svg>
+          </button>
         </div>
 
-        <div class="tab-container tab-container-3">
-          <button class="tab-btn active" onclick="switchTab('create')">
-            Oyun Seç
+        <div class="lobby-actions">
+          <button class="btn-primary" onclick="createRoom()">
+            Oda Kur
           </button>
-          <button class="tab-btn" onclick="switchTab('join')">
-            Odaya Katıl
-          </button>
-          <button class="tab-btn" onclick="switchTab('matchmaking')">
+
+          <div class="lobby-join-row">
+            <input type="text" id="roomCodeInput" placeholder="ODA KODU" maxlength="6" class="big-input" />
+            <button class="btn-secondary" onclick="joinRoom()">
+              Katıl
+            </button>
+          </div>
+
+          <button class="btn-primary mm-search-btn" onclick="goToMatchmaking()">
             Oyun Ara
           </button>
-        </div>
-
-        <div class="forms-window">
-          <div id="forms-slider" class="forms-slider">
-            <div class="slide-section">
-              <button class="btn-primary" onclick="createRoom()">
-                Oyun Seç
-              </button>
-            </div>
-
-            <div class="slide-section">
-              <div class="join-content">
-                <label>Oda Kodunu Giriniz:</label>
-                <input type="text" id="roomCodeInput" placeholder="ODA KODU" maxlength="6" class="big-input" />
-                <button class="btn-secondary" onclick="joinRoom()">
-                  Katıl
-                </button>
-              </div>
-            </div>
-
-            <div class="slide-section">
-              <div class="matchmaking-content">
-                <div class="mm-mode-select">
-                  <label>Mod Seç</label>
-                  <div class="mm-mode-btns">
-                    <button class="mm-mode-btn active" data-mode="duo" onclick="selectMMMode('duo')">Başbaşa</button>
-                    <button class="mm-mode-btn" data-mode="cift" onclick="selectMMMode('cift')">Çiftler</button>
-                    <button class="mm-mode-btn" data-mode="tek" onclick="selectMMMode('tek')">Herkes Tek</button>
-                  </div>
-                </div>
-                <div class="mm-game-select">
-                  <label>Oyun Seç (birden fazla seçebilirsin)</label>
-                  <div class="mm-game-grid" id="mm-game-grid">
-                    <label class="mm-game-chip selected"><input type="checkbox" value="telepati" checked onchange="toggleMMGame(this)" /><span>🧠 Telepati</span></label>
-                    <label class="mm-game-chip selected"><input type="checkbox" value="isimSehir" checked onchange="toggleMMGame(this)" /><span>🔤 İsim Şehir</span></label>
-                    <label class="mm-game-chip selected"><input type="checkbox" value="pictionary" checked onchange="toggleMMGame(this)" /><span>🎨 Resim Çiz</span></label>
-                    <label class="mm-game-chip selected"><input type="checkbox" value="sayiTahmin" checked onchange="toggleMMGame(this)" /><span>🔢 Sayı Tahmin</span></label>
-                    <label class="mm-game-chip selected"><input type="checkbox" value="tabu" checked onchange="toggleMMGame(this)" /><span>🚫 Tabu</span></label>
-                  </div>
-                </div>
-                <button class="btn-primary mm-search-btn" onclick="findMatch()">
-                  Eşleşme Ara
-                </button>
-              </div>
-            </div>
-          </div>
         </div>
       </div>
     </div>
 
     <div id="matchmaking-screen" class="screen">
-      <div class="mm-waiting-container">
+      <!-- Aşama 1: Mod + Oyun Seçimi -->
+      <div id="mm-select-phase" class="mm-select-container">
+        <button class="btn-back-corner" onclick="showScreen('lobby')">Geri</button>
+        <h2 class="select-title">Oyun Ara</h2>
+        <div class="matchmaking-content">
+          <div class="mm-mode-select">
+            <label>Mod Seç</label>
+            <div class="mm-mode-btns">
+              <button class="mm-mode-btn active" data-mode="duo" onclick="selectMMMode('duo')">Başbaşa</button>
+              <button class="mm-mode-btn" data-mode="cift" onclick="selectMMMode('cift')">Çiftler</button>
+              <button class="mm-mode-btn" data-mode="tek" onclick="selectMMMode('tek')">Herkes Tek</button>
+            </div>
+          </div>
+          <div class="mm-game-select">
+            <label>Oyun Seç (birden fazla seçebilirsin)</label>
+            <div class="mm-game-grid" id="mm-game-grid">
+              <label class="mm-game-chip"><input type="checkbox" value="telepati" onchange="toggleMMGame(this)" /><span>🧠 Telepati</span></label>
+              <label class="mm-game-chip"><input type="checkbox" value="isimSehir" onchange="toggleMMGame(this)" /><span>🔤 İsim Şehir</span></label>
+              <label class="mm-game-chip"><input type="checkbox" value="pictionary" onchange="toggleMMGame(this)" /><span>🎨 Resim Çiz</span></label>
+              <label class="mm-game-chip"><input type="checkbox" value="sayiTahmin" onchange="toggleMMGame(this)" /><span>🔢 Sayı Tahmin</span></label>
+              <label class="mm-game-chip"><input type="checkbox" value="tabu" onchange="toggleMMGame(this)" /><span>🚫 Tabu</span></label>
+            </div>
+          </div>
+          <button class="btn-primary mm-search-btn" onclick="findMatch()">
+            Eşleşme Ara
+          </button>
+        </div>
+      </div>
+
+      <!-- Aşama 2: Bekleme Animasyonu -->
+      <div id="mm-waiting-phase" class="mm-waiting-container" style="display:none">
         <div class="mm-waiting-anim">
           <div class="mm-pulse-ring"></div>
           <div class="mm-pulse-ring mm-pulse-ring-2"></div>
@@ -710,7 +769,9 @@
     </div>
   </div>
   <script src="socket.io.min.js"></script>
-  <script src="client.js?v=32"></script>
+  <script src="firebase-config.js"></script>
+  <script src="auth.js"></script>
+  <script src="client.js?v=34"></script>
   <script>
     // Capacitor plugin'lerini başlat (native ortamda)
     if (window.Capacitor && window.Capacitor.isNativePlatform()) {
@@ -731,28 +792,9 @@
           const { SplashScreen } = window.Capacitor.Plugins;
           await SplashScreen.hide();
         } catch (e) { }
-
-        // Animasyonlu splash'i 2.5sn sonra kaldır
-        setTimeout(() => {
-          const splash = document.getElementById('app-splash');
-          if (splash) {
-            splash.classList.add('splash-hide');
-            setTimeout(() => { splash.remove(); document.body.style.backgroundColor = '#f5f0e8'; }, 600);
-          }
-        }, 2500);
-      });
-    } else {
-      // Web ortamında da splash göster
-      document.addEventListener('DOMContentLoaded', () => {
-        setTimeout(() => {
-          const splash = document.getElementById('app-splash');
-          if (splash) {
-            splash.classList.add('splash-hide');
-            setTimeout(() => { splash.remove(); document.body.style.backgroundColor = '#f5f0e8'; }, 600);
-          }
-        }, 2000);
       });
     }
+    // Splash dismiss artık auth.js tarafından kontrol ediliyor (onAuthStateChanged)
   </script>
 </body>
 

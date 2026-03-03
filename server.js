@@ -2,6 +2,22 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const path = require("path");
+const admin = require("firebase-admin");
+let firebaseAuthEnabled = false;
+
+// Firebase Admin SDK init
+if (process.env.FIREBASE_SERVICE_ACCOUNT) {
+  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+  firebaseAuthEnabled = true;
+} else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+  admin.initializeApp({ credential: admin.credential.applicationDefault() });
+  firebaseAuthEnabled = true;
+} else {
+  // Local dev: credential yoksa auth bypass aktif
+  console.warn("Firebase Admin credential bulunamadı. DEV_AUTH_BYPASS aktif.");
+  try { admin.initializeApp(); } catch (e) { /* already initialized */ }
+}
 
 const app = express();
 const server = http.createServer(app);
@@ -43,11 +59,12 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Content-Security-Policy',
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; " +
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://www.gstatic.com https://apis.google.com; " +
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
     "font-src https://fonts.gstatic.com; " +
-    "img-src 'self' data:; " +
-    "connect-src 'self' wss://duoduels.onrender.com wss://duoduels.com wss://www.duoduels.com wss://duoduels-599689373205.europe-west1.run.app ws://localhost:3000 ws://127.0.0.1:3000;"
+    "img-src 'self' data: https://*.googleusercontent.com https://*.facebook.com; " +
+    "connect-src 'self' wss://duoduels.onrender.com wss://duoduels.com wss://www.duoduels.com wss://duoduels-599689373205.europe-west1.run.app ws://localhost:3000 ws://127.0.0.1:3000 https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; " +
+    "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com https://www.facebook.com https://appleid.apple.com;"
   );
   next();
 });
@@ -98,6 +115,30 @@ io.use((socket, next) => {
   });
   next();
 });
+
+// --- Firebase Auth Middleware ---
+if (firebaseAuthEnabled) {
+  io.use(async (socket, next) => {
+    const token = socket.handshake.auth.token;
+    if (!token) {
+      return next(new Error('Authentication required'));
+    }
+    try {
+      const decoded = await admin.auth().verifyIdToken(token);
+      socket.userId = decoded.uid;
+      next();
+    } catch (err) {
+      console.error('Auth middleware error:', err.message);
+      return next(new Error('Invalid auth token'));
+    }
+  });
+} else {
+  io.use((socket, next) => {
+    const fallbackId = socket.handshake.auth && socket.handshake.auth.fallbackUserId;
+    socket.userId = sanitizeString(fallbackId || `dev_${socket.id}`, 64);
+    next();
+  });
+}
 
 const rooms = {};
 
@@ -615,19 +656,13 @@ const IMPOSTER_WORDS = [
 
 io.on("connection", (socket) => {
   const origin = socket.handshake.headers.origin || socket.handshake.headers.referer || 'unknown';
-  console.log(`Yeni bağlantı: socketId=${socket.id} origin=${origin} transport=${socket.conn.transport.name}`);
-  let playerId = null;
-
-  socket.on("registerPlayer", (pid) => {
-    if (typeof pid === 'string' && pid.length > 0 && pid.length <= 30) {
-      playerId = pid;
-      playerSockets[pid] = socket.id;
-    }
-  });
+  console.log(`Yeni bağlantı: socketId=${socket.id} userId=${socket.userId} origin=${origin} transport=${socket.conn.transport.name}`);
+  const playerId = socket.userId;
+  playerSockets[playerId] = socket.id;
 
   // --- MATCHMAKING ---
   socket.on("findMatch", (data) => {
-    const pid = playerId || socket.id;
+    const pid = socket.userId;
     const username = sanitizeString(data.username, 12) || "Oyuncu";
     const gender = VALID_GENDERS.includes(data.gender) ? data.gender : null;
     const mode = VALID_GAME_MODES.includes(data.mode) ? data.mode : null;
@@ -664,7 +699,7 @@ io.on("connection", (socket) => {
   });
 
   socket.on("cancelMatchmaking", () => {
-    const pid = playerId || socket.id;
+    const pid = socket.userId;
     removeFromMatchmaking(pid);
     socket.emit("matchCancelled");
   });
@@ -694,7 +729,7 @@ io.on("connection", (socket) => {
     if (!time || time < 5) time = 10;
     if (time > 120) time = 120;
 
-    const pid = playerId || socket.id;
+    const pid = socket.userId;
     const hostPlayer = {
       id: pid,
       socketId: socket.id,
@@ -784,7 +819,7 @@ io.on("connection", (socket) => {
     console.log(`joinRoom isteği: oda=${cleanRoomId} kullanıcı=${cleanUsername} mevcut=${!!rooms[cleanRoomId]}`);
     const room = rooms[cleanRoomId];
     if (room && room.gameStatus === "waiting") {
-      const pid = playerId || socket.id;
+      const pid = socket.userId;
       const newPlayer = { id: pid, socketId: socket.id, username: cleanUsername, gender: cleanGender, isHost: false };
       if (room.gameMode === "tek") {
         if (room.maxPlayers > 0 && room.players.length >= room.maxPlayers) {
@@ -807,7 +842,7 @@ io.on("connection", (socket) => {
   socket.on("selectTeam", ({ roomId, teamIndex, slot }) => {
     const room = rooms[roomId];
     if (!room) return;
-    const pid = playerId || socket.id;
+    const pid = socket.userId;
     const playerIndex = room.spectators.findIndex((p) => p.id === pid);
     if (playerIndex !== -1) {
       const player = room.spectators[playerIndex];
@@ -830,7 +865,7 @@ io.on("connection", (socket) => {
     if (!room) return;
 
     // Sadece host başlatabilir
-    const pid = playerId || socket.id;
+    const pid = socket.userId;
     if (!isPlayerHost(room, pid)) {
       socket.emit("gameError", "Sadece kurucu oyunu başlatabilir!");
       return;
@@ -1009,7 +1044,7 @@ io.on("connection", (socket) => {
   socket.on("submitWord", ({ roomId, word }) => {
     const room = rooms[roomId];
     if (!room || room.gameStatus !== "playing") return socket.emit("gameError", "Oda bulunamadı!");
-    const pid = playerId || socket.id;
+    const pid = socket.userId;
 
     const currentPair = room.pairs[room.currentPairIndex];
     if (!currentPair) return;
@@ -1122,7 +1157,7 @@ io.on("connection", (socket) => {
       return;
     }
 
-    const pid = playerId || socket.id;
+    const pid = socket.userId;
     if (pid !== currentPair.p1.id && pid !== currentPair.p2.id) {
       console.log("[IS] REJECTED: player not in pair", pid, "p1:", currentPair.p1.id, "p2:", currentPair.p2.id);
       return;
@@ -1238,9 +1273,10 @@ io.on("connection", (socket) => {
     const word = room._currentPictionaryWord;
     if (!word) return;
 
+    const pid = socket.userId;
+
     if (room.gameMode === "tek") {
       // TEK MOD: bireysel tahmin
-      const pid = playerId || socket.id;
       const player = room.soloPlayers.find((p) => p.id === pid);
       if (!player) return;
 
@@ -1329,7 +1365,7 @@ io.on("connection", (socket) => {
     const room = rooms[roomId];
     if (!room || room.gameStatus !== "playing" || room.gameType !== "tabu")
       return;
-    const pid = playerId || socket.id;
+    const pid = socket.userId;
     if (pid !== room.tabuDescriberId) return;
 
     const currentWord = room.tabuCurrentWord;
@@ -1384,7 +1420,7 @@ io.on("connection", (socket) => {
     const room = rooms[roomId];
     if (!room || room.gameStatus !== "playing" || room.gameType !== "tabu")
       return;
-    const pid = playerId || socket.id;
+    const pid = socket.userId;
     if (pid !== room.tabuGuesserId) return;
 
     const currentWord = room.tabuCurrentWord;
@@ -1425,7 +1461,7 @@ io.on("connection", (socket) => {
     const room = rooms[roomId];
     if (!room || room.gameStatus !== "playing" || room.gameType !== "tabu")
       return;
-    const pid = playerId || socket.id;
+    const pid = socket.userId;
     if (pid !== room.tabuDescriberId) return;
 
     io.to(roomId).emit("tabuPassed", {
@@ -1443,7 +1479,7 @@ io.on("connection", (socket) => {
     if (room.imposterPhase !== "write1" && room.imposterPhase !== "write2")
       return;
 
-    const pid = playerId || socket.id;
+    const pid = socket.userId;
     const player = room.players.find((p) => p.id === pid);
     if (!player) return;
 
@@ -1476,7 +1512,7 @@ io.on("connection", (socket) => {
       return;
     if (room.imposterPhase !== "vote") return;
 
-    const pid = playerId || socket.id;
+    const pid = socket.userId;
     const player = room.players.find((p) => p.id === pid);
     if (!player) return;
     if (room.imposterVotes[pid]) return;
@@ -1503,7 +1539,7 @@ io.on("connection", (socket) => {
 
     const currentPair = room.pairs[room.currentPairIndex];
     if (!currentPair) return;
-    const pid = playerId || socket.id;
+    const pid = socket.userId;
     if (pid !== currentPair.p1.id && pid !== currentPair.p2.id) return;
 
     // Validate: N digits (dynamic)
@@ -1514,10 +1550,9 @@ io.on("connection", (socket) => {
       socket.emit("sayiTahminError", `${dc} haneli bir sayı girin!`);
       return;
     }
-    // Validate: no repeated digits
-    const uniqueDigits = new Set(str.split(""));
-    if (uniqueDigits.size !== dc) {
-      socket.emit("sayiTahminError", `Tekrarlı rakam kullanılamaz!`);
+    // Tüm rakamlar aynı olamaz (1111, 2222 vb.)
+    if (new Set(str.split("")).size === 1) {
+      socket.emit("sayiTahminError", `Tüm rakamlar aynı olamaz!`);
       return;
     }
 
@@ -1550,7 +1585,7 @@ io.on("connection", (socket) => {
     const currentPair = room.pairs[room.currentPairIndex];
     if (!currentPair) return;
 
-    const pid = playerId || socket.id;
+    const pid = socket.userId;
     const isP1 = pid === currentPair.p1.id;
     const isP2 = pid === currentPair.p2.id;
     if (!isP1 && !isP2) return;
@@ -1575,6 +1610,10 @@ io.on("connection", (socket) => {
     const digitRegex = new RegExp(`^\\d{${dc}}$`);
     if (str.length !== dc || !digitRegex.test(str)) {
       socket.emit("sayiTahminError", `${dc} haneli bir sayı girin!`);
+      return;
+    }
+    if (new Set(str.split("")).size === 1) {
+      socket.emit("sayiTahminError", `Tüm rakamlar aynı olamaz!`);
       return;
     }
 
@@ -1758,7 +1797,7 @@ io.on("connection", (socket) => {
   socket.on("leaveRoom", (roomId) => {
     const room = rooms[roomId];
     if (!room) return;
-    const pid = playerId || socket.id;
+    const pid = socket.userId;
     socket.leave(roomId);
     removePlayerFromRoom(roomId, pid);
   });
@@ -1767,7 +1806,7 @@ io.on("connection", (socket) => {
   socket.on("updateRoom", (data) => {
     const room = rooms[data.roomId];
     if (!room || room.gameStatus !== "waiting") return socket.emit("gameError", "Oda bulunamadı!");
-    const pid = playerId || socket.id;
+    const pid = socket.userId;
     if (!isPlayerHost(room, pid)) {
       socket.emit("gameError", "Sadece kurucu ayarları değiştirebilir!");
       return;
@@ -1783,7 +1822,8 @@ io.on("connection", (socket) => {
   });
 
   // --- REJOIN (reconnection) ---
-  socket.on("rejoinRoom", ({ roomId, playerId: pid }) => {
+  socket.on("rejoinRoom", ({ roomId }) => {
+    const pid = socket.userId;
     const room = rooms[roomId];
     if (!room) {
       socket.emit("rejoinFailed");
@@ -1799,7 +1839,6 @@ io.on("connection", (socket) => {
     player.disconnectedAt = null;
     player.socketId = socket.id;
     playerSockets[pid] = socket.id;
-    playerId = pid;
 
     socket.join(roomId);
     socket.emit("rejoinSuccess", {
@@ -1816,7 +1855,7 @@ io.on("connection", (socket) => {
 
   // --- DISCONNECT ---
   socket.on("disconnect", () => {
-    const pid = playerId || socket.id;
+    const pid = socket.userId;
     // Matchmaking kuyruğundan çıkar
     removeFromMatchmaking(pid);
     for (const roomId of Object.keys(rooms)) {
@@ -1838,7 +1877,7 @@ io.on("connection", (socket) => {
         }
       }, 30000);
     }
-    if (playerId) delete playerSockets[playerId];
+    if (pid) delete playerSockets[pid];
   });
 });
 
@@ -2055,6 +2094,36 @@ function startTurn(roomId) {
     currentPair.totalAttempts++;
     updateLeaderboard(roomId);
     const result = { pairId: currentPair.id, p1Word: w1, p2Word: w2, attempts: currentPair.currentTurnAttempts, totalMistakes: currentPair.totalAttempts, match: false };
+
+    // Elenme kontrolü
+    if (currentPair.totalAttempts >= 20 && !currentPair.isEliminated) {
+      currentPair.isEliminated = true;
+      io.to(roomId).emit("spectatorUpdate", result);
+      io.to(roomId).emit("gameOver", `${currentPair.teamName} ELENDİ! 💀`);
+      const alive = room.pairs.filter((p) => !p.isEliminated);
+      if (alive.length > 1) {
+        setTimeout(() => nextTurn(roomId), 2000);
+      } else if (alive.length === 1) {
+        const winner = alive[0];
+        const winnerIds = [winner.p1.id, winner.p2.id];
+        setTimeout(() => {
+          io.to(roomId).emit("telepatiGameOver", {
+            winnerTeam: winner.teamName, winnerP1: winner.p1.username, winnerP2: winner.p2.username,
+            winnerIds: winnerIds, winnerScore: winner.totalAttempts, lastStanding: true,
+          });
+          room.gameStatus = "finished";
+          setTimeout(() => { room.gameStatus = "waiting"; emitBackToSelect(roomId); }, 7000);
+        }, 2000);
+      } else {
+        setTimeout(() => {
+          io.to(roomId).emit("gameOver", "Herkes Elendi! 💀");
+          room.gameStatus = "finished";
+          setTimeout(() => { room.gameStatus = "waiting"; emitBackToSelect(roomId); }, 5000);
+        }, 2000);
+      }
+      return;
+    }
+
     io.to(roomId).emit("spectatorUpdate", result);
     room.moves[currentPair.id] = {};
   }, (room.roundTime + 3) * 1000);
@@ -2943,14 +3012,14 @@ function autoSubmitSayiTahminSecret(roomId) {
   const pairKey = pair.id;
   if (!room.sayiTahminSecrets[pairKey]) room.sayiTahminSecrets[pairKey] = {};
   const dc = room.sayiTahminDigitCount || 4;
-  // Generate random unique-digit numbers for players who didn't submit
-  function randomUniqueDigits(n) {
-    const digits = [0,1,2,3,4,5,6,7,8,9];
-    for (let i = digits.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [digits[i], digits[j]] = [digits[j], digits[i]]; }
-    return digits.slice(0, n).join("");
+  // Generate random number for players who didn't submit
+  function randomDigits(n) {
+    let result = '';
+    for (let i = 0; i < n; i++) result += Math.floor(Math.random() * 10);
+    return result;
   }
-  if (!room.sayiTahminSecrets[pairKey][pair.p1.id]) room.sayiTahminSecrets[pairKey][pair.p1.id] = randomUniqueDigits(dc);
-  if (!room.sayiTahminSecrets[pairKey][pair.p2.id]) room.sayiTahminSecrets[pairKey][pair.p2.id] = randomUniqueDigits(dc);
+  if (!room.sayiTahminSecrets[pairKey][pair.p1.id]) room.sayiTahminSecrets[pairKey][pair.p1.id] = randomDigits(dc);
+  if (!room.sayiTahminSecrets[pairKey][pair.p2.id]) room.sayiTahminSecrets[pairKey][pair.p2.id] = randomDigits(dc);
   room.sayiTahminGuesses[pairKey] = { p1: [], p2: [] };
   setTimeout(() => { startSayiTahminGuessPhase(roomId); }, 1000);
 }
