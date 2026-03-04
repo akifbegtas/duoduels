@@ -229,6 +229,9 @@ auth && auth.onAuthStateChanged && auth.onAuthStateChanged(async (user) => {
     userProfile = null;
     authIdToken = null;
     stopTokenRefresh();
+    // Temayı sıfırla (önceki oturumdan kalan mavi/pembe arka plan)
+    document.body.classList.remove('theme-male', 'theme-female');
+    if (typeof updateSvgColors === 'function') updateSvgColors(null);
     dismissSplash(splash);
     showScreen('auth');
   }
@@ -416,7 +419,11 @@ async function signOut() {
       socket.disconnect();
     }
     currentRoom = null;
+    _isGuestLocal = false;
     sessionStorage.removeItem("duoduels_room");
+    // Temayı sıfırla
+    document.body.classList.remove('theme-male', 'theme-female');
+    if (typeof updateSvgColors === 'function') updateSvgColors(null);
     await auth.signOut();
     // onAuthStateChanged auth ekranına yönlendirecek
   } catch (err) {
