@@ -258,14 +258,6 @@ function goToPassPlay() {
 
 function goToPrivateRoom() {
   if (!userProfile) return;
-  if (typeof requireAuthForMultiplayer === 'function') {
-    requireAuthForMultiplayer(function() {
-      pendingRoomData = { username: userProfile.username, gender: userProfile.gender };
-      showScreen("gameSelect");
-      selectMode("duo");
-    });
-    return;
-  }
   pendingRoomData = { username: userProfile.username, gender: userProfile.gender };
   showScreen("gameSelect");
   selectMode("duo");
@@ -548,17 +540,6 @@ function joinRoom() {
     Swal.fire({ title: t('warning'), text: t('warn_room_code'), icon: "warning" });
     return;
   }
-  // Oda katılma multiplayer olduğu için auth gerekli
-  if (typeof requireAuthForMultiplayer === 'function') {
-    requireAuthForMultiplayer(function() {
-      _doJoinRoom(code);
-    });
-    return;
-  }
-  _doJoinRoom(code);
-}
-
-function _doJoinRoom(code) {
   if (!socket || !socket.connected) {
     connectSocket();
     socket.once("connect", () => {
