@@ -530,24 +530,199 @@ body.keyboard-open #lobby-screen.active {
 }
 
 /* --- AUTH SCREEN STYLES --- */
+/* --- AUTH NAVBAR --- */
+.auth-navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 24px;
+  background: rgba(11, 14, 20, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255,255,255,0.06);
+}
+.auth-navbar-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.auth-navbar-logo {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+}
+.auth-navbar-brand {
+  font-family: 'Pacifico', cursive;
+  font-size: 1.3rem;
+  color: #fff;
+}
+.auth-navbar-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+.auth-navbar-link {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.2);
+  color: rgba(255,255,255,0.8);
+  padding: 6px 14px;
+  border-radius: 8px;
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.auth-navbar-link:hover {
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+}
+.auth-navbar-langs {
+  display: flex;
+  gap: 4px;
+}
+.lang-btn-mini {
+  background: none;
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 1.1rem;
+  cursor: pointer;
+  transition: all 0.2s;
+  line-height: 1;
+}
+.lang-btn-mini:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.3);
+}
+
+/* --- HOW TO PLAY OVERLAY --- */
+.htp-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 200;
+  background: rgba(0,0,0,0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  justify-content: center;
+  padding-top: 70px;
+  animation: htpFadeIn 0.2s ease;
+}
+@keyframes htpFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.htp-panel {
+  background: rgba(20, 22, 35, 0.95);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 16px;
+  width: 90%;
+  max-width: 500px;
+  max-height: 80vh;
+  overflow-y: auto;
+  animation: htpSlideDown 0.3s ease;
+}
+@keyframes htpSlideDown {
+  from { opacity: 0; transform: translateY(-20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.htp-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20px 24px 12px;
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+}
+.htp-header h3 {
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.2rem;
+  color: #fff;
+  margin: 0;
+}
+.htp-close {
+  background: none;
+  border: none;
+  color: rgba(255,255,255,0.5);
+  font-size: 1.8rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0 4px;
+}
+.htp-close:hover { color: #fff; }
+.htp-content {
+  padding: 16px 24px 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.htp-game {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+  padding: 12px;
+  border-radius: 10px;
+  background: rgba(255,255,255,0.04);
+}
+.htp-icon {
+  font-size: 1.6rem;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+.htp-game strong {
+  color: #fff;
+  font-size: 0.95rem;
+}
+.htp-game p {
+  color: rgba(255,255,255,0.6);
+  font-size: 0.82rem;
+  margin: 4px 0 0;
+  line-height: 1.4;
+}
+
+/* --- AUTH HERO / SLOGAN --- */
+.auth-hero {
+  text-align: center;
+  padding-top: 80px;
+  margin-bottom: 8px;
+}
+.auth-slogan {
+  font-family: 'Poppins', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.85);
+  margin: 0;
+  letter-spacing: -0.5px;
+}
+@media (min-width: 768px) {
+  .auth-slogan { font-size: 1.8rem; }
+}
+
 .auth-card {
   max-width: 400px;
   width: 90%;
   margin: 0 auto;
-  padding: 40px 30px;
+  padding: 30px 30px;
   display: flex;
   flex-direction: column;
   align-items: center;
 }
 
 .auth-logo-container {
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 .auth-logo {
-  width: 80px;
-  height: 80px;
-  border-radius: 20px;
+  width: 70px;
+  height: 70px;
+  border-radius: 18px;
 }
 
 .auth-title {

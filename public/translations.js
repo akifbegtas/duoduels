@@ -16,8 +16,13 @@ const TRANSLATIONS = {
     auth_apple_disabled_text: "Apple ile giriş sadece iOS'ta aktif.",
     auth_guest_failed:   "Misafir girişi başarısız. Firebase Authentication > Anonymous provider'ı açın.",
     auth_or:             "veya",
-    auth_skip:           "Giriş yapmadan oyna",
-    auth_skip_note:      "Rastgele Eşleş için giriş gereklidir",
+    auth_slogan:         "Çiftler için en eğlenceli bilgi yarışması!",
+    how_to_play:         "Nasıl Oynanır?",
+    htp_isim_sehir:      "Verilen harfle isim, şehir, hayvan, renk gibi kategorilere kelime bul!",
+    htp_tabu:            "Yasaklı kelimeleri kullanmadan verilen kelimeyi anlat!",
+    htp_pictionary:      "Çizilen resmi tahmin et veya sen çiz, karşı taraf tahmin etsin!",
+    htp_emoji:           "Emojilerden filmi, şarkıyı veya kelimeyi tahmin et!",
+    htp_duello:          "Bilgi sorularıyla rakibine karşı yarış!",
     auth_required_title: "Giriş Gerekli",
     auth_required_text:  "Rastgele Eşleş için Google veya Facebook ile giriş yapmalısın.",
     auth_required_login: "Giriş Yap",
@@ -292,8 +297,13 @@ const TRANSLATIONS = {
     auth_apple_disabled_text: "Apple sign-in is only available on iOS.",
     auth_guest_failed:   "Guest sign-in failed. Enable Firebase Authentication > Anonymous provider.",
     auth_or:             "or",
-    auth_skip:           "Play without signing in",
-    auth_skip_note:      "Login required for Random Match only",
+    auth_slogan:         "The most fun trivia game for couples!",
+    how_to_play:         "How to Play?",
+    htp_isim_sehir:      "Find words for categories like name, city, animal with the given letter!",
+    htp_tabu:            "Describe the word without using the forbidden words!",
+    htp_pictionary:      "Guess the drawing or draw for your partner to guess!",
+    htp_emoji:           "Guess the movie, song, or word from emojis!",
+    htp_duello:          "Compete against your rival with trivia questions!",
     auth_required_title: "Login Required",
     auth_required_text:  "You need to sign in with Google or Facebook for Random Match.",
     auth_required_login: "Sign In",
@@ -568,8 +578,13 @@ const TRANSLATIONS = {
     auth_apple_disabled_text: "تسجيل الدخول بـ Apple متاح فقط على iOS.",
     auth_guest_failed:   "فشل تسجيل الدخول كضيف. قم بتفعيل Firebase Authentication > Anonymous provider.",
     auth_or:             "أو",
-    auth_skip:           "العب بدون تسجيل دخول",
-    auth_skip_note:      "تسجيل الدخول مطلوب فقط للمطابقة العشوائية",
+    auth_slogan:         "أكثر لعبة معلومات ممتعة للأزواج!",
+    how_to_play:         "كيف تلعب؟",
+    htp_isim_sehir:      "اعثر على كلمات للفئات مثل الاسم والمدينة والحيوان بالحرف المعطى!",
+    htp_tabu:            "صِف الكلمة دون استخدام الكلمات المحظورة!",
+    htp_pictionary:      "خمّن الرسم أو ارسم ليخمّن شريكك!",
+    htp_emoji:           "خمّن الفيلم أو الأغنية أو الكلمة من الرموز التعبيرية!",
+    htp_duello:          "تنافس ضد خصمك بأسئلة المعلومات!",
     auth_required_title: "تسجيل الدخول مطلوب",
     auth_required_text:  "يجب تسجيل الدخول عبر Google أو Facebook للمطابقة العشوائية.",
     auth_required_login: "تسجيل الدخول",
@@ -848,6 +863,14 @@ function applyTranslations() {
 
   // Auth
   _setText('auth-subtitle',        t('auth_subtitle'));
+  _setText('auth-slogan',          t('auth_slogan'));
+  _setText('how-to-play-btn',      t('how_to_play'));
+  _setText('htp-title',            t('how_to_play'));
+  _setText('htp-desc-1',           t('htp_isim_sehir'));
+  _setText('htp-desc-2',           t('htp_tabu'));
+  _setText('htp-desc-3',           t('htp_pictionary'));
+  _setText('htp-desc-4',           t('htp_emoji'));
+  _setText('htp-desc-5',           t('htp_duello'));
   _setText('btn-text-google',      t('btn_google'));
   _setText('btn-text-facebook',    t('btn_facebook'));
   _setText('btn-text-apple',       t('btn_apple'));

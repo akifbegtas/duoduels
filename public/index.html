@@ -78,11 +78,64 @@
 
     <!-- AUTH EKRANI -->
     <div id="auth-screen" class="screen active">
+
+      <!-- Top Navbar -->
+      <nav class="auth-navbar">
+        <div class="auth-navbar-left">
+          <img src="apple-touch-icon.png" alt="DuoDuels" class="auth-navbar-logo" />
+          <span class="auth-navbar-brand">DuoDuels</span>
+        </div>
+        <div class="auth-navbar-right">
+          <button class="auth-navbar-link" onclick="toggleHowToPlay()" id="how-to-play-btn">Nasıl Oynanır?</button>
+          <div class="auth-navbar-langs">
+            <button class="lang-btn-mini" onclick="setLanguage('tr')" id="nav-lang-tr">🇹🇷</button>
+            <button class="lang-btn-mini" onclick="setLanguage('en')" id="nav-lang-en">🇬🇧</button>
+            <button class="lang-btn-mini" onclick="setLanguage('ar')" id="nav-lang-ar">🇸🇦</button>
+          </div>
+        </div>
+      </nav>
+
+      <!-- Nasıl Oynanır? Overlay -->
+      <div id="how-to-play-overlay" class="htp-overlay" style="display:none">
+        <div class="htp-panel">
+          <div class="htp-header">
+            <h3 id="htp-title">Nasıl Oynanır?</h3>
+            <button class="htp-close" onclick="toggleHowToPlay()">&times;</button>
+          </div>
+          <div class="htp-content">
+            <div class="htp-game">
+              <span class="htp-icon">🏙️</span>
+              <div><strong>İsim Şehir</strong><p id="htp-desc-1">Verilen harfle isim, şehir, hayvan, renk gibi kategorilere kelime bul!</p></div>
+            </div>
+            <div class="htp-game">
+              <span class="htp-icon">🚫</span>
+              <div><strong>Tabu</strong><p id="htp-desc-2">Yasaklı kelimeleri kullanmadan verilen kelimeyi anlat!</p></div>
+            </div>
+            <div class="htp-game">
+              <span class="htp-icon">🎨</span>
+              <div><strong>Resim Tahmin</strong><p id="htp-desc-3">Çizilen resmi tahmin et veya sen çiz, karşı taraf tahmin etsin!</p></div>
+            </div>
+            <div class="htp-game">
+              <span class="htp-icon">😄</span>
+              <div><strong>Emoji Tahmin</strong><p id="htp-desc-4">Emojilerden filmi, şarkıyı veya kelimeyi tahmin et!</p></div>
+            </div>
+            <div class="htp-game">
+              <span class="htp-icon">⚔️</span>
+              <div><strong>Düello</strong><p id="htp-desc-5">Bilgi sorularıyla rakibine karşı yarış!</p></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Slogan -->
+      <div class="auth-hero">
+        <h2 class="auth-slogan" id="auth-slogan">Çiftler için en eğlenceli bilgi yarışması!</h2>
+      </div>
+
       <div class="card auth-card">
         <div class="auth-logo-container">
           <img src="apple-touch-icon.png" alt="DuoDuels" class="auth-logo" />
         </div>
-        <h2 class="auth-title">DuoDuels</h2>
         <p id="auth-subtitle" class="auth-subtitle">Oynamak için giriş yap</p>
 
         <div class="auth-buttons">
@@ -1041,6 +1094,18 @@
         };
       });
     }
+  </script>
+  <script>
+    function toggleHowToPlay() {
+      var el = document.getElementById('how-to-play-overlay');
+      el.style.display = el.style.display === 'none' ? 'flex' : 'none';
+    }
+    // Close on overlay background click
+    document.addEventListener('click', function(e) {
+      if (e.target && e.target.id === 'how-to-play-overlay') {
+        e.target.style.display = 'none';
+      }
+    });
   </script>
 </body>
 
