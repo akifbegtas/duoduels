@@ -5,6 +5,60 @@ const path = require("path");
 const admin = require("firebase-admin");
 let firebaseAuthEnabled = false;
 
+// Server-side i18n helper (mirrors client translations for error messages)
+const SERVER_MESSAGES = {
+  tr: {
+    room_not_found: "Oda bulunamadı!",
+    only_host_start: "Sadece kurucu oyunu başlatabilir!",
+    imposter_tek: "Imposter sadece tek modda oynanabilir!",
+    imposter_min3: "Imposter için en az 3 oyuncu gerekli!",
+    tek_pictionary: "Tek modda sadece Resim Çiz oynanabilir!",
+    min2_players: "En az 2 oyuncu gerekli!",
+    not_enough_teams: "Yeterli takım yok!",
+    only_host_settings: "Sadece kurucu ayarları değiştirebilir!",
+    room_inactive: "Oda hareketsizlik nedeniyle kapatıldı.",
+    wait_opponent: "Rakibin tahminini bekle!",
+    searching_opponent: "Karşı cinsten oyuncu aranıyor...",
+    eliminated: "ELENDİ! 💀",
+    all_eliminated: "Herkes Elendi! 💀",
+  },
+  en: {
+    room_not_found: "Room not found!",
+    only_host_start: "Only the host can start the game!",
+    imposter_tek: "Imposter can only be played in single mode!",
+    imposter_min3: "Imposter requires at least 3 players!",
+    tek_pictionary: "Only Pictionary is available in single mode!",
+    min2_players: "At least 2 players required!",
+    not_enough_teams: "Not enough teams!",
+    only_host_settings: "Only the host can change settings!",
+    room_inactive: "Room closed due to inactivity.",
+    wait_opponent: "Wait for your opponent's guess!",
+    searching_opponent: "Searching for an opponent...",
+    eliminated: "ELIMINATED! 💀",
+    all_eliminated: "Everyone Eliminated! 💀",
+  },
+  ar: {
+    room_not_found: "الغرفة غير موجودة!",
+    only_host_start: "فقط المضيف يمكنه بدء اللعبة!",
+    imposter_tek: "المحتال متاح فقط في الوضع الفردي!",
+    imposter_min3: "المحتال يتطلب 3 لاعبين على الأقل!",
+    tek_pictionary: "فقط الرسم متاح في الوضع الفردي!",
+    min2_players: "يجب وجود لاعبين على الأقل!",
+    not_enough_teams: "لا توجد فرق كافية!",
+    only_host_settings: "فقط المضيف يمكنه تغيير الإعدادات!",
+    room_inactive: "تم إغلاق الغرفة بسبب عدم النشاط.",
+    wait_opponent: "انتظر تخمين خصمك!",
+    searching_opponent: "البحث عن خصم...",
+    eliminated: "تم الإقصاء! 💀",
+    all_eliminated: "تم إقصاء الجميع! 💀",
+  }
+};
+
+function serverT(key, lang) {
+  lang = lang || 'tr';
+  return (SERVER_MESSAGES[lang] && SERVER_MESSAGES[lang][key]) || SERVER_MESSAGES['tr'][key] || key;
+}
+
 // Firebase Admin SDK init
 if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
@@ -14,8 +68,12 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   admin.initializeApp({ credential: admin.credential.applicationDefault() });
   firebaseAuthEnabled = true;
 } else {
-  // Local dev: credential yoksa auth bypass aktif
-  console.warn("Firebase Admin credential bulunamadı. DEV_AUTH_BYPASS aktif.");
+  // Auth bypass — sadece NODE_ENV=production DEĞİLSE aktif
+  if (process.env.NODE_ENV === 'production') {
+    console.error("HATA: Production'da Firebase credential bulunamadı! FIREBASE_SERVICE_ACCOUNT veya GOOGLE_APPLICATION_CREDENTIALS ayarlanmalı.");
+    process.exit(1);
+  }
+  console.warn("Firebase Admin credential bulunamadı. DEV_AUTH_BYPASS aktif (sadece development).");
   try { admin.initializeApp(); } catch (e) { /* already initialized */ }
 }
 
@@ -63,11 +121,35 @@ app.use((req, res, next) => {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
     "font-src https://fonts.gstatic.com; " +
     "img-src 'self' data: https://*.googleusercontent.com https://*.facebook.com; " +
-    "connect-src 'self' wss://duoduels.onrender.com wss://duoduels.com wss://www.duoduels.com wss://duoduels-599689373205.europe-west1.run.app ws://localhost:3000 ws://127.0.0.1:3000 https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; " +
+    "connect-src 'self' wss://duoduels.onrender.com wss://duoduels.com wss://www.duoduels.com https://duoduels-599689373205.europe-west1.run.app wss://duoduels-599689373205.europe-west1.run.app wss://duoduels-efwwv7zyia-ew.a.run.app ws://localhost:3000 ws://127.0.0.1:3000 https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; " +
     "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com https://www.facebook.com https://appleid.apple.com;"
   );
   next();
 });
+
+// --- HTTP Rate Limiting ---
+const httpRateLimits = new Map();
+app.use((req, res, next) => {
+  const ip = req.ip || req.connection.remoteAddress;
+  const now = Date.now();
+  let entry = httpRateLimits.get(ip);
+  if (!entry || now > entry.resetAt) {
+    entry = { count: 0, resetAt: now + 60000 }; // 1 dakika penceresi
+    httpRateLimits.set(ip, entry);
+  }
+  entry.count++;
+  if (entry.count > 300) { // dakikada max 300 istek
+    return res.status(429).json({ error: 'Too many requests' });
+  }
+  next();
+});
+// Eski HTTP rate limit kayıtlarını temizle (her 5 dk)
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, entry] of httpRateLimits) {
+    if (now > entry.resetAt) httpRateLimits.delete(ip);
+  }
+}, 5 * 60 * 1000);
 
 app.use(express.static(path.join(__dirname, "public")));
 
@@ -80,12 +162,6 @@ const VALID_GAME_MODES = ['cift', 'duo', 'tek'];
 const BOT_NAMES_FEMALE = ['Zeynep', 'Ayşe', 'Selin', 'Elif', 'Merve'];
 const BOT_NAMES_MALE   = ['Mehmet', 'Emre', 'Burak', 'Can', 'Kaan'];
 const BOT_TELEPATI_WORDS = ['ELMA', 'EV', 'ARABA', 'GÜNEŞ', 'KÖPEK', 'SU', 'AŞK', 'BALIK', 'AĞAÇ', 'GÜL', 'KAT', 'YOL'];
-
-function randomDigits(n) {
-  let result = '';
-  for (let i = 0; i < n; i++) result += Math.floor(Math.random() * 10);
-  return result;
-}
 
 function createBotPlayer(gender, selectedGames) {
   const names = gender === 'female' ? BOT_NAMES_FEMALE : BOT_NAMES_MALE;
@@ -117,6 +193,11 @@ function isValidRoomId(id) {
   return typeof id === 'string' && /^[A-Z0-9]{5,6}$/.test(id);
 }
 
+function getValidRoom(roomId) {
+  if (!isValidRoomId(roomId)) return null;
+  return rooms[roomId] || null;
+}
+
 function generateRoomId() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let id;
@@ -132,9 +213,21 @@ function generateRoomId() {
 // --- Rate Limiting ---
 io.use((socket, next) => {
   const limits = { count: 0, resetAt: Date.now() + 1000 };
+  const drawLimits = { count: 0, resetAt: Date.now() + 1000 };
   socket.use(([event], next) => {
-    if (event === 'drawData') return next(); // exempt drawing
     const now = Date.now();
+    if (event === 'drawData') {
+      // drawData için ayrı, daha yüksek limit (saniyede 120)
+      if (now > drawLimits.resetAt) {
+        drawLimits.count = 0;
+        drawLimits.resetAt = now + 1000;
+      }
+      drawLimits.count++;
+      if (drawLimits.count > 120) {
+        return next(new Error('Draw rate limit exceeded'));
+      }
+      return next();
+    }
     if (now > limits.resetAt) {
       limits.count = 0;
       limits.resetAt = now + 1000;
@@ -152,12 +245,24 @@ io.use((socket, next) => {
 if (firebaseAuthEnabled) {
   io.use(async (socket, next) => {
     const token = socket.handshake.auth.token;
+    const fallbackId = socket.handshake.auth && socket.handshake.auth.fallbackUserId;
+
+    // Guest local kullanıcılar (Pass & Play) — token olmadan fallbackUserId ile bağlanır
+    if (!token && fallbackId) {
+      socket.userId = sanitizeString(fallbackId, 64);
+      socket.isGuestLocal = true;
+      socket.lang = socket.handshake.auth.lang || 'tr';
+      return next();
+    }
+
     if (!token) {
       return next(new Error('Authentication required'));
     }
     try {
       const decoded = await admin.auth().verifyIdToken(token);
       socket.userId = decoded.uid;
+      socket.isGuestLocal = false;
+      socket.lang = socket.handshake.auth.lang || 'tr';
       next();
     } catch (err) {
       console.error('Auth middleware error:', err.message);
@@ -168,6 +273,7 @@ if (firebaseAuthEnabled) {
   io.use((socket, next) => {
     const fallbackId = socket.handshake.auth && socket.handshake.auth.fallbackUserId;
     socket.userId = sanitizeString(fallbackId || `dev_${socket.id}`, 64);
+    socket.lang = socket.handshake.auth.lang || 'tr';
     next();
   });
 }
@@ -726,7 +832,7 @@ io.on("connection", (socket) => {
       selectedGames: selectedGames
     });
 
-    socket.emit("matchSearching", { message: "Karşı cinsten oyuncu aranıyor..." });
+    socket.emit("matchSearching", { message: serverT('searching_opponent', socket.lang) });
     console.log(`Matchmaking: ${username} (${gender}) ${mode} modunda arıyor. Kuyruk: E:${matchmakingQueue[mode].male.length} K:${matchmakingQueue[mode].female.length}`);
 
     checkForMatch(mode);
@@ -883,7 +989,7 @@ io.on("connection", (socket) => {
     console.log(`joinRoom isteği: oda=${cleanRoomId} kullanıcı=${cleanUsername} mevcut=${!!rooms[cleanRoomId]}`);
     const room = rooms[cleanRoomId];
     if (!room) {
-      socket.emit("gameError", "Oda bulunamadı!");
+      socket.emit("gameError", serverT('room_not_found', socket.lang));
       return;
     }
     const pid = socket.userId;
@@ -918,7 +1024,7 @@ io.on("connection", (socket) => {
 
   // --- TAKIM SEÇME ---
   socket.on("selectTeam", ({ roomId, teamIndex, slot }) => {
-    const room = rooms[roomId];
+    const room = getValidRoom(roomId);
     if (!room) return;
     const pid = socket.userId;
     const playerIndex = room.spectators.findIndex((p) => p.id === pid);
@@ -939,24 +1045,25 @@ io.on("connection", (socket) => {
 
   // --- OYUN BAŞLATMA ---
   socket.on("startGame", (roomId) => {
-    const room = rooms[roomId];
+    if (typeof roomId === 'string') roomId = roomId.toUpperCase().trim();
+    const room = getValidRoom(roomId);
     if (!room) return;
 
     // Sadece host başlatabilir
     const pid = socket.userId;
     if (!isPlayerHost(room, pid)) {
-      socket.emit("gameError", "Sadece kurucu oyunu başlatabilir!");
+      socket.emit("gameError", serverT('only_host_start', socket.lang));
       return;
     }
 
     // --- IMPOSTOR OYUNU ---
     if (room.gameType === "imposter") {
       if (room.gameMode !== "tek") {
-        socket.emit("gameError", "Imposter sadece tek modda oynanabilir!");
+        socket.emit("gameError", serverT('imposter_tek', socket.lang));
         return;
       }
       if (!room.players || room.players.length < 3) {
-        socket.emit("gameError", "Imposter için en az 3 oyuncu gerekli!");
+        socket.emit("gameError", serverT('imposter_min3', socket.lang));
         return;
       }
       room.gameStatus = "playing";
@@ -983,11 +1090,11 @@ io.on("connection", (socket) => {
     // TEK MOD
     if (room.gameMode === "tek") {
       if (room.gameType !== "pictionary") {
-        socket.emit("gameError", "Tek modda sadece Resim Çiz oynanabilir!");
+        socket.emit("gameError", serverT('tek_pictionary', socket.lang));
         return;
       }
       if (room.players.length < 2) {
-        socket.emit("gameError", "En az 2 oyuncu gerekli!");
+        socket.emit("gameError", serverT('min2_players', socket.lang));
         return;
       }
       room.gameStatus = "playing";
@@ -1026,7 +1133,7 @@ io.on("connection", (socket) => {
     });
 
     if (validPairs.length < 1) {
-      socket.emit("gameError", "Yeterli takım yok!");
+      socket.emit("gameError", serverT('not_enough_teams', socket.lang));
       return;
     }
 
@@ -1120,8 +1227,8 @@ io.on("connection", (socket) => {
 
   // --- TELEPATİ: KELİME GÖNDERME ---
   socket.on("submitWord", ({ roomId, word, passPlayActingAs }) => {
-    const room = rooms[roomId];
-    if (!room || room.gameStatus !== "playing") return socket.emit("gameError", "Oda bulunamadı!");
+    const room = getValidRoom(roomId);
+    if (!room || room.gameStatus !== "playing") return socket.emit("gameError", serverT('room_not_found', socket.lang));
     let pid = socket.userId;
     // Pass & Play: same socket can submit as P2
     if (room && room.passPlay && passPlayActingAs) {
@@ -1178,7 +1285,7 @@ io.on("connection", (socket) => {
       if (currentPair.totalAttempts >= 20 && !currentPair.isEliminated) {
         currentPair.isEliminated = true;
         io.to(roomId).emit("spectatorUpdate", result);
-        io.to(roomId).emit("gameOver", `${currentPair.teamName} ELENDİ! 💀`);
+        io.to(roomId).emit("gameOver", currentPair.teamName + " " + serverT('eliminated'));
         // Check if game is already over before scheduling nextTurn
         const alive = room.pairs.filter((p) => !p.isEliminated);
         if (alive.length > 1) {
@@ -1203,7 +1310,7 @@ io.on("connection", (socket) => {
           }, 2000);
         } else {
           setTimeout(() => {
-            io.to(roomId).emit("gameOver", "Herkes Elendi! 💀");
+            io.to(roomId).emit("gameOver", serverT('all_eliminated'));
             room.gameStatus = "finished";
             setTimeout(() => {
               room.gameStatus = "waiting";
@@ -1230,7 +1337,7 @@ io.on("connection", (socket) => {
 
   // --- İSİM ŞEHİR: 3 CEVAP BİRDEN GÖNDERME ---
   socket.on("submitAllIsimSehir", ({ roomId, answers, passPlayActingAs }) => {
-    const room = rooms[roomId];
+    const room = getValidRoom(roomId);
     if (!room || room.gameStatus !== "playing") {
       console.log("[IS] REJECTED: room not found or not playing", roomId);
       return;
@@ -1343,7 +1450,7 @@ io.on("connection", (socket) => {
 
   // --- PICTIONARY: DRAW DATA ---
   socket.on("drawData", (data) => {
-    const room = rooms[data.roomId];
+    const room = getValidRoom(data.roomId);
     if (!room || room.gameType !== "pictionary") return;
     // Relay to everyone else in room
     socket.to(data.roomId).emit("drawData", data);
@@ -1351,7 +1458,7 @@ io.on("connection", (socket) => {
 
   // --- PICTIONARY: GUESS ---
   socket.on("pictionaryGuess", ({ roomId, guess }) => {
-    const room = rooms[roomId];
+    const room = getValidRoom(roomId);
     if (
       !room ||
       room.gameStatus !== "playing" ||
@@ -1452,7 +1559,7 @@ io.on("connection", (socket) => {
 
   // --- TABU: İPUCU ---
   socket.on("tabuClue", ({ roomId, clue }) => {
-    const room = rooms[roomId];
+    const room = getValidRoom(roomId);
     if (!room || room.gameStatus !== "playing" || room.gameType !== "tabu")
       return;
     const pid = socket.userId;
@@ -1507,7 +1614,7 @@ io.on("connection", (socket) => {
 
   // --- TABU: TAHMİN ---
   socket.on("tabuGuess", ({ roomId, guess }) => {
-    const room = rooms[roomId];
+    const room = getValidRoom(roomId);
     if (!room || room.gameStatus !== "playing" || room.gameType !== "tabu")
       return;
     const pid = socket.userId;
@@ -1548,7 +1655,7 @@ io.on("connection", (socket) => {
 
   // --- TABU: PAS ---
   socket.on("tabuPass", ({ roomId }) => {
-    const room = rooms[roomId];
+    const room = getValidRoom(roomId);
     if (!room || room.gameStatus !== "playing" || room.gameType !== "tabu")
       return;
     const pid = socket.userId;
@@ -1563,7 +1670,7 @@ io.on("connection", (socket) => {
 
   // --- IMPOSTER: KELİME GÖNDERME ---
   socket.on("submitImposterWord", ({ roomId, word }) => {
-    const room = rooms[roomId];
+    const room = getValidRoom(roomId);
     if (!room || room.gameStatus !== "playing" || room.gameType !== "imposter")
       return;
     if (room.imposterPhase !== "write1" && room.imposterPhase !== "write2")
@@ -1597,7 +1704,7 @@ io.on("connection", (socket) => {
 
   // --- IMPOSTER: OY VERME ---
   socket.on("submitImposterVote", ({ roomId, votedPlayerId }) => {
-    const room = rooms[roomId];
+    const room = getValidRoom(roomId);
     if (!room || room.gameStatus !== "playing" || room.gameType !== "imposter")
       return;
     if (room.imposterPhase !== "vote") return;
@@ -1624,7 +1731,7 @@ io.on("connection", (socket) => {
 
   // --- SAYI TAHMİN: GİZLİ SAYI GÖNDERME ---
   socket.on("submitSecretNumber", ({ roomId, number, passPlayActingAs }) => {
-    const room = rooms[roomId];
+    const room = getValidRoom(roomId);
     if (!room || room.gameStatus !== "playing" || room.gameType !== "sayiTahmin") return;
 
     const currentPair = room.pairs[room.currentPairIndex];
@@ -1673,7 +1780,7 @@ io.on("connection", (socket) => {
 
   // --- SAYI TAHMİN: TAHMİN GÖNDERME (senkronize round - ikisi de gönderince sonuçlar açılır) ---
   socket.on("submitNumberGuess", ({ roomId, guess, passPlayActingAs }) => {
-    const room = rooms[roomId];
+    const room = getValidRoom(roomId);
     if (!room || room.gameStatus !== "playing" || room.gameType !== "sayiTahmin") return;
 
     const currentPair = room.pairs[room.currentPairIndex];
@@ -1698,7 +1805,7 @@ io.on("connection", (socket) => {
 
     // Bu oyuncu zaten bu round'da tahmin gönderdiyse kabul etme
     if (room.sayiTahminPendingGuesses[pairKey][who]) {
-      socket.emit("sayiTahminError", "Rakibin tahminini bekle!");
+      socket.emit("sayiTahminError", serverT('wait_opponent', socket.lang));
       return;
     }
 
@@ -1767,7 +1874,8 @@ io.on("connection", (socket) => {
   // --- ODA AYARLARINI GÜNCELLE (oyun bitince tekrar seçim) ---
   // --- ODADAN AYRILMA ---
   socket.on("leaveRoom", (roomId) => {
-    const room = rooms[roomId];
+    if (typeof roomId === 'string') roomId = roomId.toUpperCase().trim();
+    const room = getValidRoom(roomId);
     if (!room) return;
     const pid = socket.userId;
     socket.leave(roomId);
@@ -1776,11 +1884,11 @@ io.on("connection", (socket) => {
 
   // --- ODA AYARLARINI GÜNCELLE (oyun bitince tekrar seçim) ---
   socket.on("updateRoom", (data) => {
-    const room = rooms[data.roomId];
-    if (!room || room.gameStatus !== "waiting") return socket.emit("gameError", "Oda bulunamadı!");
+    const room = getValidRoom(data.roomId);
+    if (!room || room.gameStatus !== "waiting") return socket.emit("gameError", serverT('room_not_found', socket.lang));
     const pid = socket.userId;
     if (!isPlayerHost(room, pid)) {
-      socket.emit("gameError", "Sadece kurucu ayarları değiştirebilir!");
+      socket.emit("gameError", serverT('only_host_settings', socket.lang));
       return;
     }
 
@@ -1796,7 +1904,7 @@ io.on("connection", (socket) => {
   // --- REJOIN (reconnection) ---
   socket.on("rejoinRoom", ({ roomId }) => {
     const pid = socket.userId;
-    const room = rooms[roomId];
+    const room = getValidRoom(roomId);
     if (!room) {
       socket.emit("rejoinFailed");
       return;
@@ -2000,7 +2108,7 @@ function nextTurn(roomId) {
     if (nextP.isEliminated) {
       const alive = room.pairs.filter((p) => !p.isEliminated);
       if (alive.length === 0) {
-        io.to(roomId).emit("gameOver", "Herkes Elendi! 💀");
+        io.to(roomId).emit("gameOver", serverT('all_eliminated'));
         room.gameStatus = "finished";
         setTimeout(() => {
           room.gameStatus = "waiting";
@@ -2077,13 +2185,13 @@ function startTurn(roomId) {
         if (pair.totalAttempts >= 20 && !pair.isEliminated) {
           pair.isEliminated = true;
           io.to(roomId).emit('spectatorUpdate', result);
-          io.to(roomId).emit('gameOver', `${pair.teamName} ELENDİ! 💀`);
+          io.to(roomId).emit('gameOver', pair.teamName + " " + serverT('eliminated'));
           const alive = room.pairs.filter(x => !x.isEliminated);
           if (alive.length > 1) setTimeout(() => nextTurn(roomId), 2000);
           else if (alive.length === 1) {
             const winner = alive[0];
             setTimeout(() => { io.to(roomId).emit('telepatiGameOver', { winnerTeam: winner.teamName, winnerP1: winner.p1.username, winnerP2: winner.p2.username, winnerIds: [winner.p1.id, winner.p2.id], winnerScore: winner.totalAttempts, lastStanding: true }); room.gameStatus = 'finished'; setTimeout(() => { room.gameStatus = 'waiting'; emitBackToSelect(roomId); }, 7000); }, 2000);
-          } else { setTimeout(() => { io.to(roomId).emit('gameOver', 'Herkes Elendi! 💀'); room.gameStatus = 'finished'; setTimeout(() => { room.gameStatus = 'waiting'; emitBackToSelect(roomId); }, 5000); }, 2000); }
+          } else { setTimeout(() => { io.to(roomId).emit('gameOver', serverT('all_eliminated')); room.gameStatus = 'finished'; setTimeout(() => { room.gameStatus = 'waiting'; emitBackToSelect(roomId); }, 5000); }, 2000); }
           return;
         }
         setTimeout(() => {
@@ -2116,7 +2224,7 @@ function startTurn(roomId) {
     if (currentPair.totalAttempts >= 20 && !currentPair.isEliminated) {
       currentPair.isEliminated = true;
       io.to(roomId).emit("spectatorUpdate", result);
-      io.to(roomId).emit("gameOver", `${currentPair.teamName} ELENDİ! 💀`);
+      io.to(roomId).emit("gameOver", currentPair.teamName + " " + serverT('eliminated'));
       const alive = room.pairs.filter((p) => !p.isEliminated);
       if (alive.length > 1) {
         setTimeout(() => nextTurn(roomId), 2000);
@@ -2133,7 +2241,7 @@ function startTurn(roomId) {
         }, 2000);
       } else {
         setTimeout(() => {
-          io.to(roomId).emit("gameOver", "Herkes Elendi! 💀");
+          io.to(roomId).emit("gameOver", serverT('all_eliminated'));
           room.gameStatus = "finished";
           setTimeout(() => { room.gameStatus = "waiting"; emitBackToSelect(roomId); }, 5000);
         }, 2000);
@@ -3353,7 +3461,7 @@ setInterval(() => {
 
     if (age > limit) {
       clearAllRoomTimers(room);
-      io.to(roomId).emit("gameError", "Oda hareketsizlik nedeniyle kapatıldı.");
+      io.to(roomId).emit("gameError", serverT('room_inactive'));
       delete rooms[roomId];
       cleaned++;
       console.log(`Oda temizlendi (hareketsiz, ${Math.round(age / 60000)}dk): ${roomId}`);

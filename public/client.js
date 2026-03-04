@@ -43,8 +43,9 @@ let _socketListenersAttached = false;
 function connectSocket() {
   if (socket && socket.connected) return;
 
-  // Dev modda (localhost) Firebase token olmadan fallbackUserId ile bağlan
-  const devUid = isLocalDev && !authIdToken && typeof _getOrCreateDevUid === 'function'
+  // Dev veya guest local modda Firebase token olmadan fallbackUserId ile bağlan
+  const useLocalFallback = (isLocalDev || (typeof _isGuestLocal !== 'undefined' && _isGuestLocal)) && !authIdToken;
+  const devUid = useLocalFallback && typeof _getOrCreateDevUid === 'function'
     ? _getOrCreateDevUid()
     : null;
 
@@ -54,8 +55,8 @@ function connectSocket() {
   }
 
   const authPayload = authIdToken
-    ? { token: authIdToken }
-    : { fallbackUserId: devUid };
+    ? { token: authIdToken, lang: currentLang || 'tr' }
+    : { fallbackUserId: devUid, lang: currentLang || 'tr' };
 
   if (socket) {
     // Mevcut socket varsa auth güncelle ve yeniden bağlan
@@ -80,7 +81,7 @@ function showRoundToast(roundNum) {
 
   const toast = document.createElement('div');
   toast.id = 'round-toast';
-  toast.innerHTML = `<span style="font-size:1.3rem;margin-right:8px">⚡</span><span>${roundNum}. Tura Geçiliyor</span>`;
+  toast.innerHTML = `<span style="font-size:1.3rem;margin-right:8px">⚡</span><span>${roundNum}. ${t('round_transition')}</span>`;
   toast.style.cssText = `
     position:fixed;bottom:-60px;left:50%;transform:translateX(-50%);z-index:99999;
     background:var(--theme-gradient,linear-gradient(135deg,#3ABFBF,#4A90D9));
@@ -114,6 +115,7 @@ function escapeHtml(str) {
 }
 
 let currentRoom = null;
+let isHost = false;
 // myPlayerId artık Firebase Auth UID'si (auth.js'deki getMyPlayerId() fonksiyonu)
 let myPlayerId = null; // connectSocket sonrası set edilir
 let amIPlaying = false;
@@ -256,6 +258,14 @@ function goToPassPlay() {
 
 function goToPrivateRoom() {
   if (!userProfile) return;
+  if (typeof requireAuthForMultiplayer === 'function') {
+    requireAuthForMultiplayer(function() {
+      pendingRoomData = { username: userProfile.username, gender: userProfile.gender };
+      showScreen("gameSelect");
+      selectMode("duo");
+    });
+    return;
+  }
   pendingRoomData = { username: userProfile.username, gender: userProfile.gender };
   showScreen("gameSelect");
   selectMode("duo");
@@ -264,9 +274,9 @@ function goToPrivateRoom() {
 function selectPassPlayGame(gameType) {
   if (!userProfile) return;
   const p1Name = (document.getElementById('pp-p1-name').value || '').trim() || userProfile.username;
-  const p2Name = (document.getElementById('pp-p2-name').value || '').trim() || 'Oyuncu 2';
+  const p2Name = (document.getElementById('pp-p2-name').value || '').trim() || t('pp_player2');
   if (p1Name.length > 12 || p2Name.length > 12) {
-    Swal.fire({ title: 'Uyarı', text: 'İsimler en fazla 12 karakter olabilir', icon: 'warning' });
+    Swal.fire({ title: t('warning'), text: t('warn_name_long'), icon: 'warning' });
     return;
   }
   const p1Gender = document.querySelector('input[name="pp-p1-gender"]:checked')?.value || userProfile.gender;
@@ -299,7 +309,7 @@ function selectPassPlayGame(gameType) {
 }
 
 function passPlaySwitch(nextPlayerName, onUnlock) {
-  document.getElementById('pp-lock-title').textContent = 'Telefonu ' + nextPlayerName + "'e ver";
+  document.getElementById('pp-lock-title').textContent = t('pp_give_phone').replace('{name}', nextPlayerName);
   document.getElementById('passplay-lock').style.display = 'flex';
   window._ppUnlockCallback = onUnlock;
 }
@@ -311,13 +321,13 @@ function passPlayUnlock() {
 
 function openQrScanner() {
   if (typeof Html5Qrcode === 'undefined') {
-    Swal.fire({ title: 'QR Tarayıcı Yüklenemedi', text: 'Lütfen internet bağlantınızı kontrol edin.', icon: 'error' });
+    Swal.fire({ title: t('qr_scanner_failed'), text: t('qr_scanner_failed_text'), icon: 'error' });
     return;
   }
   const modal = document.createElement('div');
   modal.id = 'qr-scanner-modal';
   modal.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;';
-  modal.innerHTML = '<div id="qr-reader" style="width:280px;border-radius:12px;overflow:hidden"></div><button style="background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:10px;padding:10px 28px;font-size:1rem;cursor:pointer" onclick="closeQrScanner()">İptal</button>';
+  modal.innerHTML = '<div id="qr-reader" style="width:280px;border-radius:12px;overflow:hidden"></div><button style="background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:10px;padding:10px 28px;font-size:1rem;cursor:pointer" onclick="closeQrScanner()">' + t('qr_cancel') + '</button>';
   document.body.appendChild(modal);
 
   const html5Qrcode = new Html5Qrcode('qr-reader');
@@ -348,7 +358,7 @@ function openQrScanner() {
     () => {}
   ).catch((err) => {
     closeQrScanner();
-    Swal.fire({ title: 'Kamera Açılamadı', text: err, icon: 'error' });
+    Swal.fire({ title: t('qr_camera_failed'), text: err, icon: 'error' });
   });
 }
 
@@ -389,12 +399,12 @@ function selectGame(type) {
     if (!ciftVal) {
       Swal.fire({
         html: `<div style="font-size:3.5rem;margin-bottom:10px">👆</div>
-               <div style="font-size:1.3rem;font-weight:700;color:#fff;margin-bottom:6px">Dur bir dakika!</div>
-               <div style="font-size:0.95rem;color:rgba(255,255,255,0.7)">Önce kaç çift oynayacak onu seç 💑</div>`,
+               <div style="font-size:1.3rem;font-weight:700;color:#fff;margin-bottom:6px">${t('pp_wait')}</div>
+               <div style="font-size:0.95rem;color:rgba(255,255,255,0.7)">${t('pp_select_couples')}</div>`,
         background: 'linear-gradient(135deg, #1a1a2e, #2d3436)',
         color: '#fff',
         showConfirmButton: true,
-        confirmButtonText: 'Anladım! 👍',
+        confirmButtonText: t('pp_got_it'),
         confirmButtonColor: '#ff6b6b',
         timer: 3000,
         timerProgressBar: true,
@@ -410,12 +420,12 @@ function selectGame(type) {
     if (!tekVal) {
       Swal.fire({
         html: `<div style="font-size:3.5rem;margin-bottom:10px">👆</div>
-               <div style="font-size:1.3rem;font-weight:700;color:#fff;margin-bottom:6px">Dur bir dakika!</div>
-               <div style="font-size:0.95rem;color:rgba(255,255,255,0.7)">Önce kaç kişi oynayacak onu seç 🧑‍🤝‍🧑</div>`,
+               <div style="font-size:1.3rem;font-weight:700;color:#fff;margin-bottom:6px">${t('pp_wait')}</div>
+               <div style="font-size:0.95rem;color:rgba(255,255,255,0.7)">${t('pp_select_players')}</div>`,
         background: 'linear-gradient(135deg, #1a1a2e, #2d3436)',
         color: '#fff',
         showConfirmButton: true,
-        confirmButtonText: 'Anladım! 👍',
+        confirmButtonText: t('pp_got_it'),
         confirmButtonColor: '#ff6b6b',
         timer: 3000,
         timerProgressBar: true,
@@ -437,9 +447,9 @@ function selectGame(type) {
         sel.value = "";
         Swal.fire({
           html: `<div style="font-size:3rem;margin-bottom:10px">🕵️</div>
-                 <div style="font-size:1.2rem;font-weight:700;color:#fff;margin-bottom:6px">Imposter en az 3 kişi gerektirir!</div>
-                 <div style="font-size:0.9rem;color:rgba(255,255,255,0.7)">Lütfen en az 3 kişi seçin</div>`,
-          confirmButtonText: 'Tamam',
+                 <div style="font-size:1.2rem;font-weight:700;color:#fff;margin-bottom:6px">${t('pp_imp_min3')}</div>
+                 <div style="font-size:0.9rem;color:rgba(255,255,255,0.7)">${t('pp_imp_min3_text')}</div>`,
+          confirmButtonText: t('btn_ok'),
           timer: 3000,
           timerProgressBar: true,
         });
@@ -456,15 +466,15 @@ function selectGame(type) {
 
   // Oyun adını göster
   const names = {
-    telepati: "Telepati",
-    isimSehir: "İsim Şehir",
-    pictionary: "Resim Çiz",
-    tabu: "Tabu",
-    imposter: "Imposter",
-    sayiTahmin: "Sayı Tahmin",
+    telepati: t('game_telepati'),
+    isimSehir: t('game_isim_sehir'),
+    pictionary: t('game_pictionary'),
+    tabu: t('game_tabu'),
+    imposter: t('game_imposter'),
+    sayiTahmin: t('game_sayi_tahmin'),
   };
   document.getElementById("settings-game-title").innerText =
-    names[type] + " - Ayarlar";
+    names[type] + t('game_settings');
 
   // Resim Çiz için süre sabit 45sn, gizle
   const timeInput = document.getElementById("roundTimeInput");
@@ -535,9 +545,20 @@ function joinRoom() {
   if (!userProfile) return;
   const code = document.getElementById("roomCodeInput").value.trim();
   if (!code) {
-    Swal.fire({ title: "Uyarı", text: "Oda kodunu giriniz", icon: "warning" });
+    Swal.fire({ title: t('warning'), text: t('warn_room_code'), icon: "warning" });
     return;
   }
+  // Oda katılma multiplayer olduğu için auth gerekli
+  if (typeof requireAuthForMultiplayer === 'function') {
+    requireAuthForMultiplayer(function() {
+      _doJoinRoom(code);
+    });
+    return;
+  }
+  _doJoinRoom(code);
+}
+
+function _doJoinRoom(code) {
   if (!socket || !socket.connected) {
     connectSocket();
     socket.once("connect", () => {
@@ -550,7 +571,16 @@ function joinRoom() {
 
 function goToMatchmaking() {
   if (!userProfile) return;
-  // Seçim aşamasını göster, bekleme aşamasını gizle
+  if (typeof requireAuthForMultiplayer === 'function') {
+    requireAuthForMultiplayer(function() {
+      var selectPhase = document.getElementById("mm-select-phase");
+      var waitingPhase = document.getElementById("mm-waiting-phase");
+      if (selectPhase) selectPhase.style.display = "";
+      if (waitingPhase) waitingPhase.style.display = "none";
+      showScreen("matchmaking-screen");
+    });
+    return;
+  }
   var selectPhase = document.getElementById("mm-select-phase");
   var waitingPhase = document.getElementById("mm-waiting-phase");
   if (selectPhase) selectPhase.style.display = "";
@@ -585,7 +615,7 @@ function findMatch() {
     selectedGames.push(cb.value);
   });
   if (selectedGames.length === 0) {
-    Swal.fire({ title: "En az 1 oyun seçmelisin!", icon: "warning", customClass: { popup: "swal-premium" }, background: "rgba(15,12,40,0.95)", color: "#fff" });
+    Swal.fire({ title: t('mm_select_game'), icon: "warning", customClass: { popup: "swal-premium" }, background: "rgba(15,12,40,0.95)", color: "#fff" });
     return;
   }
   socket.emit("findMatch", {
@@ -615,8 +645,8 @@ function resetMatchmakingScreen() {
   var wtitle = document.querySelector(".mm-waiting-title");
   var wsub = document.getElementById("mm-waiting-text");
   var wcancelBtn = document.querySelector(".mm-cancel-btn");
-  if (wtitle) wtitle.textContent = "Oyuncu Aranıyor...";
-  if (wsub) wsub.textContent = "Karşı cinsten bir oyuncu bekleniyor";
+  if (wtitle) wtitle.textContent = t('mm_searching');
+  if (wsub) wsub.textContent = t('mm_waiting_gender');
   if (wcancelBtn) wcancelBtn.style.display = "";
 }
 
@@ -641,7 +671,7 @@ socket.on("matchFound", function(data) {
   var wtitle = document.querySelector(".mm-waiting-title");
   var wsub = document.getElementById("mm-waiting-text");
   var wcancelBtn = document.querySelector(".mm-cancel-btn");
-  if (wtitle) wtitle.textContent = "Eşleşme Bulundu!";
+  if (wtitle) wtitle.textContent = t('mm_match_found');
   if (wsub) wsub.textContent = data.players.map(function(p) { return p.username; }).join(" vs ") + " — " + data.gameType;
   if (wcancelBtn) wcancelBtn.style.display = "none";
 });
@@ -661,7 +691,7 @@ function copyRoomCode() {
   navigator.clipboard.writeText(code).then(() => {
     el.classList.add("code-copied");
     el.dataset.originalText = code;
-    el.innerText = "Kopyalandı!";
+    el.innerText = t('conn_copied');
     setTimeout(() => {
       el.innerText = code;
       el.classList.remove("code-copied");
@@ -672,7 +702,7 @@ function copyRoomCode() {
 async function shareWhatsApp() {
   const code = document.getElementById("displayRoomCode").innerText;
   const url = 'https://www.duoduels.com';
-  const message = `DuoDuels'a gel! 💖\n\nOda Kodu: ${code}\n\n${url}`;
+  const message = t('share_msg').replace('{code}', code).replace('{url}', url);
 
   // Capacitor native share varsa onu kullan
   if (window.Capacitor && window.Capacitor.isNativePlatform()) {
@@ -681,7 +711,7 @@ async function shareWhatsApp() {
       await Share.share({
         title: 'DuoDuels',
         text: message,
-        dialogTitle: 'Arkadaşlarını davet et'
+        dialogTitle: t('share_title')
       });
       return;
     } catch (e) {
@@ -723,7 +753,7 @@ function sendWord(auto) {
     inp.value = "";
     inp.disabled = true;
     document.getElementById("sendWordBtn").disabled = true;
-    document.getElementById("left-status").innerText = "Gönderildi!";
+    document.getElementById("left-status").innerText = t('conn_sent');
     clearInterval(timerInterval);
   }
 }
@@ -788,7 +818,7 @@ function sendAllIsimSehir(auto) {
   if (passPlayActive && _ppCurrentPlayer === 'p2') payload.passPlayActingAs = passPlayP2Id;
   socket.emit("submitAllIsimSehir", payload);
   document.getElementById("isSendAllBtn").disabled = true;
-  document.getElementById("is-left-status").innerText = "Gönderildi!";
+  document.getElementById("is-left-status").innerText = t('conn_sent');
   clearInterval(timerInterval);
 }
 
@@ -840,7 +870,7 @@ function showConnectionStatus(status) {
   let el = document.getElementById("connection-status");
   if (!el) return;
   el.className = "connection-status " + status;
-  el.innerText = status === "disconnected" ? "Bağlantı koptu! Yeniden bağlanılıyor..." : "Yeniden bağlanılıyor...";
+  el.innerText = status === "disconnected" ? t('conn_lost') : t('conn_reconnecting');
   el.style.display = "block";
 }
 function hideConnectionStatus() {
@@ -1007,10 +1037,10 @@ socket.on("rejoinFailed", () => {
   currentRoom = null;
   sessionStorage.removeItem("duoduels_room");
   showScreen("lobby");
-  Swal.fire({ title: "Bağlantı Koptu", text: "Oyun odası artık mevcut değil.", icon: "warning" });
+  Swal.fire({ title: t('conn_room_gone'), text: t('conn_room_gone_text'), icon: "warning" });
 });
 socket.on("gameError", (msg) => {
-  Swal.fire({ title: "Hata", text: msg, icon: "error" });
+  Swal.fire({ title: t('error'), text: msg, icon: "error" });
 });
 socket.on("roomCreated", (id) => {
   currentRoom = id;
@@ -1048,8 +1078,8 @@ socket.on("joinedRoom", (id) => {
 
 socket.on("hostChanged", (data) => {
   Swal.fire({
-    title: "Kurucu Değişti",
-    text: data.newHostName + " yeni kurucu oldu!",
+    title: t('host_changed'),
+    text: data.newHostName + " " + t('new_host'),
     icon: "info",
     timer: 3000,
     timerProgressBar: true,
@@ -1079,7 +1109,7 @@ socket.on("hostLeft", () => {
   document.getElementById("scoreboard-panel").style.display = "none";
   Swal.close();
   document.querySelectorAll(".match-overlay").forEach((el) => el.remove());
-  Swal.fire({ title: "Oda Kapandı", text: "Tüm oyuncular ayrıldı.", icon: "warning" });
+  Swal.fire({ title: t('conn_room_closed'), text: t('conn_room_closed_text'), icon: "warning" });
   showScreen("lobby");
 });
 
@@ -1105,10 +1135,10 @@ socket.on("updateLobby", (data) => {
     hostEl.classList.add("hidden");
     if (iAmSpectator && !iAmPlayer) {
       memberEl.classList.remove("hidden");
-      memberEl.innerHTML = '<span style="opacity:0.7;font-size:0.9em">👁 Seyirci olarak izliyorsunuz. Boş slota tıklayın.</span>';
+      memberEl.innerHTML = '<span style="opacity:0.7;font-size:0.9em">👁 ' + t('spectator_msg') + '</span>';
     } else {
       memberEl.classList.remove("hidden");
-      memberEl.innerHTML = memberEl.dataset.defaultText || "Kurucunun oyunu başlatması bekleniyor...";
+      memberEl.innerHTML = memberEl.dataset.defaultText || t('waiting_host');
     }
   }
 
@@ -1122,13 +1152,13 @@ socket.on("updateLobby", (data) => {
         const icon = p.gender === "female" ? "👩" : "👨";
         const cls = p.gender === "female" ? "slot-female" : "slot-male";
         const hostBadge =
-          p.id === data.hostId ? ' <span class="host-badge">KURUCU</span>' : "";
+          p.id === data.hostId ? ' <span class="host-badge">' + t('host_label') + '</span>' : "";
         return `<div class="slot filled ${cls}">${icon} ${escapeHtml(p.username)}${hostBadge}</div>`;
       })
       .join("");
     const maxLabel = data.maxPlayers > 0 ? `${data.players.length}/${data.maxPlayers}` : `${data.players.length}`;
     div.innerHTML = `<div class="team-card" style="grid-column:1/-1;">
-      <div class="team-title">Oyuncular (${maxLabel})</div>
+      <div class="team-title">${t('players_label')} (${maxLabel})</div>
       <div class="tek-players-list">${playerSlots}</div>
     </div>`;
   } else {
@@ -1148,13 +1178,13 @@ socket.on("updateLobby", (data) => {
   const specTitle = document.querySelector(".spectators-area h3");
   if (specTitle) {
     specTitle.innerText =
-      data.gameMode === "tek" ? "İzleyiciler" : "Lobidekiler (Takım Seçin)";
+      data.gameMode === "tek" ? t('spectators') : t('lobby_select_team');
   }
   const specs = data.spectators
     .map((p) => {
       const icon = p.gender === "female" ? "👩" : "👨";
       const cls = p.gender === "female" ? "spec-female" : "spec-male";
-      const isMe = p.id === pid ? ' style="outline:2px solid var(--theme-color);border-radius:6px;padding:2px 4px;" title="Sen"' : '';
+      const isMe = p.id === pid ? ' style="outline:2px solid var(--theme-color);border-radius:6px;padding:2px 4px;" title="' + t('you_label') + '"' : '';
       return `<span class="${cls}"${isMe}>${icon} ${escapeHtml(p.username)}</span>`;
     })
     .join("");
@@ -1166,10 +1196,10 @@ function renderSlot(p, i, slot, hostId) {
     const genderClass = p.gender === "female" ? "slot-female" : "slot-male";
     const icon = p.gender === "female" ? "👩" : "👨";
     const hostBadge =
-      p.id === hostId ? ' <span class="host-badge">KURUCU</span>' : "";
+      p.id === hostId ? ' <span class="host-badge">' + t('host_label') + '</span>' : "";
     return `<div class="slot filled ${genderClass}">${icon} ${escapeHtml(p.username)}${hostBadge}</div>`;
   }
-  return `<div class="slot empty" onclick="joinTeamSlot(${i}, '${slot}')">+ KATIL</div>`;
+  return `<div class="slot empty" onclick="joinTeamSlot(${i}, '${slot}')">${t('join_slot')}</div>`;
 }
 
 // --- TELEPATİ SOCKET ---
@@ -1180,12 +1210,12 @@ socket.on("gameInit", (data) => {
   window._totalRounds = data.roundCount || 5;
 
   document.getElementById("scoreboard-panel").style.display = "block";
-  document.getElementById("scoreboard-title").innerText = "📊 HATA";
-  document.getElementById("score-note-text").innerText = "20 Hata = ELENİR! 💀";
+  document.getElementById("scoreboard-title").innerText = "📊 " + t('error_count');
+  document.getElementById("score-note-text").innerText = "20 " + t('error_eliminate') + " 💀";
   document.getElementById("attempts-display").innerText =
-    `Tur: 1 / ${window._totalRounds}`;
+    `${t('round_label')} 1 / ${window._totalRounds}`;
 
-  Swal.fire({ title: "Başlıyor!", timer: 1500, showConfirmButton: false });
+  Swal.fire({ title: t('starting'), timer: 1500, showConfirmButton: false });
 
   if (!_listenersAttached.wordInput) {
     document.getElementById("wordInput").addEventListener("keydown", (e) => {
@@ -1203,7 +1233,7 @@ socket.on("turnStarted", (data) => {
   if (passPlayActive) _ppCurrentPlayer = 'p1';
 
   document.getElementById("attempts-display").innerText =
-    `Tur: ${curR} / ${totR}`;
+    `${t('round_label')} ${curR} / ${totR}`;
   document.getElementById("game-log").innerHTML = "";
   startTimer(window._roundTime);
 
@@ -1230,7 +1260,7 @@ socket.on("turnStarted", (data) => {
   const rightStatus = document.getElementById("right-status");
 
   if (amIPlaying) {
-    infoBar.innerText = "SIRA SİZDE! 🚀";
+    infoBar.innerText = t('telepati_your_turn');
     infoBar.style.backgroundColor = "#27ae60";
     inpArea.classList.remove("hidden");
     specL.classList.add("hidden");
@@ -1238,7 +1268,7 @@ socket.on("turnStarted", (data) => {
     leftStatus.classList.remove("hidden");
     rightStatus.classList.remove("hidden");
     leftStatus.innerText = "...";
-    rightStatus.innerText = "Yazıyor...";
+    rightStatus.innerText = t('writing');
 
     const inp = document.getElementById("wordInput");
     inp.disabled = false;
@@ -1253,7 +1283,7 @@ socket.on("turnStarted", (data) => {
       p2.className = `game-panel panel-${data.p1.gender}`;
     }
   } else {
-    infoBar.innerText = `${data.p1.username} & ${data.p2.username} Oynuyor...`;
+    infoBar.innerText = `${data.p1.username} & ${data.p2.username} ${t('playing')}`;
     infoBar.style.backgroundColor = "#34495e";
     inpArea.classList.add("hidden");
     specL.classList.remove("hidden");
@@ -1292,7 +1322,7 @@ socket.on("partnerSubmitted", () => {
         const btn = document.getElementById("sendWordBtn");
         if (btn) btn.disabled = false;
         document.getElementById("left-status").innerText = "...";
-        document.getElementById("right-status").innerText = "Yazıyor...";
+        document.getElementById("right-status").innerText = t('writing');
         const nameEl = document.getElementById("leftName");
         if (nameEl) nameEl.innerText = passPlayP2Name;
         startTimer(window._roundTime);
@@ -1303,9 +1333,9 @@ socket.on("partnerSubmitted", () => {
 
   if (amIPlaying) {
     if (window._currentGameType === "isimSehir") {
-      document.getElementById("is-right-status").innerText = "YAZDI!";
+      document.getElementById("is-right-status").innerText = t('submitted');
     } else {
-      document.getElementById("right-status").innerText = "YAZDI!";
+      document.getElementById("right-status").innerText = t('submitted');
     }
   }
 });
@@ -1343,7 +1373,7 @@ function showMatchOverlay(leftName, rightName, leftWord, rightWord, isMatch, cal
       <div class="match-word-card word-right">${escapeHtml(rightWord)}</div>
     </div>
     <div class="match-result-badge ${isMatch ? 'result-success' : 'result-fail'}">
-      ${isMatch ? 'EŞLEŞME! ✅' : 'EŞLEŞMEDİ ❌'}
+      ${isMatch ? t('match_yes') : t('match_no')}
     </div>
   `;
   document.body.appendChild(overlay);
@@ -1386,8 +1416,8 @@ socket.on("spectatorUpdate", (res) => {
         inp.disabled = false;
         document.getElementById("sendWordBtn").disabled = false;
         inp.focus();
-        document.getElementById("left-status").innerText = "Tekrar...";
-        document.getElementById("right-status").innerText = "Yazıyor...";
+        document.getElementById("left-status").innerText = t('retry');
+        document.getElementById("right-status").innerText = t('writing');
         startTimer(window._roundTime);
       }
     });
@@ -1406,23 +1436,23 @@ socket.on("updateScoreboard", (scores) => {
 
     list.innerHTML += `<div class="score-item" style="${style}">
             <span>${icon} ${escapeHtml(s.name)}</span>
-            <span style="font-weight:bold">${s.score}${window._currentGameType === "telepati" ? "/20" : " puan"}</span>
+            <span style="font-weight:bold">${s.score}${window._currentGameType === "telepati" ? "/20" : t('points_suffix')}</span>
         </div>`;
   });
 });
 
 socket.on("levelFinished", () =>
   Swal.fire({
-    title: "EŞLEŞTİ!",
+    title: t('matched'),
     icon: "success",
     timer: 1000,
     showConfirmButton: false,
   }),
 );
 socket.on("roundChanged", (r) =>
-  Swal.fire({ title: `${r}. TUR`, timer: 1500, showConfirmButton: false }),
+  Swal.fire({ title: `${r}. ${t('round_n')}`, timer: 1500, showConfirmButton: false }),
 );
-socket.on("gameOver", (msg) => Swal.fire({ title: "BİTTİ", text: msg }));
+socket.on("gameOver", (msg) => Swal.fire({ title: t('finished'), text: msg }));
 
 socket.on("telepatiGameOver", (data) => {
   clearInterval(timerInterval);
@@ -1433,31 +1463,31 @@ socket.on("telepatiGameOver", (data) => {
     confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 } });
     setTimeout(() => confetti({ particleCount: 80, spread: 60, origin: { y: 0.5 } }), 500);
     Swal.fire({
-      title: "KAZANDINIZ! 🏆",
+      title: t('you_won'),
       html: `<div style="font-size:1.2rem;margin:10px 0">
         <strong>${escapeHtml(data.winnerP1)} & ${escapeHtml(data.winnerP2)}</strong>
       </div>
       <div style="font-size:2.5rem;margin:10px 0">🎉🥳🎊</div>
-      <div style="color:#27ae60;font-weight:bold">${data.lastStanding ? "Son hayatta kalan takım!" : "En az hatayla bitirdiniz!"}</div>`,
+      <div style="color:#27ae60;font-weight:bold">${data.lastStanding ? t('last_standing') : t('least_errors')}</div>`,
       background: "linear-gradient(135deg, #1a1a2e, #2d3436)",
       color: "#fff",
       confirmButtonColor: "#27ae60",
-      confirmButtonText: "Harikayız! 💪",
+      confirmButtonText: t('great_job'),
     });
   } else {
     // Kaybeden takım
     Swal.fire({
-      title: "KAYBETTİNİZ 😔",
+      title: t('you_lost'),
       html: `<div style="font-size:1rem;margin:10px 0">
-        Kazanan: <strong>${escapeHtml(data.winnerTeam)}</strong>
+        ${t('winner_prefix')}<strong>${escapeHtml(data.winnerTeam)}</strong>
       </div>
-      <div style="font-size:1rem">${escapeHtml(data.winnerP1)} & ${escapeHtml(data.winnerP2)} kazandı!</div>
+      <div style="font-size:1rem">${escapeHtml(data.winnerP1)} & ${escapeHtml(data.winnerP2)} ${t('winner_suffix')}</div>
       <div style="font-size:2rem;margin:10px 0">😤</div>
-      <div style="color:#e67e22;font-weight:bold">Bir dahaki sefere! 💪</div>`,
+      <div style="color:#e67e22;font-weight:bold">${t('next_time')}</div>`,
       background: "linear-gradient(135deg, #1a1a2e, #3d2020)",
       color: "#fff",
       confirmButtonColor: "#e74c3c",
-      confirmButtonText: "Tekrar Dene",
+      confirmButtonText: t('btn_retry'),
     });
   }
 });
@@ -1510,11 +1540,11 @@ socket.on("isimSehirStart", (data) => {
   window._totalRounds = data.roundCount || 5;
 
   document.getElementById("scoreboard-panel").style.display = "block";
-  document.getElementById("scoreboard-title").innerText = "📊 SKORLAR";
+  document.getElementById("scoreboard-title").innerText = "📊 " + t('scores');
   document.getElementById("score-note-text").innerText =
-    "En çok puan kazanır! 🏆";
+    t('score_wins');
   document.getElementById("is-round-display").innerText =
-    `Tur: 1 / ${window._totalRounds}`;
+    `${t('round_label')} 1 / ${window._totalRounds}`;
 
   // Panelleri hemen renklendir
   if (data.firstPair) {
@@ -1539,7 +1569,7 @@ socket.on("isimSehirStart", (data) => {
   }
 
   Swal.fire({
-    title: "İsim Şehir Başlıyor!",
+    title: t('is_starting'),
     timer: 1500,
     showConfirmButton: false,
   });
@@ -1570,7 +1600,7 @@ socket.on("letterSelected", (data) => {
 
   if (data.currentRound) {
     document.getElementById("is-round-display").innerText =
-      `Tur: ${data.currentRound} / ${data.totalRounds || window._totalRounds}`;
+      `${t('round_label')} ${data.currentRound} / ${data.totalRounds || window._totalRounds}`;
   }
 });
 
@@ -1608,7 +1638,7 @@ socket.on("allCategoriesStart", (data) => {
   p2El.className = `game-panel panel-${data.p2.gender}`;
 
   if (amIPlaying) {
-    infoBar.innerText = "SIRA SİZDE! 🚀 Hepsini doldurun";
+    infoBar.innerText = t('is_fill_all');
     infoBar.style.backgroundColor = "#27ae60";
     allInputs.classList.remove("hidden");
     specArea.classList.add("hidden");
@@ -1644,13 +1674,13 @@ socket.on("allCategoriesStart", (data) => {
       p2El.className = `game-panel panel-${data.p1.gender}`;
     }
   } else {
-    infoBar.innerText = `${data.p1.username} & ${data.p2.username} Oynuyor...`;
+    infoBar.innerText = `${data.p1.username} & ${data.p2.username} ${t('playing')}`;
     infoBar.style.backgroundColor = "#34495e";
     allInputs.classList.add("hidden");
     specArea.classList.remove("hidden");
     document.getElementById("is-spectator-left").innerText = "🤔";
     document.getElementById("is-spectator-right").innerText = "🤔";
-    document.getElementById("is-right-status").innerText = "Yazıyor...";
+    document.getElementById("is-right-status").innerText = t('writing');
   }
 
   if (letterAnimationDone) startTimer(window._roundTime, "is-timer");
@@ -1697,14 +1727,14 @@ function addIsimSehirLogItem(res) {
   div.className = res.match ? "log-item log-success" : "log-item log-fail";
   let resultText = `${escapeHtml(res.category)}: ${escapeHtml(res.p1Word)} - ${escapeHtml(res.p2Word)} ${res.match ? "✅ +1" : "❌ 0"}`;
   if (res.example) {
-    resultText += ` (Örnek: ${res.example})`;
+    resultText += ` (${t('example_prefix')}${res.example})`;
   }
   div.innerHTML = resultText;
   document.getElementById("is-game-log").prepend(div);
 }
 
 socket.on("isimSehirGameOver", (msg) => {
-  Swal.fire({ title: "BİTTİ", text: msg });
+  Swal.fire({ title: t('finished'), text: msg });
 });
 
 // --- PICTIONARY ---
@@ -1998,16 +2028,16 @@ socket.on("pictionaryStart", (data) => {
   window._totalRounds = data.roundCount || 5;
 
   document.getElementById("scoreboard-panel").style.display = "block";
-  document.getElementById("scoreboard-title").innerText = "📊 SKORLAR";
+  document.getElementById("scoreboard-title").innerText = "📊 " + t('scores');
   document.getElementById("score-note-text").innerText =
-    "İlk bilene en çok puan! 🏆";
+    t('pic_first_guess');
   document.getElementById("pic-round-display").innerText =
-    `Tur: 1 / ${window._totalRounds}`;
+    `${t('round_label')} 1 / ${window._totalRounds}`;
 
   initPictionaryCanvas();
 
   Swal.fire({
-    title: "Resim Çiz Başlıyor!",
+    title: t('pic_starting'),
     timer: 1500,
     showConfirmButton: false,
   });
@@ -2024,7 +2054,7 @@ socket.on("pictionaryStart", (data) => {
 
 socket.on("pictionaryRound", (data) => {
   document.getElementById("pic-round-display").innerText =
-    `Tur: ${data.round} / ${data.totalRounds}`;
+    `${t('round_label')} ${data.round} / ${data.totalRounds}`;
   document.getElementById("pic-game-log").innerHTML = "";
 
   const canvas = document.getElementById("pic-canvas");
@@ -2051,16 +2081,16 @@ socket.on("pictionaryRound", (data) => {
     amIPlaying = amDrawer || amGuesser;
 
     if (amDrawer) {
-      infoBar.innerText = `ÇİZ! Herkes tahmin edecek`;
+      infoBar.innerText = t('pic_draw_everyone');
       infoBar.style.backgroundColor = "#e67e22";
       wordDisplay.classList.remove("hidden");
-      wordDisplay.innerText = `Kelime: ${data.word}`;
+      wordDisplay.innerText = `${t('pic_word')} ${data.word}`;
       leftTools.classList.remove("hidden");
       colorBar.classList.remove("hidden");
       guessArea.classList.add("hidden");
       canvas.style.cursor = "crosshair";
     } else if (amGuesser) {
-      infoBar.innerText = `TAHMİN ET! ${data.drawerName} çiziyor`;
+      infoBar.innerText = `${t('pic_guess')} ${data.drawerName} ${t('pic_drawing')}`;
       infoBar.style.backgroundColor = "#27ae60";
       wordDisplay.classList.add("hidden");
       leftTools.classList.add("hidden");
@@ -2073,7 +2103,7 @@ socket.on("pictionaryRound", (data) => {
       inp.value = "";
       inp.focus();
     } else {
-      infoBar.innerText = `${data.drawerName} çiziyor`;
+      infoBar.innerText = `${data.drawerName} ${t('pic_drawing')}`;
       infoBar.style.backgroundColor = "#34495e";
       wordDisplay.classList.add("hidden");
       leftTools.classList.add("hidden");
@@ -2087,16 +2117,16 @@ socket.on("pictionaryRound", (data) => {
     amIPlaying = amDrawer || amGuesser;
 
     if (amDrawer) {
-      infoBar.innerText = `ÇİZ! ${data.drawerName} (sen) çiziyorsun`;
+      infoBar.innerText = `${t('pic_draw')} ${data.drawerName} ${t('pic_you_drawing')}`;
       infoBar.style.backgroundColor = "#e67e22";
       wordDisplay.classList.remove("hidden");
-      wordDisplay.innerText = `Kelime: ${data.word}`;
+      wordDisplay.innerText = `${t('pic_word')} ${data.word}`;
       leftTools.classList.remove("hidden");
       colorBar.classList.remove("hidden");
       guessArea.classList.add("hidden");
       canvas.style.cursor = "crosshair";
     } else if (amGuesser) {
-      infoBar.innerText = `TAHMİN ET! ${data.drawerName} çiziyor`;
+      infoBar.innerText = `${t('pic_guess')} ${data.drawerName} ${t('pic_drawing')}`;
       infoBar.style.backgroundColor = "#27ae60";
       wordDisplay.classList.add("hidden");
       leftTools.classList.add("hidden");
@@ -2109,7 +2139,7 @@ socket.on("pictionaryRound", (data) => {
       inp.value = "";
       inp.focus();
     } else {
-      infoBar.innerText = `${data.drawerName} çiziyor, ${data.guesserName} tahmin ediyor`;
+      infoBar.innerText = `${data.drawerName} ${t('pic_drawing')}, ${data.guesserName} ${t('pic_guessing')}`;
       infoBar.style.backgroundColor = "#34495e";
       wordDisplay.classList.add("hidden");
       leftTools.classList.add("hidden");
@@ -2170,7 +2200,7 @@ socket.on("pictionaryWrongGuess", (data) => {
 socket.on("pictionaryCorrect", (data) => {
   const div = document.createElement("div");
   div.className = "log-item log-success";
-  div.innerHTML = `${escapeHtml(data.teamName)} bildi! +${data.points} puan (${data.order}. sıra)`;
+  div.innerHTML = `${escapeHtml(data.teamName)} ${t('pic_correct')} +${data.points}${t('points_suffix')} (${data.order}. ${t('pic_order')})`;
   document.getElementById("pic-game-log").prepend(div);
 
   if (data.gameMode === "tek") {
@@ -2179,8 +2209,8 @@ socket.on("pictionaryCorrect", (data) => {
       document.getElementById("pic-guess-input").disabled = true;
       document.getElementById("pic-guess-btn").disabled = true;
       Swal.fire({
-        title: "Doğru!",
-        text: `+${data.points} puan`,
+        title: t('pic_correct_title'),
+        text: `+${data.points}${t('points_suffix')}`,
         icon: "success",
         timer: 1500,
         showConfirmButton: false,
@@ -2193,8 +2223,8 @@ socket.on("pictionaryCorrect", (data) => {
       const guessArea = document.getElementById("pic-guess-area");
       guessArea.classList.add("hidden");
       Swal.fire({
-        title: "Doğru!",
-        text: `+${data.points} puan`,
+        title: t('pic_correct_title'),
+        text: `+${data.points}${t('points_suffix')}`,
         icon: "success",
         timer: 1500,
         showConfirmButton: false,
@@ -2208,7 +2238,7 @@ socket.on("pictionaryRoundEnd", (data) => {
   clearInterval(timerInterval);
   const wordDisplay = document.getElementById("pic-word-display");
   wordDisplay.classList.remove("hidden");
-  wordDisplay.innerText = `Cevap: ${data.word}`;
+  wordDisplay.innerText = `${t('pic_answer')} ${data.word}`;
   document.getElementById("pic-left-tools").classList.add("hidden");
   document.getElementById("pic-color-bar").classList.add("hidden");
   document.getElementById("pic-guess-area").classList.add("hidden");
@@ -2216,7 +2246,7 @@ socket.on("pictionaryRoundEnd", (data) => {
 });
 
 socket.on("pictionaryGameOver", (msg) => {
-  Swal.fire({ title: "BİTTİ", text: msg });
+  Swal.fire({ title: t('finished'), text: msg });
 });
 
 // --- TABU ---
@@ -2249,13 +2279,13 @@ socket.on("tabuStart", (data) => {
   window._totalRounds = data.roundCount || 5;
 
   document.getElementById("scoreboard-panel").style.display = "block";
-  document.getElementById("scoreboard-title").innerText = "📊 SKORLAR";
+  document.getElementById("scoreboard-title").innerText = "📊 " + t('scores');
   document.getElementById("score-note-text").innerText =
-    "En çok kelime bilen kazanır! 🏆";
+    t('tabu_most_words');
   document.getElementById("tabu-round-display").innerText =
-    `Tur: 1 / ${window._totalRounds}`;
+    `${t('round_label')} 1 / ${window._totalRounds}`;
 
-  Swal.fire({ title: "Tabu Başlıyor!", timer: 1500, showConfirmButton: false });
+  Swal.fire({ title: t('tabu_starting'), timer: 1500, showConfirmButton: false });
 
   if (!_listenersAttached.tabuClueInput) {
     document
@@ -2274,7 +2304,7 @@ socket.on("tabuStart", (data) => {
 
 socket.on("tabuTurn", (data) => {
   document.getElementById("tabu-round-display").innerText =
-    `Tur: ${data.currentRound} / ${data.totalRounds}`;
+    `${t('round_label')} ${data.currentRound} / ${data.totalRounds}`;
   document.getElementById("tabu-chat").innerHTML = "";
   document.getElementById("tabu-game-log").innerHTML = "";
 
@@ -2291,7 +2321,7 @@ socket.on("tabuTurn", (data) => {
 
   if (amDescriber) {
     tabuRole = "describer";
-    infoBar.innerText = `ANLAT! ${data.guesser.username} tahmin edecek`;
+    infoBar.innerText = `${t('pic_describe')} ${data.guesser.username} ${t('pic_will_guess')}`;
     infoBar.style.backgroundColor = "#e67e22";
     cardEl.classList.remove("hidden");
     clueArea.classList.remove("hidden");
@@ -2303,7 +2333,7 @@ socket.on("tabuTurn", (data) => {
     inp.focus();
   } else if (amGuesser) {
     tabuRole = "guesser";
-    infoBar.innerText = `TAHMİN ET! ${data.describer.username} anlatıyor`;
+    infoBar.innerText = `${t('pic_guess')} ${data.describer.username} ${t('tabu_describing')}`;
     infoBar.style.backgroundColor = "#27ae60";
     cardEl.classList.add("hidden");
     clueArea.classList.add("hidden");
@@ -2315,7 +2345,7 @@ socket.on("tabuTurn", (data) => {
     inp.focus();
   } else {
     tabuRole = "spectator";
-    infoBar.innerText = `${data.describer.username} anlatıyor, ${data.guesser.username} tahmin ediyor`;
+    infoBar.innerText = `${data.describer.username} ${t('tabu_describing')}, ${data.guesser.username} ${t('pic_guessing')}`;
     infoBar.style.backgroundColor = "#34495e";
     cardEl.classList.remove("hidden");
     clueArea.classList.add("hidden");
@@ -2362,7 +2392,7 @@ socket.on("tabuCorrect", (data) => {
   const chat = document.getElementById("tabu-chat");
   const div = document.createElement("div");
   div.className = "tabu-clue-item guess correct";
-  div.innerText = `✅ DOĞRU! "${data.word}" - ${data.teamName} (${data.score} puan)`;
+  div.innerText = `✅ ${t('tabu_correct')} "${data.word}" - ${data.teamName} (${data.score}${t('points_suffix')})`;
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
 
@@ -2373,7 +2403,7 @@ socket.on("tabuCorrect", (data) => {
 
   if (amIPlaying) {
     Swal.fire({
-      title: "DOĞRU!",
+      title: t('tabu_correct_title'),
       icon: "success",
       timer: 800,
       showConfirmButton: false,
@@ -2383,14 +2413,14 @@ socket.on("tabuCorrect", (data) => {
 
 socket.on("tabuForbidden", (data) => {
   const alertEl = document.getElementById("tabu-forbidden-alert");
-  alertEl.innerText = `YASAKLI KELİME! 🚫 "${data.forbiddenWord}"`;
+  alertEl.innerText = `${t('tabu_forbidden')} 🚫 "${data.forbiddenWord}"`;
   alertEl.classList.remove("hidden");
   setTimeout(() => alertEl.classList.add("hidden"), 2500);
 
   const chat = document.getElementById("tabu-chat");
   const div = document.createElement("div");
   div.className = "tabu-clue-item system";
-  div.innerText = `🚫 ${data.describerName} yasaklı kelime kullandı: "${data.forbiddenWord}" - Kelime geçildi!`;
+  div.innerText = `🚫 ${data.describerName} ${t('tabu_forbidden_used')} "${data.forbiddenWord}" - ${t('tabu_word_skipped')}`;
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
 });
@@ -2399,7 +2429,7 @@ socket.on("tabuPassed", (data) => {
   const chat = document.getElementById("tabu-chat");
   const div = document.createElement("div");
   div.className = "tabu-clue-item system";
-  div.innerText = `⏭ PAS - "${data.word}" geçildi`;
+  div.innerText = `⏭ ${t('tabu_pass')} - "${data.word}" ${t('tabu_skipped')}`;
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
 });
@@ -2409,7 +2439,7 @@ socket.on("tabuTurnEnd", (data) => {
   const chat = document.getElementById("tabu-chat");
   const div = document.createElement("div");
   div.className = "tabu-clue-item system";
-  div.innerText = `⏰ Süre doldu! ${data.teamName}: ${data.score} puan`;
+  div.innerText = `⏰ ${t('tabu_time_up')} ${data.teamName}: ${data.score}${t('points_suffix')}`;
   chat.appendChild(div);
   chat.scrollTop = chat.scrollHeight;
 
@@ -2424,7 +2454,7 @@ socket.on("tabuTurnEnd", (data) => {
 });
 
 socket.on("tabuGameOver", (msg) => {
-  Swal.fire({ title: "BİTTİ", text: msg });
+  Swal.fire({ title: t('finished'), text: msg });
 });
 
 // --- İMPOSTOR ---
@@ -2466,7 +2496,7 @@ socket.on("imposterStart", (data) => {
     `Tur: 1 / ${window._totalRounds}`;
 
   Swal.fire({
-    title: "Imposter Başlıyor!",
+    title: t('imp_starting'),
     timer: 1500,
     showConfirmButton: false,
   });
@@ -2501,15 +2531,15 @@ socket.on("imposterRound", (data) => {
 
   const phaseLabel = document.getElementById("imposter-phase-label");
   phaseLabel.classList.remove("hidden");
-  phaseLabel.innerText = "1. Yazma Turu";
+  phaseLabel.innerText = t('imp_write_round1');
 
   const hintEl = document.getElementById("imposter-hint");
 
   if (data.isSpectator) {
     document.getElementById("imposter-turn-info").innerText =
-      "İzliyorsunuz...";
+      t('imp_watching');
     document.getElementById("imposter-turn-info").style.backgroundColor = "#34495e";
-    document.getElementById("imposter-title").innerText = "Kelime";
+    document.getElementById("imposter-title").innerText = t('imp_word');
     document.getElementById("imposter-main-word").innerText = data.word || "???";
     document.getElementById("imposter-hint").classList.add("hidden");
     document.getElementById("imposter-input-area").classList.add("hidden");
@@ -2520,22 +2550,22 @@ socket.on("imposterRound", (data) => {
 
   if (data.isImposter) {
     document.getElementById("imposter-turn-info").innerText =
-      "Sen IMPOSTOR'sun! Yakalanma! 🕵️";
+      t('imp_you_impostor');
     document.getElementById("imposter-turn-info").style.backgroundColor =
       "#e74c3c";
     document.getElementById("imposter-screen").style.background =
       "linear-gradient(135deg, #e74c3c22, #c0392b22)";
-    document.getElementById("imposter-title").innerText = "🕵️ IMPOSTOR";
+    document.getElementById("imposter-title").innerText = "🕵️ " + t('imp_impostor');
     document.getElementById("imposter-main-word").innerText = "???";
     hintEl.classList.remove("hidden");
-    hintEl.innerText = `İpucu: ${data.hint}`;
+    hintEl.innerText = `${t('imp_hint')} ${data.hint}`;
   } else {
     document.getElementById("imposter-turn-info").innerText =
-      "Kelimeyle ilgili bir şey yaz! 🔍";
+      t('imp_write_clue');
     document.getElementById("imposter-turn-info").style.backgroundColor =
       "#27ae60";
     document.getElementById("imposter-screen").style.background = "";
-    document.getElementById("imposter-title").innerText = "Kelime";
+    document.getElementById("imposter-title").innerText = t('imp_word');
     document.getElementById("imposter-main-word").innerText = data.word;
     hintEl.classList.add("hidden");
   }
@@ -2549,7 +2579,7 @@ socket.on("imposterPlayerSubmitted", (data) => {
   list.classList.remove("hidden");
   const span = document.createElement("div");
   span.className = "imposter-submitted-item";
-  span.innerText = `✅ ${data.username} yazdı`;
+  span.innerText = `✅ ${data.username} ${t('imp_submitted')}`;
   list.appendChild(span);
 });
 
@@ -2563,7 +2593,7 @@ socket.on("imposterPhaseResults", (data) => {
   answersEl.classList.remove("hidden");
 
   if (data.phase === "write1") {
-    answersEl.innerHTML = "<h4>1. Tur Cevapları</h4>";
+    answersEl.innerHTML = "<h4>" + t('imp_round1') + "</h4>";
     data.results.forEach((r) => {
       const div = document.createElement("div");
       div.className = "imposter-answer-item";
@@ -2572,11 +2602,11 @@ socket.on("imposterPhaseResults", (data) => {
     });
 
     document.getElementById("imposter-turn-info").innerText =
-      "Cevaplar açıklandı! 2. tur hazırlanıyor...";
+      t('imp_answers_revealed') + " " + t('imp_round2_prep');
     document.getElementById("imposter-turn-info").style.backgroundColor =
       "#8e44ad";
   } else if (data.phase === "write2") {
-    answersEl.innerHTML = "<h4>1. Tur Cevapları</h4>";
+    answersEl.innerHTML = "<h4>" + t('imp_round1') + "</h4>";
     data.results1.forEach((r) => {
       const div = document.createElement("div");
       div.className = "imposter-answer-item";
@@ -2584,7 +2614,7 @@ socket.on("imposterPhaseResults", (data) => {
       answersEl.appendChild(div);
     });
     const h2 = document.createElement("h4");
-    h2.innerText = "2. Tur Cevapları";
+    h2.innerText = t('imp_round2');
     h2.style.marginTop = "12px";
     answersEl.appendChild(h2);
     data.results2.forEach((r) => {
@@ -2595,7 +2625,7 @@ socket.on("imposterPhaseResults", (data) => {
     });
 
     document.getElementById("imposter-turn-info").innerText =
-      "Cevaplar açıklandı! Oylama hazırlanıyor...";
+      t('imp_answers_revealed') + " " + t('imp_vote_prep');
     document.getElementById("imposter-turn-info").style.backgroundColor =
       "#8e44ad";
   }
@@ -2603,7 +2633,7 @@ socket.on("imposterPhaseResults", (data) => {
 
 socket.on("imposterPhase2Start", (data) => {
   const phaseLabel = document.getElementById("imposter-phase-label");
-  phaseLabel.innerText = "2. Yazma Turu";
+  phaseLabel.innerText = t('imp_write_round2');
 
   const inp = document.getElementById("imposterWordInput");
   inp.disabled = false;
@@ -2615,12 +2645,12 @@ socket.on("imposterPhase2Start", (data) => {
 
   if (imposterIsMe) {
     document.getElementById("imposter-turn-info").innerText =
-      "2. Tur - Tekrar yaz! Yakalanma! 🕵️";
+      t('imp_round2_impostor');
     document.getElementById("imposter-turn-info").style.backgroundColor =
       "#e74c3c";
   } else {
     document.getElementById("imposter-turn-info").innerText =
-      "2. Tur - Tekrar bir şey yaz! 🔍";
+      t('imp_round2_normal');
     document.getElementById("imposter-turn-info").style.backgroundColor =
       "#27ae60";
   }
@@ -2632,11 +2662,11 @@ socket.on("imposterPhase2Start", (data) => {
 socket.on("imposterVoteStart", (data) => {
   document.getElementById("imposter-input-area").classList.add("hidden");
   document.getElementById("imposter-submitted-list").classList.add("hidden");
-  document.getElementById("imposter-phase-label").innerText = "Oylama";
+  document.getElementById("imposter-phase-label").innerText = t('imp_vote_phase');
   document.getElementById("imposter-timer").innerText = "";
 
   document.getElementById("imposter-turn-info").innerText =
-    "Imposter kim? Oy ver! 🗳️";
+    t('imp_vote_prompt');
   document.getElementById("imposter-turn-info").style.backgroundColor =
     "#e67e22";
 
@@ -2661,7 +2691,7 @@ socket.on("imposterPlayerVoted", (data) => {
   list.classList.remove("hidden");
   const span = document.createElement("div");
   span.className = "imposter-submitted-item";
-  span.innerText = `🗳️ ${data.username} oy verdi`;
+  span.innerText = `🗳️ ${data.username} ${t('imp_voted')}`;
   list.appendChild(span);
 });
 
@@ -2672,14 +2702,14 @@ socket.on("imposterVoteResult", (data) => {
 
   const infoBar = document.getElementById("imposter-turn-info");
   if (data.imposterCaught) {
-    infoBar.innerText = `Impostor yakalandı! 🎉 ${data.imposterName} impostor'du!`;
+    infoBar.innerText = `${t('imp_caught')} 🎉 ${data.imposterName} ${t('imp_was')}`;
     infoBar.style.backgroundColor = "#27ae60";
   } else {
-    infoBar.innerText = `Impostor kazandı! 🕵️ ${data.imposterName} impostor'du!`;
+    infoBar.innerText = `${t('imp_won')} 🕵️ ${data.imposterName} ${t('imp_was')}`;
     infoBar.style.backgroundColor = "#e74c3c";
   }
 
-  document.getElementById("imposter-title").innerText = "Sonuç";
+  document.getElementById("imposter-title").innerText = t('imp_result');
   document.getElementById("imposter-main-word").innerText = data.secretWord;
   document.getElementById("imposter-hint").classList.add("hidden");
   document.getElementById("imposter-screen").style.background = "";
@@ -2690,7 +2720,7 @@ socket.on("imposterVoteResult", (data) => {
   data.voteDetails.forEach((v) => {
     const div = document.createElement("div");
     const badge = v.isImposter ? " 🕵️" : "";
-    const voteBadge = v.votes > 0 ? ` (${v.votes} oy)` : "";
+    const voteBadge = v.votes > 0 ? ` (${v.votes} ${t('imp_votes')})` : "";
     div.className = v.isImposter ? "log-item log-fail" : "log-item log-success";
     div.innerHTML = `${escapeHtml(v.username)}${badge} → ${escapeHtml(v.votedFor)}${voteBadge}`;
     log.appendChild(div);
@@ -2703,7 +2733,7 @@ socket.on("imposterVoteResult", (data) => {
 
 socket.on("imposterGameOver", (data) => {
   if (typeof data === 'string') {
-    Swal.fire({ title: "BİTTİ", text: data });
+    Swal.fire({ title: t('finished'), text: data });
     return;
   }
   let scoresHtml = '';
@@ -2711,12 +2741,12 @@ socket.on("imposterGameOver", (data) => {
     scoresHtml = data.scores.map(s =>
       `<div style="display:flex;justify-content:space-between;padding:6px 12px;margin:4px 0;background:rgba(255,255,255,0.05);border-radius:8px">
         <span>${escapeHtml(s.username)}</span>
-        <span style="font-weight:bold">${s.score} puan</span>
+        <span style="font-weight:bold">${s.score} ${t('points_suffix').trim()}</span>
       </div>`
     ).join('');
   }
   Swal.fire({
-    title: "OYUN BİTTİ! 🏆",
+    title: t('game_over'),
     html: `<div style="padding:10px 0">
       <div style="font-size:1.1rem;margin-bottom:12px">${escapeHtml(data.message)}</div>
       ${scoresHtml}
@@ -2734,16 +2764,16 @@ function sendSecretNumber() {
   const inp = document.getElementById("st-secret-input");
   const val = inp.value.trim();
   if (!val || val.length !== dc) {
-    document.getElementById("st-secret-status").innerText = `${dc} haneli bir sayı gir!`;
+    document.getElementById("st-secret-status").innerText = `${dc} ${t('st_enter_digit')}`;
     return;
   }
   const regex = new RegExp(`^\\d{${dc}}$`);
   if (!regex.test(val)) {
-    document.getElementById("st-secret-status").innerText = "Sadece rakam gir!";
+    document.getElementById("st-secret-status").innerText = t('st_only_digits');
     return;
   }
   if (new Set(val.split("")).size === 1) {
-    document.getElementById("st-secret-status").innerText = "Tüm rakamlar aynı olamaz!";
+    document.getElementById("st-secret-status").innerText = t('st_same_digits');
     return;
   }
   _stSecretSubmitted = true;
@@ -2752,7 +2782,7 @@ function sendSecretNumber() {
   socket.emit("submitSecretNumber", secretPayload);
   inp.disabled = true;
   document.getElementById("st-secret-btn").disabled = true;
-  document.getElementById("st-secret-status").innerHTML = '<div class="st-waiting-spinner"><span class="hourglass">⏳</span> Rakip bekleniyor...</div>';
+  document.getElementById("st-secret-status").innerHTML = '<div class="st-waiting-spinner"><span class="hourglass">⏳</span> ' + t('st_waiting') + '</div>';
 }
 
 function sendNumberGuess() {
@@ -2774,7 +2804,7 @@ function sendNumberGuess() {
 
 socket.on("sayiTahminError", (msg) => {
   Swal.fire({
-    title: "Hata",
+    title: t('error'),
     text: msg,
     icon: "error",
     timer: 2000,
@@ -2791,7 +2821,7 @@ socket.on("sayiTahminStart", (data) => {
   document.getElementById("st-round-display").innerText = `Tur: 1 / ${window._totalRounds}`;
   document.getElementById("st-game-log").innerHTML = "";
 
-  Swal.fire({ title: `Sayı Tahmin (${_stDigitCount} basamak)`, timer: 1500, showConfirmButton: false });
+  Swal.fire({ title: `${t('st_title')} (${_stDigitCount} ${t('st_digits')})`, timer: 1500, showConfirmButton: false });
 
   if (!_listenersAttached.stSecretInput) {
     document.getElementById("st-secret-input").addEventListener("keydown", (e) => {
@@ -2841,16 +2871,16 @@ socket.on("sayiTahminSecretPhase", (data) => {
 
   // Secret area başlığını güncelle
   const secretTitle = secretArea.querySelector("h3");
-  if (secretTitle) secretTitle.innerText = `${dc} Haneli Gizli Sayını Gir`;
+  if (secretTitle) secretTitle.innerText = `${dc} ${t('st_enter_secret')}`;
   const secretDesc = secretArea.querySelector("p");
-  if (secretDesc) secretDesc.innerText = `0-9 arası rakamlarla ${dc} haneli bir sayı seç`;
+  if (secretDesc) secretDesc.innerText = `0-9 ${t('st_pick_digits')} ${dc} ${t('st_pick_number')}`;
 
   if (amIPlaying) {
     const myData = iamP1 ? data.p1 : data.p2;
     // Cinsiyet bilgisini sakla (guess phase'de kullanılacak)
     window._stMyGender = myData.gender;
 
-    infoBar.innerText = "GİZLİ SAYINI GİR! 🔒";
+    infoBar.innerText = t('st_enter_secret_btn');
     infoBar.style.background = "var(--theme-gradient)";
     secretArea.classList.remove("hidden");
     phaseLabel.classList.remove("hidden");
@@ -2868,13 +2898,13 @@ socket.on("sayiTahminSecretPhase", (data) => {
     document.getElementById("st-secret-status").innerHTML = "";
     inp.focus();
   } else {
-    infoBar.innerText = `${data.p1.username} & ${data.p2.username} sayı seçiyor...`;
+    infoBar.innerText = `${data.p1.username} & ${data.p2.username} ${t('st_selecting')}`;
     infoBar.style.background = "var(--theme-gradient)";
     secretArea.classList.add("hidden");
     phaseLabel.classList.remove("hidden");
     phaseLabel.innerText = `${data.teamName}`;
     waitArea.classList.remove("hidden");
-    document.querySelector("#st-wait-area .st-wait-text").innerText = "Oyuncular gizli sayılarını seçiyor...";
+    document.querySelector("#st-wait-area .st-wait-text").innerText = t('st_players_selecting');
   }
 });
 
@@ -2889,7 +2919,7 @@ socket.on("secretSubmitted", () => {
         const dc = _stDigitCount;
         const secretArea = document.getElementById("st-secret-area");
         const infoBar = document.getElementById("st-turn-info");
-        infoBar.innerText = "GİZLİ SAYINI GİR! 🔒";
+        infoBar.innerText = t('st_enter_secret_btn');
         secretArea.classList.remove("hidden");
         const inp = document.getElementById("st-secret-input");
         inp.value = "";
@@ -2902,14 +2932,14 @@ socket.on("secretSubmitted", () => {
       });
       return;
     }
-    document.getElementById("st-secret-status").innerHTML = '<div class="st-waiting-spinner"><span class="hourglass">⏳</span> Rakip bekleniyor...</div>';
+    document.getElementById("st-secret-status").innerHTML = '<div class="st-waiting-spinner"><span class="hourglass">⏳</span> ' + t('st_waiting') + '</div>';
   }
 });
 
 socket.on("partnerSecretSubmitted", () => {
   if (amIPlaying) {
     if (!_stSecretSubmitted) {
-      document.getElementById("st-secret-status").innerHTML = '<div class="st-waiting-spinner"><span class="hourglass">⏳</span> Rakip girdi, seni bekliyor!</div>';
+      document.getElementById("st-secret-status").innerHTML = '<div class="st-waiting-spinner"><span class="hourglass">⏳</span> ' + t('st_partner_ready') + '</div>';
     }
   }
 });
@@ -2944,7 +2974,7 @@ socket.on("sayiTahminGuessStart", (data) => {
   if (amIPlaying) {
     const myData = iamP1 ? data.p1 : data.p2;
     const opData = iamP1 ? data.p2 : data.p1;
-    document.getElementById("st-history-left-title").innerText = myData.username + " (Ben)";
+    document.getElementById("st-history-left-title").innerText = myData.username + " " + t('st_me');
     document.getElementById("st-history-right-title").innerText = opData.username;
     window._stMyId = myPlayerId;
 
@@ -2953,12 +2983,12 @@ socket.on("sayiTahminGuessStart", (data) => {
     rightCol.classList.add(opData.gender === "female" ? "gender-female" : "gender-male");
 
     // İkisi de aynı anda tahmin girer
-    infoBar.innerText = `${opData.username}'in sayısını tahmin et! 🎯`;
+    infoBar.innerText = `${opData.username} ${t('st_guess_number')}`;
     infoBar.style.background = "var(--theme-gradient)";
     guessArea.classList.remove("hidden");
 
     const dc = data.digitCount || _stDigitCount;
-    document.getElementById("st-target-label").innerText = `${opData.username}'in ${dc} haneli sayısını tahmin et`;
+    document.getElementById("st-target-label").innerText = `${opData.username} ${t('st_guess_digit')}`;
     const inp = document.getElementById("st-guess-input");
     inp.value = "";
     inp.disabled = false;
@@ -2979,11 +3009,11 @@ socket.on("sayiTahminGuessStart", (data) => {
     leftCol.classList.add(data.p1.gender === "female" ? "gender-female" : "gender-male");
     rightCol.classList.add(data.p2.gender === "female" ? "gender-female" : "gender-male");
 
-    infoBar.innerText = `${data.p1.username} vs ${data.p2.username} - Tahmin ediyorlar!`;
+    infoBar.innerText = `${data.p1.username} vs ${data.p2.username} - ${t('st_guessing')}`;
     infoBar.style.background = "var(--theme-gradient)";
     guessArea.classList.add("hidden");
     waitArea.classList.remove("hidden");
-    document.querySelector("#st-wait-area .st-wait-text").innerText = "Oyuncular birbirlerinin sayılarını tahmin ediyor...";
+    document.querySelector("#st-wait-area .st-wait-text").innerText = t('st_players_guessing');
   }
 });
 
@@ -2999,7 +3029,7 @@ socket.on("sayiTahminGuessWaiting", () => {
       const dc = _stDigitCount;
       const guessArea = document.getElementById("st-guess-area");
       const infoBar = document.getElementById("st-turn-info");
-      infoBar.innerText = `P1'in sayısını tahmin et! 🎯`;
+      infoBar.innerText = t('st_guess_p1');
       guessArea.classList.remove("hidden");
       const inp = document.getElementById("st-guess-input");
       inp.value = "";
@@ -3013,7 +3043,7 @@ socket.on("sayiTahminGuessWaiting", () => {
   }
 
   const infoBar = document.getElementById("st-turn-info");
-  infoBar.innerHTML = '<span class="hourglass" style="font-size:1.1rem">⏳</span> Rakip bekleniyor...';
+  infoBar.innerHTML = '<span class="hourglass" style="font-size:1.1rem">⏳</span> ' + t('st_waiting');
   infoBar.style.background = "var(--theme-gradient-hover)";
 });
 
@@ -3024,7 +3054,7 @@ socket.on("sayiTahminPartnerGuessed", () => {
   // Eğer henüz tahmin göndermediyse (input aktifse) bilgilendir
   if (!inp.disabled) {
     const infoBar = document.getElementById("st-turn-info");
-    infoBar.innerText = "⚡ Rakip tahminini gönderdi! Seni bekliyor...";
+    infoBar.innerText = "⚡ " + t('st_opponent_sent');
     infoBar.style.background = "var(--theme-gradient-hover)";
   }
 });
@@ -3086,7 +3116,7 @@ socket.on("sayiTahminNextRoundReady", () => {
       inp.focus();
       document.getElementById("st-guess-btn").disabled = false;
       const infoBar = document.getElementById("st-turn-info");
-      infoBar.innerText = "🎯 Yeni tahmin gir!";
+      infoBar.innerText = t('st_new_guess');
       infoBar.style.background = "var(--theme-gradient)";
     });
     return;
@@ -3099,7 +3129,7 @@ socket.on("sayiTahminNextRoundReady", () => {
   document.getElementById("st-guess-btn").disabled = false;
 
   const infoBar = document.getElementById("st-turn-info");
-  infoBar.innerText = "🎯 Yeni tahmin gir!";
+  infoBar.innerText = t('st_new_guess');
   infoBar.style.background = "var(--theme-gradient)";
 });
 
@@ -3107,10 +3137,10 @@ socket.on("sayiTahminTie", (data) => {
   clearInterval(timerInterval);
 
   Swal.fire({
-    title: `${data.currentRound}. Tur Tekrar Ediliyor!`,
+    title: `${data.currentRound}. ${t('st_round_tie')}`,
     html: `<div style="padding:15px 0 10px">
       <div style="font-size:3rem;margin-bottom:10px">🤝</div>
-      <div style="font-size:0.95rem;color:rgba(255,255,255,0.7);margin-bottom:14px">İkisi de <b>${data.guessCount}</b> tahminde bildi!</div>
+      <div style="font-size:0.95rem;color:rgba(255,255,255,0.7);margin-bottom:14px">${t('st_both_guessed').replace('{count}', data.guessCount)}</div>
       <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
         <div style="padding:10px 16px;background:rgba(243,156,18,0.15);border:1px solid rgba(243,156,18,0.3);border-radius:12px;flex:1;min-width:100px">
           <span style="font-size:0.7rem;color:rgba(255,255,255,0.5);text-transform:uppercase;letter-spacing:1px">${escapeHtml(data.p1Name)}</span>
@@ -3125,7 +3155,7 @@ socket.on("sayiTahminTie", (data) => {
     background: "linear-gradient(145deg, rgba(243,156,18,0.12), rgba(20,18,50,0.97))",
     color: "#fff",
     confirmButtonColor: "#f39c12",
-    confirmButtonText: "Devam",
+    confirmButtonText: t('btn_continue_game'),
     timer: 3500,
     timerProgressBar: true,
     showClass: { popup: 'swal2-show animate__animated animate__zoomIn' },
@@ -3141,12 +3171,12 @@ socket.on("sayiTahminWin", (data) => {
   }
 
   Swal.fire({
-    title: iWon ? "BİLDİN!" : `${data.winnerName} BİLDİ!`,
+    title: iWon ? t('st_you_won') : `${data.winnerName} ${t('st_player_won')}`,
     html: `<div style="position:relative;padding:20px 0 10px">
       <div style="font-size:3.5rem;margin-bottom:12px;filter:drop-shadow(0 4px 12px rgba(0,0,0,0.3))">${iWon ? '🏆' : '😤'}</div>
       <div style="display:inline-block;background:${iWon ? 'linear-gradient(135deg,#27ae60,#2ecc71)' : 'linear-gradient(135deg,#e74c3c,#c0392b)'};padding:8px 20px;border-radius:30px;margin-bottom:14px">
         <span style="font-size:1.1rem;font-weight:800;color:#fff;letter-spacing:0.5px">${escapeHtml(data.winnerName)}</span>
-        <span style="font-size:0.95rem;color:rgba(255,255,255,0.85);margin-left:6px">${data.guessCount} tahminde bildi!</span>
+        <span style="font-size:0.95rem;color:rgba(255,255,255,0.85);margin-left:6px">${data.guessCount} ${t('st_in_guesses')}</span>
       </div>
       <div style="display:flex;gap:12px;justify-content:center;margin-top:10px;flex-wrap:wrap">
         <div style="padding:10px 16px;background:rgba(39,174,96,0.15);border:1px solid rgba(39,174,96,0.3);border-radius:12px;flex:1;min-width:120px">
@@ -3164,7 +3194,7 @@ socket.on("sayiTahminWin", (data) => {
       : "linear-gradient(145deg, rgba(231,76,60,0.12), rgba(20,18,50,0.97))",
     color: "#fff",
     confirmButtonColor: iWon ? "#27ae60" : "#e74c3c",
-    confirmButtonText: iWon ? "Harika! 💪" : "Tamam",
+    confirmButtonText: iWon ? t('st_great') : t('btn_ok'),
     timer: 5000,
     timerProgressBar: true,
     showClass: { popup: 'swal2-show animate__animated animate__zoomIn' },
@@ -3174,7 +3204,7 @@ socket.on("sayiTahminWin", (data) => {
 socket.on("sayiTahminGameOver", (data) => {
   // Eski format uyumluluğu (string mesaj)
   if (typeof data === 'string') {
-    Swal.fire({ title: "BİTTİ", text: data });
+    Swal.fire({ title: t('finished'), text: data });
     return;
   }
 
@@ -3201,14 +3231,14 @@ socket.on("sayiTahminGameOver", (data) => {
   }
 
   Swal.fire({
-    title: "OYUN BİTTİ! 🏆",
+    title: t('game_over'),
     html: `<div style="padding:10px 0">
-      <div style="font-size:0.85rem;color:rgba(255,255,255,0.5);margin-bottom:8px">${data.roundCount} Tur Tamamlandı</div>
+      <div style="font-size:0.85rem;color:rgba(255,255,255,0.5);margin-bottom:8px">${data.roundCount} ${t('st_rounds_done')}</div>
       ${scoresHtml}
     </div>`,
     background: "linear-gradient(145deg, rgba(20, 18, 50, 0.97), rgba(10, 8, 35, 0.98))",
     color: "#fff",
-    confirmButtonText: "Tamam",
+    confirmButtonText: t('btn_ok'),
     showClass: { popup: 'swal2-show animate__animated animate__zoomIn' },
   });
 });

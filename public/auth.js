@@ -6,6 +6,7 @@ let userProfile = null;
 let authIdToken = null;
 let _tokenRefreshTimer = null;
 let _enabledProviders = new Set(["google", "facebook", "guest"]);
+let _isGuestLocal = false; // Giriş yapmadan oynayan kullanıcı
 
 // Local dev bypass — Firebase olmadan çalışır
 const _isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -63,7 +64,7 @@ async function signInWithGoogle() {
       await auth.signInWithRedirect(provider);
     } else {
       console.error("Google sign-in error:", err);
-      Swal.fire({ title: "Giriş Hatası", text: err.message, icon: "error" });
+      Swal.fire({ title: t('auth_error'), text: err.message, icon: "error" });
     }
   }
 }
@@ -78,13 +79,13 @@ async function signInWithFacebook() {
       await auth.signInWithRedirect(provider);
     } else if (err.code === 'auth/account-exists-with-different-credential') {
       Swal.fire({
-        title: "Hesap Mevcut",
-        text: "Bu e-posta ile daha önce farklı bir yöntemle giriş yapılmış. Lütfen o yöntemi kullanın.",
+        title: t('auth_account_exists'),
+        text: t('auth_account_exists_text'),
         icon: "warning"
       });
     } else {
       console.error("Facebook sign-in error:", err);
-      Swal.fire({ title: "Giriş Hatası", text: err.message, icon: "error" });
+      Swal.fire({ title: t('auth_error'), text: err.message, icon: "error" });
     }
   }
 }
@@ -92,8 +93,8 @@ async function signInWithFacebook() {
 async function signInWithApple() {
   if (!_enabledProviders.has("apple")) {
     Swal.fire({
-      title: "Bu platformda kapalı",
-      text: "Apple ile giriş sadece iOS'ta aktif.",
+      title: t('auth_apple_disabled'),
+      text: t('auth_apple_disabled_text'),
       icon: "info"
     });
     return;
@@ -108,7 +109,7 @@ async function signInWithApple() {
       await auth.signInWithRedirect(provider);
     } else {
       console.error("Apple sign-in error:", err);
-      Swal.fire({ title: "Giriş Hatası", text: err.message, icon: "error" });
+      Swal.fire({ title: t('auth_error'), text: err.message, icon: "error" });
     }
   }
 }
@@ -131,8 +132,8 @@ async function signInAsGuest() {
       _devSignIn();
     } else {
       Swal.fire({
-        title: "Giriş Hatası",
-        text: "Misafir girişi başarısız. Firebase Authentication > Anonymous provider'ı açın.",
+        title: t('auth_error'),
+        text: t('auth_guest_failed'),
         icon: "error"
       });
     }
@@ -191,6 +192,11 @@ auth && auth.onAuthStateChanged && auth.onAuthStateChanged(async (user) => {
   // Dev modda Firebase observer'ı yok say
   if (_devModeActive) return;
 
+  // Kullanıcı Firebase ile giriş yaptıysa guest local modunu kapat
+  if (user && !user.isAnonymous) {
+    _isGuestLocal = false;
+  }
+
   const splash = document.getElementById('app-splash');
 
   if (user) {
@@ -244,7 +250,7 @@ function dismissSplash(splash) {
   splash.classList.add('splash-hide');
   setTimeout(() => {
     splash.remove();
-    document.body.style.backgroundColor = '#f5f0e8';
+    document.body.style.backgroundColor = '#0B0E14';
   }, 600);
 }
 
@@ -255,15 +261,15 @@ async function saveProfile() {
 
   const username = usernameInput.value.trim();
   if (!username) {
-    Swal.fire({ title: "Uyarı", text: "Kullanıcı adı giriniz", icon: "warning" });
+    Swal.fire({ title: t('warning'), text: t('warn_username_empty'), icon: "warning" });
     return;
   }
   if (username.length > 12) {
-    Swal.fire({ title: "Uyarı", text: "Kullanıcı adı en fazla 12 karakter olabilir", icon: "warning" });
+    Swal.fire({ title: t('warning'), text: t('warn_username_long'), icon: "warning" });
     return;
   }
   if (!genderEl) {
-    Swal.fire({ title: "Uyarı", text: "Cinsiyet seçiniz", icon: "warning" });
+    Swal.fire({ title: t('warning'), text: t('warn_gender'), icon: "warning" });
     return;
   }
 
@@ -274,10 +280,11 @@ async function saveProfile() {
     photoURL: currentUser.photoURL || '',
   };
 
-  // Local dev — Firestore yerine localStorage kullan
-  if (_isLocalDev && !authIdToken) {
+  // Local guest veya dev — Firestore yerine localStorage kullan
+  if ((_isGuestLocal || (_isLocalDev && !authIdToken)) && !authIdToken) {
     userProfile = { ...profileData };
-    localStorage.setItem('dd_dev_profile', JSON.stringify(profileData));
+    const storageKey = _isGuestLocal ? 'dd_guest_profile' : 'dd_dev_profile';
+    localStorage.setItem(storageKey, JSON.stringify(profileData));
     enterLobby();
     return;
   }
@@ -294,9 +301,66 @@ async function saveProfile() {
     enterLobby();
   } catch (err) {
     console.error("Profil kaydetme hatası:", err);
-    Swal.fire({ title: "Hata", text: "Profil kaydedilemedi: " + err.message, icon: "error" });
+    Swal.fire({ title: t('error'), text: t('error_profile_save') + err.message, icon: "error" });
   }
 }
+
+// --- GUEST LOCAL (giriş yapmadan Pass & Play) ---
+function skipToLobbyAsGuest() {
+  _isGuestLocal = true;
+  const uid = _getOrCreateDevUid();
+  currentUser = { uid, email: null, photoURL: null, displayName: null };
+  authIdToken = null;
+
+  const splash = document.getElementById('app-splash');
+  dismissSplash(splash);
+
+  // Daha önce kaydedilmiş profil var mı?
+  const saved = localStorage.getItem('dd_guest_profile');
+  if (saved) {
+    try {
+      userProfile = JSON.parse(saved);
+      enterLobby();
+      return;
+    } catch(e) {}
+  }
+  if (typeof showScreen === 'function') showScreen('profileSetup');
+  else _devShowScreen('profile-setup');
+}
+
+// Kullanıcı Firebase ile giriş yapmış mı? (Google/Facebook/Apple — anonymous değil)
+function isFullyAuthenticated() {
+  if (_isGuestLocal) return false;
+  if (_devModeActive) return false;
+  if (!currentUser) return false;
+  // Firebase anonymous users have isAnonymous === true
+  if (currentUser.isAnonymous) return false;
+  return !!authIdToken;
+}
+
+// Multiplayer için giriş gerektiğinde çağrılır
+function requireAuthForMultiplayer(callback) {
+  if (isFullyAuthenticated()) {
+    callback();
+    return;
+  }
+  Swal.fire({
+    title: t('auth_required_title'),
+    text: t('auth_required_text'),
+    icon: 'info',
+    showCancelButton: true,
+    confirmButtonText: t('auth_required_login'),
+    cancelButtonText: t('cancel'),
+  }).then((result) => {
+    if (result.isConfirmed) {
+      // Auth ekranına yönlendir, giriş sonrası lobby'ye dönecek
+      _pendingMultiplayerCallback = callback;
+      showScreen('auth');
+    }
+  });
+}
+
+let _pendingMultiplayerCallback = null;
 
 // --- ENTER LOBBY ---
 function enterLobby() {
@@ -332,8 +396,17 @@ function enterLobby() {
     }
   }
 
-  // Socket bağlantısını başlat
-  connectSocket();
+  // Socket bağlantısını başlat (guest local için Pass & Play seçene kadar bekleme)
+  if (!_isGuestLocal) {
+    connectSocket();
+  }
+
+  // Auth sonrası bekleyen multiplayer callback varsa çalıştır
+  if (_pendingMultiplayerCallback && isFullyAuthenticated()) {
+    const cb = _pendingMultiplayerCallback;
+    _pendingMultiplayerCallback = null;
+    cb();
+  }
 }
 
 // --- SIGN OUT ---

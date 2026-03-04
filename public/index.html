@@ -26,8 +26,10 @@
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
 
-  <link rel="stylesheet" href="style.css?v=40" />
-  <script src="translations.js?v=1"></script>
+  <link rel="stylesheet" href="style.css?v=41" />
+  <!-- Firebase runtime config (opsiyonel — varsa firebase-config.js'ten önce yüklenir) -->
+  <script src="firebase-runtime-config.js" onerror=""></script>
+  <script src="translations.js?v=2"></script>
 </head>
 
 <body>
@@ -101,6 +103,14 @@
             <span id="btn-text-guest">Misafir Olarak Devam Et</span>
           </button>
         </div>
+
+        <div class="auth-skip-divider">
+          <span id="auth-or-text">veya</span>
+        </div>
+        <button class="auth-skip-btn" onclick="skipToLobbyAsGuest()">
+          <span id="btn-text-skip">Giriş yapmadan oyna</span>
+        </button>
+        <p id="auth-skip-note" class="auth-skip-note">Sadece Tek Cihazda Oyna modu kullanılabilir</p>
       </div>
     </div>
 

@@ -200,7 +200,6 @@ body.keyboard-open {
   font-family: "Pacifico", cursive;
   font-size: 2rem;
   color: #fff;
-  color: #2d3436;
   text-shadow: 0 0 30px var(--theme-glow), 0 0 60px var(--theme-border);
   opacity: 0;
   animation: splashTitleIn 0.6s 0.4s ease-out both;
@@ -631,6 +630,52 @@ body.keyboard-open #lobby-screen.active {
 .auth-btn-guest:hover {
   background: rgba(255, 255, 255, 0.2);
   box-shadow: 0 2px 12px rgba(255, 255, 255, 0.14);
+}
+
+.auth-skip-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 16px 0 8px;
+  width: 100%;
+}
+.auth-skip-divider::before,
+.auth-skip-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: rgba(255,255,255,0.15);
+}
+.auth-skip-divider span {
+  font-size: 0.82rem;
+  color: rgba(255,255,255,0.45);
+  text-transform: lowercase;
+}
+
+.auth-skip-btn {
+  width: 100%;
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px dashed rgba(255,255,255,0.25);
+  background: transparent;
+  color: rgba(255,255,255,0.7);
+  font-family: 'Poppins', sans-serif;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.auth-skip-btn:hover {
+  background: rgba(255,255,255,0.06);
+  color: #fff;
+  border-color: rgba(255,255,255,0.4);
+}
+
+.auth-skip-note {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.35);
+  text-align: center;
+  margin-top: 6px;
 }
 
 /* --- PROFILE SETUP SCREEN --- */
