@@ -671,11 +671,57 @@ body.keyboard-open #lobby-screen.active {
   border-color: rgba(255,255,255,0.4);
 }
 
-.auth-skip-note {
-  font-size: 0.75rem;
-  color: rgba(255,255,255,0.35);
-  text-align: center;
-  margin-top: 6px;
+.auth-store-badges {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  width: 100%;
+}
+.store-badge {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.05);
+  color: #fff;
+  text-decoration: none;
+  transition: all 0.2s;
+}
+.store-badge:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.3);
+}
+.store-badge-text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+.store-badge-small {
+  font-size: 0.6rem;
+  opacity: 0.7;
+  font-weight: 400;
+}
+.store-badge-name {
+  font-size: 0.85rem;
+  font-weight: 600;
+}
+.auth-social-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin-top: 14px;
+  color: rgba(255,255,255,0.5);
+  text-decoration: none;
+  font-size: 0.85rem;
+  transition: color 0.2s;
+}
+.auth-social-link:hover {
+  color: #E1306C;
 }
 
 /* --- PROFILE SETUP SCREEN --- */
