@@ -68,12 +68,7 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   admin.initializeApp({ credential: admin.credential.applicationDefault() });
   firebaseAuthEnabled = true;
 } else {
-  // Auth bypass — sadece NODE_ENV=production DEĞİLSE aktif
-  if (process.env.NODE_ENV === 'production') {
-    console.error("HATA: Production'da Firebase credential bulunamadı! FIREBASE_SERVICE_ACCOUNT veya GOOGLE_APPLICATION_CREDENTIALS ayarlanmalı.");
-    process.exit(1);
-  }
-  console.warn("Firebase Admin credential bulunamadı. DEV_AUTH_BYPASS aktif (sadece development).");
+  console.warn("Firebase Admin credential bulunamadı. Server-side token doğrulama devre dışı.");
   try { admin.initializeApp(); } catch (e) { /* already initialized */ }
 }
 
