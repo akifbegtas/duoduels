@@ -724,6 +724,22 @@ body.keyboard-open #lobby-screen.active {
   color: #E1306C;
 }
 
+/* --- SIDEBAR ADS (Desktop only) --- */
+.ad-sidebar {
+  display: none;
+  position: fixed;
+  top: 0;
+  width: 160px;
+  height: 100vh;
+  z-index: 10;
+  overflow: hidden;
+}
+.ad-sidebar-left { left: 0; }
+.ad-sidebar-right { right: 0; }
+@media (min-width: 1200px) {
+  .ad-sidebar { display: block; }
+}
+
 /* --- PROFILE SETUP SCREEN --- */
 .profile-setup-form {
   width: 100%;
