@@ -41,21 +41,21 @@ body.theme-male {
   --svg-color3: #00c6fb;
 }
 
-/* Kadın teması: Neon Pembe - Mor */
+/* Kadın teması: Pembe - Mor */
 body.theme-female {
-  --theme-primary: #ff0844;
-  --theme-secondary: #ffb199;
-  --theme-dark: #c20635;
-  --theme-glow: rgba(255, 8, 68, 0.6);
-  --theme-border: rgba(255, 177, 153, 0.4);
-  --theme-shadow: rgba(255, 8, 68, 0.15);
-  --theme-gradient: linear-gradient(135deg, #ff0844, #ffb199);
-  --theme-gradient-hover: linear-gradient(135deg, #ff0844, #d50032);
-  --theme-title-gradient: linear-gradient(135deg, #ffffff 20%, #ffb199 80%);
-  --theme-tab-gradient: linear-gradient(135deg, rgba(255, 8, 68, 0.9), rgba(255, 177, 153, 0.9));
-  --svg-color1: #ff0844;
-  --svg-color2: #ffb199;
-  --svg-color3: #ff4d79;
+  --theme-primary: #e84393;
+  --theme-secondary: #a855f7;
+  --theme-dark: #c0369e;
+  --theme-glow: rgba(232, 67, 147, 0.6);
+  --theme-border: rgba(168, 85, 247, 0.4);
+  --theme-shadow: rgba(232, 67, 147, 0.15);
+  --theme-gradient: linear-gradient(135deg, #e84393, #a855f7);
+  --theme-gradient-hover: linear-gradient(135deg, #d63384, #9333ea);
+  --theme-title-gradient: linear-gradient(135deg, #ffffff 20%, #f78fb3 80%);
+  --theme-tab-gradient: linear-gradient(135deg, rgba(232, 67, 147, 0.9), rgba(168, 85, 247, 0.9));
+  --svg-color1: #e84393;
+  --svg-color2: #a855f7;
+  --svg-color3: #f78fb3;
 }
 
 * {
