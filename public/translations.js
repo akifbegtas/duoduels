@@ -17,7 +17,9 @@ const TRANSLATIONS = {
     auth_guest_failed:   "Misafir girişi başarısız. Firebase Authentication > Anonymous provider'ı açın.",
     auth_or:             "veya",
     auth_slogan:         "Çiftler için en eğlenceli bilgi yarışması!",
-    how_to_play:         "Nasıl Oynanır?",
+    how_to_play:         "NASIL OYNANIR?",
+    nav_login:           "GİRİŞ YAP",
+    nav_play:            "HEMEN OYNA",
     htp_isim_sehir:      "Verilen harfle isim, şehir, hayvan, renk gibi kategorilere kelime bul!",
     htp_tabu:            "Yasaklı kelimeleri kullanmadan verilen kelimeyi anlat!",
     htp_pictionary:      "Çizilen resmi tahmin et veya sen çiz, karşı taraf tahmin etsin!",
@@ -298,7 +300,9 @@ const TRANSLATIONS = {
     auth_guest_failed:   "Guest sign-in failed. Enable Firebase Authentication > Anonymous provider.",
     auth_or:             "or",
     auth_slogan:         "The most fun trivia game for couples!",
-    how_to_play:         "How to Play?",
+    how_to_play:         "HOW TO PLAY?",
+    nav_login:           "SIGN IN",
+    nav_play:            "PLAY NOW",
     htp_isim_sehir:      "Find words for categories like name, city, animal with the given letter!",
     htp_tabu:            "Describe the word without using the forbidden words!",
     htp_pictionary:      "Guess the drawing or draw for your partner to guess!",
@@ -580,6 +584,8 @@ const TRANSLATIONS = {
     auth_or:             "أو",
     auth_slogan:         "أكثر لعبة معلومات ممتعة للأزواج!",
     how_to_play:         "كيف تلعب؟",
+    nav_login:           "تسجيل الدخول",
+    nav_play:            "العب الآن",
     htp_isim_sehir:      "اعثر على كلمات للفئات مثل الاسم والمدينة والحيوان بالحرف المعطى!",
     htp_tabu:            "صِف الكلمة دون استخدام الكلمات المحظورة!",
     htp_pictionary:      "خمّن الرسم أو ارسم ليخمّن شريكك!",
@@ -865,6 +871,8 @@ function applyTranslations() {
   _setText('auth-subtitle',        t('auth_subtitle'));
   _setText('auth-slogan',          t('auth_slogan'));
   _setText('how-to-play-btn',      t('how_to_play'));
+  _setText('nav-login-btn',        t('nav_login'));
+  _setText('nav-play-btn',         t('nav_play'));
   _setText('htp-title',            t('how_to_play'));
   _setText('htp-desc-1',           t('htp_isim_sehir'));
   _setText('htp-desc-2',           t('htp_tabu'));

@@ -86,12 +86,22 @@
           <span class="auth-navbar-brand">DuoDuels</span>
         </div>
         <div class="auth-navbar-right">
-          <button class="auth-navbar-link" onclick="toggleHowToPlay()" id="how-to-play-btn">Nasıl Oynanır?</button>
-          <div class="auth-navbar-langs">
-            <button class="lang-btn-mini" onclick="setLanguage('tr')" id="nav-lang-tr">🇹🇷</button>
-            <button class="lang-btn-mini" onclick="setLanguage('en')" id="nav-lang-en">🇬🇧</button>
-            <button class="lang-btn-mini" onclick="setLanguage('ar')" id="nav-lang-ar">🇸🇦</button>
+          <!-- Language Dropdown -->
+          <div class="nav-lang-dropdown" id="nav-lang-dropdown">
+            <button class="nav-lang-toggle" onclick="toggleLangDropdown()">
+              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="opacity:0.7"><path d="M12.87 15.07l-2.54-2.51.03-.03A17.52 17.52 0 0014.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg>
+              <span class="nav-lang-label" id="nav-lang-label">TÜRKÇE</span>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="opacity:0.5"><path d="M7 10l5 5 5-5z"/></svg>
+            </button>
+            <div class="nav-lang-menu" id="nav-lang-menu">
+              <button onclick="setLanguage('tr'); closeLangDropdown()">🇹🇷 Türkçe</button>
+              <button onclick="setLanguage('en'); closeLangDropdown()">🇬🇧 English</button>
+              <button onclick="setLanguage('ar'); closeLangDropdown()">🇸🇦 العربية</button>
+            </div>
           </div>
+          <button class="nav-btn nav-btn-outline" onclick="toggleHowToPlay()" id="how-to-play-btn">NASIL OYNANIR?</button>
+          <button class="nav-btn nav-btn-dark" onclick="document.querySelector('.auth-btn-google').click()" id="nav-login-btn">GİRİŞ YAP</button>
+          <button class="nav-btn nav-btn-cta" onclick="signInAsGuest()" id="nav-play-btn">HEMEN OYNA</button>
         </div>
       </nav>
 
@@ -1100,10 +1110,23 @@
       var el = document.getElementById('how-to-play-overlay');
       el.style.display = el.style.display === 'none' ? 'flex' : 'none';
     }
-    // Close on overlay background click
+    function toggleLangDropdown() {
+      document.getElementById('nav-lang-menu').classList.toggle('open');
+    }
+    function closeLangDropdown() {
+      document.getElementById('nav-lang-menu').classList.remove('open');
+      // Update label
+      var labels = { tr: 'TÜRKÇE', en: 'ENGLISH', ar: 'العربية' };
+      var el = document.getElementById('nav-lang-label');
+      if (el && typeof currentLang !== 'undefined') el.textContent = labels[currentLang] || 'TÜRKÇE';
+    }
+    // Close dropdowns on outside click
     document.addEventListener('click', function(e) {
       if (e.target && e.target.id === 'how-to-play-overlay') {
         e.target.style.display = 'none';
+      }
+      if (!e.target.closest('.nav-lang-dropdown')) {
+        closeLangDropdown();
       }
     });
   </script>
