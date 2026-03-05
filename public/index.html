@@ -69,8 +69,65 @@
     <div id="score-note-text" class="score-note">20 Hata = ELENİR! 💀</div>
   </div>
 
+  <!-- Auth Navbar (outside main-container for full width) -->
+  <nav class="auth-navbar" id="auth-navbar">
+    <div class="auth-navbar-left">
+      <img src="apple-touch-icon.png" alt="DuoDuels" class="auth-navbar-logo" />
+      <span class="auth-navbar-brand">DuoDuels</span>
+    </div>
+    <div class="auth-navbar-right">
+      <div class="nav-lang-dropdown" id="nav-lang-dropdown">
+        <button class="nav-lang-toggle" onclick="toggleLangDropdown()">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="opacity:0.7"><path d="M12.87 15.07l-2.54-2.51.03-.03A17.52 17.52 0 0014.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg>
+          <span class="nav-lang-label" id="nav-lang-label">TÜRKÇE</span>
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="opacity:0.5"><path d="M7 10l5 5 5-5z"/></svg>
+        </button>
+        <div class="nav-lang-menu" id="nav-lang-menu">
+          <button onclick="setLanguage('tr'); closeLangDropdown()">🇹🇷 Türkçe</button>
+          <button onclick="setLanguage('en'); closeLangDropdown()">🇬🇧 English</button>
+          <button onclick="setLanguage('ar'); closeLangDropdown()">🇸🇦 العربية</button>
+        </div>
+      </div>
+      <button class="nav-btn nav-btn-outline" onclick="toggleHowToPlay()" id="how-to-play-btn">NASIL OYNANIR?</button>
+      <button class="nav-btn nav-btn-dark" onclick="document.querySelector('.auth-btn-google').click()" id="nav-login-btn">GİRİŞ YAP</button>
+      <button class="nav-btn nav-btn-cta" onclick="signInAsGuest()" id="nav-play-btn">HEMEN OYNA</button>
+    </div>
+  </nav>
+
+  <!-- Nasıl Oynanır? Overlay (outside main-container for full screen) -->
+  <div id="how-to-play-overlay" class="htp-overlay" style="display:none">
+    <div class="htp-panel">
+      <div class="htp-header">
+        <h3 id="htp-title">Nasıl Oynanır?</h3>
+        <button class="htp-close" onclick="toggleHowToPlay()">&times;</button>
+      </div>
+      <div class="htp-content">
+        <div class="htp-game">
+          <span class="htp-icon">🏙️</span>
+          <div><strong>İsim Şehir</strong><p id="htp-desc-1">Verilen harfle isim, şehir, hayvan, renk gibi kategorilere kelime bul!</p></div>
+        </div>
+        <div class="htp-game">
+          <span class="htp-icon">🚫</span>
+          <div><strong>Tabu</strong><p id="htp-desc-2">Yasaklı kelimeleri kullanmadan verilen kelimeyi anlat!</p></div>
+        </div>
+        <div class="htp-game">
+          <span class="htp-icon">🎨</span>
+          <div><strong>Resim Tahmin</strong><p id="htp-desc-3">Çizilen resmi tahmin et veya sen çiz, karşı taraf tahmin etsin!</p></div>
+        </div>
+        <div class="htp-game">
+          <span class="htp-icon">😄</span>
+          <div><strong>Emoji Tahmin</strong><p id="htp-desc-4">Emojilerden filmi, şarkıyı veya kelimeyi tahmin et!</p></div>
+        </div>
+        <div class="htp-game">
+          <span class="htp-icon">⚔️</span>
+          <div><strong>Düello</strong><p id="htp-desc-5">Bilgi sorularıyla rakibine karşı yarış!</p></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="main-container">
-    <header>
+    <header id="main-header" style="display:none">
       <h1 class="game-title">
         DuoDuels <span id="interactive-heart">💖</span>
       </h1>
@@ -78,64 +135,6 @@
 
     <!-- AUTH EKRANI -->
     <div id="auth-screen" class="screen active">
-
-      <!-- Top Navbar -->
-      <nav class="auth-navbar">
-        <div class="auth-navbar-left">
-          <img src="apple-touch-icon.png" alt="DuoDuels" class="auth-navbar-logo" />
-          <span class="auth-navbar-brand">DuoDuels</span>
-        </div>
-        <div class="auth-navbar-right">
-          <!-- Language Dropdown -->
-          <div class="nav-lang-dropdown" id="nav-lang-dropdown">
-            <button class="nav-lang-toggle" onclick="toggleLangDropdown()">
-              <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="opacity:0.7"><path d="M12.87 15.07l-2.54-2.51.03-.03A17.52 17.52 0 0014.07 6H17V4h-7V2H8v2H1v2h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"/></svg>
-              <span class="nav-lang-label" id="nav-lang-label">TÜRKÇE</span>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor" style="opacity:0.5"><path d="M7 10l5 5 5-5z"/></svg>
-            </button>
-            <div class="nav-lang-menu" id="nav-lang-menu">
-              <button onclick="setLanguage('tr'); closeLangDropdown()">🇹🇷 Türkçe</button>
-              <button onclick="setLanguage('en'); closeLangDropdown()">🇬🇧 English</button>
-              <button onclick="setLanguage('ar'); closeLangDropdown()">🇸🇦 العربية</button>
-            </div>
-          </div>
-          <button class="nav-btn nav-btn-outline" onclick="toggleHowToPlay()" id="how-to-play-btn">NASIL OYNANIR?</button>
-          <button class="nav-btn nav-btn-dark" onclick="document.querySelector('.auth-btn-google').click()" id="nav-login-btn">GİRİŞ YAP</button>
-          <button class="nav-btn nav-btn-cta" onclick="signInAsGuest()" id="nav-play-btn">HEMEN OYNA</button>
-        </div>
-      </nav>
-
-      <!-- Nasıl Oynanır? Overlay -->
-      <div id="how-to-play-overlay" class="htp-overlay" style="display:none">
-        <div class="htp-panel">
-          <div class="htp-header">
-            <h3 id="htp-title">Nasıl Oynanır?</h3>
-            <button class="htp-close" onclick="toggleHowToPlay()">&times;</button>
-          </div>
-          <div class="htp-content">
-            <div class="htp-game">
-              <span class="htp-icon">🏙️</span>
-              <div><strong>İsim Şehir</strong><p id="htp-desc-1">Verilen harfle isim, şehir, hayvan, renk gibi kategorilere kelime bul!</p></div>
-            </div>
-            <div class="htp-game">
-              <span class="htp-icon">🚫</span>
-              <div><strong>Tabu</strong><p id="htp-desc-2">Yasaklı kelimeleri kullanmadan verilen kelimeyi anlat!</p></div>
-            </div>
-            <div class="htp-game">
-              <span class="htp-icon">🎨</span>
-              <div><strong>Resim Tahmin</strong><p id="htp-desc-3">Çizilen resmi tahmin et veya sen çiz, karşı taraf tahmin etsin!</p></div>
-            </div>
-            <div class="htp-game">
-              <span class="htp-icon">😄</span>
-              <div><strong>Emoji Tahmin</strong><p id="htp-desc-4">Emojilerden filmi, şarkıyı veya kelimeyi tahmin et!</p></div>
-            </div>
-            <div class="htp-game">
-              <span class="htp-icon">⚔️</span>
-              <div><strong>Düello</strong><p id="htp-desc-5">Bilgi sorularıyla rakibine karşı yarış!</p></div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <!-- Slogan -->
       <div class="auth-hero">

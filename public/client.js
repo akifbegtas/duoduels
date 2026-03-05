@@ -154,6 +154,11 @@ function showScreen(name) {
   } else {
     document.body.classList.remove("game-active");
   }
+  // Toggle auth navbar & header visibility
+  var authNav = document.getElementById('auth-navbar');
+  var mainHeader = document.getElementById('main-header');
+  if (authNav) authNav.style.display = (name === 'auth') ? 'flex' : 'none';
+  if (mainHeader) mainHeader.style.display = (name === 'auth') ? 'none' : '';
 }
 
 // --- TEMA DEĞİŞTİRME (cinsiyet seçimine göre) ---

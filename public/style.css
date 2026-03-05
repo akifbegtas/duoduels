@@ -306,6 +306,10 @@ header {
   margin-bottom: 15px;
 }
 
+/* Hide main header when auth screen is active (navbar replaces it) */
+#auth-screen.active ~ * #main-header,
+#main-header.auth-hidden { display: none; }
+
 .game-title {
   font-family: "Pacifico", cursive;
   font-size: 2.5rem;
