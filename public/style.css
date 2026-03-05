@@ -987,6 +987,21 @@ body.keyboard-open #lobby-screen.active {
 .auth-social-link:hover {
   color: #E1306C;
 }
+.auth-legal {
+  font-size: 0.7rem;
+  color: rgba(255,255,255,0.35);
+  text-align: center;
+  margin-top: 14px;
+  line-height: 1.5;
+}
+.auth-legal a {
+  color: rgba(255,255,255,0.55);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.auth-legal a:hover {
+  color: #fff;
+}
 
 /* --- SIDEBAR ADS (Desktop only) --- */
 .ad-sidebar {
