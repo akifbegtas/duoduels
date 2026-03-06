@@ -144,11 +144,12 @@ const screens = {
   tabu: document.getElementById("tabu-screen"),
   imposter: document.getElementById("imposter-screen"),
   sayiTahmin: document.getElementById("sayiTahmin-screen"),
+  bilBakalim: document.getElementById("bilBakalim-screen"),
 };
 function showScreen(name) {
   Object.values(screens).forEach((s) => s.classList.remove("active"));
   screens[name].classList.add("active");
-  const gameScreens = ["game", "isimSehir", "pictionary", "tabu", "imposter", "sayiTahmin"];
+  const gameScreens = ["game", "isimSehir", "pictionary", "tabu", "imposter", "sayiTahmin", "bilBakalim"];
   if (gameScreens.includes(name)) {
     document.body.classList.add("game-active");
   } else {
@@ -469,6 +470,7 @@ function selectGame(type) {
     tabu: t('game_tabu'),
     imposter: t('game_imposter'),
     sayiTahmin: t('game_sayi_tahmin'),
+    bilBakalim: t('game_bil_bakalim'),
   };
   document.getElementById("settings-game-title").innerText =
     names[type] + t('game_settings');
@@ -476,8 +478,13 @@ function selectGame(type) {
   // Resim Çiz için süre sabit 45sn, gizle
   const timeInput = document.getElementById("roundTimeInput");
   const timeLabel = timeInput.parentElement;
-  // Basamak sayısı default gizle (sadece sayiTahmin'de göster)
+  // Basamak ve hedef puan satırlarını varsayılan gizle
   document.getElementById("digitCountRow").style.display = "none";
+  document.getElementById("targetScoreRow").style.display = "none";
+  // roundCount satırını varsayılan göster
+  var roundCountRow = document.getElementById("roundCountInput").closest(".half-input");
+  if (roundCountRow) roundCountRow.style.display = "";
+
   if (type === "pictionary") {
     timeLabel.style.display = "none";
     timeInput.value = 45;
@@ -493,8 +500,13 @@ function selectGame(type) {
   } else if (type === "sayiTahmin") {
     timeLabel.style.display = "none";
     timeInput.value = 60;
-    // Basamak sayısı seçicisini göster
     document.getElementById("digitCountRow").style.display = "";
+  } else if (type === "bilBakalim") {
+    // Tur sayısı yerine hedef puan, süre de var
+    if (roundCountRow) roundCountRow.style.display = "none";
+    timeLabel.style.display = "";
+    timeInput.value = 20;
+    document.getElementById("targetScoreRow").style.display = "";
   } else {
     timeLabel.style.display = "";
     timeInput.value = 10;
@@ -512,6 +524,7 @@ function confirmGameSettings() {
   pendingRoomData.roundCount = document.getElementById("roundCountInput").value;
   pendingRoomData.roundTime = document.getElementById("roundTimeInput").value;
   pendingRoomData.digitCount = document.getElementById("digitCountInput").value;
+  pendingRoomData.targetScore = document.getElementById("targetScoreInput").value;
 
   function doEmit() {
     if (currentRoom) {
@@ -522,6 +535,7 @@ function confirmGameSettings() {
         roundCount: pendingRoomData.roundCount,
         roundTime: pendingRoomData.roundTime,
         digitCount: pendingRoomData.digitCount,
+        targetScore: pendingRoomData.targetScore,
       });
       pendingRoomData = null;
     } else {
@@ -1033,6 +1047,9 @@ socket.on("roomCreated", (id) => {
   sessionStorage.setItem("duoduels_room", id);
   showScreen("waiting");
   document.getElementById("displayRoomCode").innerText = id;
+
+  // Oda kurulunca 1 kez interstitial reklam göster
+  showInterstitialAd();
 
   // Generate QR code for the room join URL
   const qrCanvas = document.getElementById('room-qr-canvas');
@@ -3248,6 +3265,200 @@ socket.on("sayiTahminGameOver", (data) => {
   window.sendNumberGuess  = sendNumberGuess;
   window.clearCanvas      = clearCanvas;
   window.passPlayUnlock   = passPlayUnlock;
+  window.sendBilBakalimAnswer = sendBilBakalimAnswer;
+
+  // ============ BİL BAKALIM SOCKET EVENTS ============
+
+  var _bbMyPairId = null;
+  var _bbMyGender = null;
+  var _bbPairs = [];
+  var _bbAnswered = false;
+  var _bbTimerInterval = null;
+
+  socket.on("bilBakalimStart", function(data) {
+    window._currentGameType = "bilBakalim";
+    _bbPairs = data.pairs || [];
+    _bbMyPairId = null;
+    _bbMyGender = null;
+
+    // Kendi pair'ini ve cinsiyetini bul
+    const myId = typeof getMyPlayerId === 'function' ? getMyPlayerId() : null;
+    _bbPairs.forEach(function(pair) {
+      if (pair.p1.id === myId) { _bbMyPairId = pair.id; _bbMyGender = pair.p1.gender; }
+      if (pair.p2.id === myId) { _bbMyPairId = pair.id; _bbMyGender = pair.p2.gender; }
+    });
+
+    var targetEl = document.getElementById("bb-target-label");
+    if (targetEl) targetEl.textContent = t('bb_target_score') + " " + data.targetScore;
+
+    showScreen("bilBakalim");
+    _bbUpdateScores({}, data.targetScore);
+
+    // Soru ekranını temizle
+    var questionArea = document.getElementById("bb-question-area");
+    if (questionArea) questionArea.style.opacity = "0.4";
+    var questionText = document.getElementById("bb-question-text");
+    if (questionText) questionText.textContent = "...";
+  });
+
+  socket.on("bilBakalimQuestion", function(data) {
+    _bbAnswered = false;
+    if (_bbTimerInterval) clearInterval(_bbTimerInterval);
+
+    // Soru alanını göster
+    var questionArea = document.getElementById("bb-question-area");
+    if (questionArea) questionArea.style.opacity = "1";
+
+    var questionNo = document.getElementById("bb-question-no");
+    if (questionNo) questionNo.textContent = t('bb_question_no') + " " + data.questionNo;
+
+    var questionText = document.getElementById("bb-question-text");
+    if (questionText) questionText.textContent = data.question;
+
+    var unitEl = document.getElementById("bb-unit");
+    if (unitEl) unitEl.textContent = data.unit || "";
+
+    // Cinsiyet etiketi
+    var genderLabel = document.getElementById("bb-gender-label");
+    if (genderLabel) genderLabel.textContent = _bbMyGender === "female" ? t('bb_women_group') : t('bb_men_group');
+
+    // Cevap inputunu sıfırla
+    var input = document.getElementById("bb-answer-input");
+    if (input) { input.value = ""; input.disabled = false; }
+    var sendBtn = document.getElementById("bb-send-btn");
+    if (sendBtn) { sendBtn.disabled = false; sendBtn.textContent = t('bb_send'); }
+    var statusEl = document.getElementById("bb-answered-status");
+    if (statusEl) statusEl.textContent = "";
+
+    // Sonuç alanını gizle
+    var resultArea = document.getElementById("bb-result-area");
+    if (resultArea) resultArea.classList.add("hidden");
+    var answerArea = document.getElementById("bb-answer-area");
+    if (answerArea) answerArea.classList.remove("hidden");
+
+    // Puanları güncelle
+    _bbUpdateScores(data.scores, null);
+
+    // Timer
+    var remaining = data.roundTime || 20;
+    var timerLabel = document.getElementById("bb-timer-label");
+    var timerBar = document.getElementById("bb-timer-bar");
+    var totalTime = remaining;
+
+    if (timerLabel) timerLabel.textContent = remaining;
+    if (timerBar) timerBar.style.width = "100%";
+
+    _bbTimerInterval = setInterval(function() {
+      remaining--;
+      if (timerLabel) timerLabel.textContent = remaining;
+      if (timerBar) timerBar.style.width = Math.max(0, (remaining / totalTime) * 100) + "%";
+      if (remaining <= 0) { clearInterval(_bbTimerInterval); _bbTimerInterval = null; }
+    }, 1000);
+  });
+
+  socket.on("bilBakalimAnswerReceived", function(data) {
+    var statusEl = document.getElementById("bb-answered-status");
+    if (!statusEl) return;
+    // Sadece başka oyuncular cevap verdi bilgisini göster
+    var myId = typeof getMyPlayerId === 'function' ? getMyPlayerId() : null;
+    if (data.playerId !== myId) {
+      statusEl.textContent = t('bb_opponent_answered');
+    }
+  });
+
+  socket.on("bilBakalimResult", function(data) {
+    if (_bbTimerInterval) { clearInterval(_bbTimerInterval); _bbTimerInterval = null; }
+
+    // Cevap alanını gizle, sonuç alanını göster
+    var answerArea = document.getElementById("bb-answer-area");
+    if (answerArea) answerArea.classList.add("hidden");
+    var resultArea = document.getElementById("bb-result-area");
+    if (resultArea) resultArea.classList.remove("hidden");
+
+    // Doğru cevap
+    var correctEl = document.getElementById("bb-correct-answer");
+    if (correctEl) correctEl.innerHTML = "✅ " + t('bb_correct_answer') + " <strong>" + data.correctAnswer.toLocaleString('tr-TR') + " " + (data.unit || "") + "</strong>";
+
+    // Sonuçlar listesi
+    var listEl = document.getElementById("bb-results-list");
+    if (listEl) {
+      var html = "";
+      var genderMap = { male: t('bb_men_group'), female: t('bb_women_group') };
+      Object.keys(data.genderResults || {}).forEach(function(gender) {
+        var gr = data.genderResults[gender];
+        html += '<div class="bb-gender-result"><div class="bb-gender-title">' + genderMap[gender] + '</div>';
+        (gr.contestants || []).forEach(function(c) {
+          var isWinner = (gr.winners || []).includes(c.pairId);
+          // Hangi takım
+          var pairName = "";
+          _bbPairs.forEach(function(p) { if (p.id === c.pairId) pairName = p.teamName; });
+          html += '<div class="bb-result-row' + (isWinner ? " bb-winner" : "") + '">';
+          html += '<span class="bb-result-name">' + (isWinner ? "🏆 " : "") + c.username + ' <small>(' + pairName + ')</small></span>';
+          html += '<span class="bb-result-val">' + (c.answer !== null ? c.answer.toLocaleString('tr-TR') : "—") + '</span>';
+          html += '</div>';
+        });
+        html += '</div>';
+      });
+      listEl.innerHTML = html;
+    }
+
+    // Puanları güncelle
+    _bbUpdateScores(data.scores, data.targetScore);
+  });
+
+  socket.on("bilBakalimEnd", function(data) {
+    if (_bbTimerInterval) { clearInterval(_bbTimerInterval); _bbTimerInterval = null; }
+
+    var winnerPair = _bbPairs.find(function(p) { return p.id === data.winner; });
+    var scoresHtml = (data.ranking || []).map(function(r, i) {
+      return '<div style="margin:6px 0; font-size:' + (i === 0 ? '1.2rem' : '1rem') + '">' +
+        (i === 0 ? '🏆 ' : (i === 1 ? '🥈 ' : '🥉 ')) +
+        '<strong>' + r.teamName + '</strong>: ' + r.score + t('points_suffix') + '</div>';
+    }).join('');
+
+    Swal.fire({
+      title: '🎯 ' + t('bb_final_rankings'),
+      html: '<div style="padding:10px 0">' +
+        (winnerPair ? '<div style="font-size:1.3rem;margin-bottom:10px">🏆 ' + t('bb_champion') + ': <strong>' + winnerPair.teamName + '</strong></div>' : '') +
+        scoresHtml + '</div>',
+      background: "linear-gradient(145deg, rgba(20, 18, 50, 0.97), rgba(10, 8, 35, 0.98))",
+      color: "#fff",
+      confirmButtonText: t('btn_ok'),
+    }).then(function() {
+      showScreen("waiting");
+    });
+  });
+
+  function _bbUpdateScores(scores, targetScore) {
+    var scoresEl = document.getElementById("bb-scores");
+    if (!scoresEl || !_bbPairs.length) return;
+    var html = _bbPairs.map(function(pair) {
+      var sc = (scores && scores[pair.id]) || 0;
+      var isMe = pair.id === _bbMyPairId;
+      return '<div class="bb-score-chip' + (isMe ? " bb-score-me" : "") + '">' +
+        '<span class="bb-score-name">' + pair.teamName + '</span>' +
+        '<span class="bb-score-val">' + sc + (targetScore ? '/' + targetScore : '') + '</span>' +
+        '</div>';
+    }).join('');
+    scoresEl.innerHTML = html;
+  }
+
+  function sendBilBakalimAnswer() {
+    if (_bbAnswered) return;
+    var input = document.getElementById("bb-answer-input");
+    if (!input) return;
+    var val = parseFloat(input.value);
+    if (isNaN(val)) { input.focus(); return; }
+
+    _bbAnswered = true;
+    input.disabled = true;
+    var sendBtn = document.getElementById("bb-send-btn");
+    if (sendBtn) { sendBtn.disabled = true; sendBtn.textContent = t('bb_answered'); }
+    var statusEl = document.getElementById("bb-answered-status");
+    if (statusEl) statusEl.textContent = t('bb_answered');
+
+    socket.emit("bilBakalimAnswer", { roomId: currentRoom, answer: val });
+  }
 
 } // end setupSocketListeners
 
@@ -3276,3 +3487,54 @@ window.showScreen         = showScreen;
 // --- SESSION RECOVERY ---
 // Session recovery artık auth.js'deki onAuthStateChanged ve connectSocket tarafından yönetiliyor
 // Saved room varsa connect sonrası otomatik rejoin yapılıyor (connect handler'da)
+
+// --- REKLAM YÖNETİMİ ---
+// Bottom bar toggle (gizle/göster)
+(function() {
+  var toggle = document.getElementById('ad-bottombar-toggle');
+  var bar = document.getElementById('ad-bottombar');
+  if (toggle && bar) {
+    toggle.addEventListener('click', function() {
+      var collapsed = bar.classList.toggle('collapsed');
+      toggle.textContent = collapsed ? '▲ Reklam' : '▼ Gizle';
+    });
+  }
+})();
+
+// Interstitial reklam - oda kurulunca 1 kez 5 saniye gösterilir
+var _interstitialShown = false;
+
+function showInterstitialAd() {
+  if (_interstitialShown) return;
+  _interstitialShown = true;
+
+  var overlay = document.getElementById('ad-interstitial');
+  var countdownEl = document.getElementById('ad-interstitial-countdown');
+  var closeBtn = document.getElementById('ad-interstitial-close');
+  if (!overlay) return;
+
+  // AdSense reklamını yükle
+  try {
+    (adsbygoogle = window.adsbygoogle || []).push({});
+  } catch(e) {}
+
+  overlay.classList.add('active');
+  var remaining = 5;
+  if (countdownEl) countdownEl.textContent = remaining;
+
+  var timer = setInterval(function() {
+    remaining--;
+    if (countdownEl) countdownEl.textContent = remaining;
+    if (remaining <= 0) {
+      clearInterval(timer);
+      if (closeBtn) closeBtn.classList.add('visible');
+    }
+  }, 1000);
+
+  if (closeBtn) {
+    closeBtn.onclick = function() {
+      overlay.classList.remove('active');
+    };
+  }
+}
+window.showInterstitialAd = showInterstitialAd;

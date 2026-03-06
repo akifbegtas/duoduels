@@ -149,7 +149,7 @@ setInterval(() => {
 app.use(express.static(path.join(__dirname, "public")));
 
 // --- Input Validation Helpers ---
-const VALID_GAME_TYPES = ['telepati', 'isimSehir', 'pictionary', 'tabu', 'sayiTahmin', 'imposter'];
+const VALID_GAME_TYPES = ['telepati', 'isimSehir', 'pictionary', 'tabu', 'sayiTahmin', 'imposter', 'bilBakalim'];
 const VALID_GENDERS = ['male', 'female'];
 const VALID_GAME_MODES = ['cift', 'duo', 'tek'];
 
@@ -157,6 +157,40 @@ const VALID_GAME_MODES = ['cift', 'duo', 'tek'];
 const BOT_NAMES_FEMALE = ['Zeynep', 'Ayşe', 'Selin', 'Elif', 'Merve'];
 const BOT_NAMES_MALE   = ['Mehmet', 'Emre', 'Burak', 'Can', 'Kaan'];
 const BOT_TELEPATI_WORDS = ['ELMA', 'EV', 'ARABA', 'GÜNEŞ', 'KÖPEK', 'SU', 'AŞK', 'BALIK', 'AĞAÇ', 'GÜL', 'KAT', 'YOL'];
+
+// --- BİL BAKALIM SORU BANKASI ---
+const BIL_BAKALIM_QUESTIONS = [
+  { q: "İnsan vücudunda kaç kemik bulunur?", a: 206, unit: "kemik" },
+  { q: "Dünya'da kaç ülke vardır?", a: 195, unit: "ülke" },
+  { q: "Fil bir günde ortalama kaç litre su içer?", a: 150, unit: "litre" },
+  { q: "Bir ahtapotun kaç kalbi vardır?", a: 3, unit: "kalp" },
+  { q: "Türkiye'nin kaç ili vardır?", a: 81, unit: "il" },
+  { q: "İnsan gözü kaç rengi ayırt edebilir?", a: 10000000, unit: "renk" },
+  { q: "Ortalama bir bulut kaç ton ağırlığındadır?", a: 500, unit: "ton" },
+  { q: "Bir salyangoz kaç yıl uyuyabilir?", a: 3, unit: "yıl" },
+  { q: "Güneş'ten Dünya'ya ışığın ulaşması kaç dakika sürer?", a: 8, unit: "dakika" },
+  { q: "İnsan beyni kaç milyar nöron içerir?", a: 86, unit: "milyar" },
+  { q: "Bir arının kanadı saniyede kaç kez çırpar?", a: 200, unit: "kez" },
+  { q: "DNA'nın bir insan hücresindeki uzunluğu kaç metredir?", a: 2, unit: "metre" },
+  { q: "Dünya'nın en derin noktası (Mariana Çukuru) kaç metre derinliktedir?", a: 11034, unit: "metre" },
+  { q: "Bir timsah kaç yıl yaşayabilir?", a: 70, unit: "yıl" },
+  { q: "Ortalama bir insan hayatında kaç kilometre yürür?", a: 160000, unit: "km" },
+  { q: "Türkiye'nin yüzölçümü kaç km²'dir?", a: 783562, unit: "km²" },
+  { q: "Bir zürafanın dili kaç santimetre uzunluğundadır?", a: 45, unit: "cm" },
+  { q: "Bütün dünyadaki karıncaların toplam ağırlığı kaç trilyon tondur?", a: 20, unit: "trilyon ton" },
+  { q: "Bir insanın tüm kan damarlarının toplam uzunluğu kaç km'dir?", a: 100000, unit: "km" },
+  { q: "Okyanusların ortalama derinliği kaç metredir?", a: 3688, unit: "metre" },
+  { q: "Bir koala günde kaç saat uyur?", a: 22, unit: "saat" },
+  { q: "İnsan vücudundaki bakteri sayısı, hücre sayısının kaç katıdır?", a: 1, unit: "kat" },
+  { q: "Bir muz yaklaşık kaç kalori içerir?", a: 89, unit: "kalori" },
+  { q: "Dünya'nın çevresinin uzunluğu kaç km'dir?", a: 40075, unit: "km" },
+  { q: "En hızlı hayvan olan şahin kaç km/saat hıza ulaşabilir?", a: 389, unit: "km/saat" },
+  { q: "Bir inek hayatı boyunca kaç litre süt verir?", a: 200000, unit: "litre" },
+  { q: "Türkiye'de kaç tür kuş yaşamaktadır?", a: 500, unit: "tür" },
+  { q: "Bir insanın tüm saçları yılda ortalama kaç cm uzar?", a: 15, unit: "cm" },
+  { q: "Bir karınca kendi ağırlığının kaç katını taşıyabilir?", a: 50, unit: "kat" },
+  { q: "Dünyanın en yüksek dağı Everest kaç metre yüksekliğindedir?", a: 8849, unit: "metre" },
+];
 
 function createBotPlayer(gender, selectedGames) {
   const names = gender === 'female' ? BOT_NAMES_FEMALE : BOT_NAMES_MALE;
@@ -328,7 +362,7 @@ function createMatchRoom(mode, players) {
   }
 
   const roomId = generateRoomId();
-  const defaultTimes = { telepati: 10, isimSehir: 20, pictionary: 45, tabu: 60, sayiTahmin: 60, imposter: 60 };
+  const defaultTimes = { telepati: 10, isimSehir: 20, pictionary: 45, tabu: 60, sayiTahmin: 60, imposter: 60, bilBakalim: 20 };
 
   let teams = [];
   let roomPlayers = [];
@@ -400,6 +434,13 @@ function createMatchRoom(mode, players) {
     sayiTahminDigitCount: 4,
     sayiTahminTimer: null,
     sayiTahminTieCount: 0,
+    // Bil Bakalım specific
+    bilBakalimScores: {},
+    bilBakalimAnswers: {},
+    bilBakalimCurrentQ: null,
+    bilBakalimUsedQIndices: [],
+    bilBakalimTimer: null,
+    bilBakalimTargetScore: 10,
     isMatchmaking: true
   };
 
@@ -434,7 +475,7 @@ function autoStartGame(roomId) {
 
   room.gameStatus = "playing";
 
-  if (room.gameType === 'telepati' || room.gameType === 'isimSehir' || room.gameType === 'sayiTahmin' || room.gameType === 'tabu') {
+  if (room.gameType === 'telepati' || room.gameType === 'isimSehir' || room.gameType === 'sayiTahmin' || room.gameType === 'tabu' || room.gameType === 'bilBakalim') {
     if (room.gameMode === 'tek') {
       // Tek mod — şimdilik sadece pictionary destekli, diğerleri duo/cift gibi çalışsın
     }
@@ -952,6 +993,13 @@ io.on("connection", (socket) => {
       sayiTahminDigitCount: Math.min(Math.max(parseInt(data.digitCount) || 4, 3), 6),
       sayiTahminTimer: null,
       sayiTahminTieCount: 0,
+      // Bil Bakalım specific
+      bilBakalimScores: {},
+      bilBakalimAnswers: {},
+      bilBakalimCurrentQ: null,
+      bilBakalimUsedQIndices: [],
+      bilBakalimTimer: null,
+      bilBakalimTargetScore: Math.min(Math.max(parseInt(data.targetScore) || 10, 5), 20),
     };
 
     // --- Pass & Play desteği ---
@@ -1205,6 +1253,25 @@ io.on("connection", (socket) => {
       setTimeout(() => {
         startSayiTahminSecretPhase(roomId);
       }, 1200);
+    } else if (room.gameType === "bilBakalim") {
+      // Bil Bakalım — sadece çift/duo mod (2 takım karşılaşır)
+      room.bilBakalimScores = {};
+      room.bilBakalimAnswers = {};
+      room.bilBakalimUsedQIndices = [];
+      validPairs.forEach(pair => { room.bilBakalimScores[pair.id] = 0; });
+
+      io.to(roomId).emit("bilBakalimStart", {
+        targetScore: room.bilBakalimTargetScore,
+        roundTime: room.roundTime,
+        pairs: validPairs.map(p => ({
+          id: p.id,
+          teamName: p.teamName,
+          p1: { id: p.p1.id, username: p.p1.username, gender: p.p1.gender },
+          p2: { id: p.p2.id, username: p.p2.username, gender: p.p2.gender },
+        })),
+      });
+
+      setTimeout(() => startBilBakalimQuestion(roomId), 2500);
     } else {
       // Telepati
       io.to(roomId).emit("gameInit", {
@@ -1928,6 +1995,30 @@ io.on("connection", (socket) => {
     emitLobbyUpdate(roomId);
   });
 
+  // --- BİL BAKALIM: CEVAP ---
+  socket.on("bilBakalimAnswer", ({ roomId, answer }) => {
+    const room = getValidRoom(roomId);
+    if (!room || room.gameStatus !== 'playing' || room.gameType !== 'bilBakalim') return;
+    const pid = socket.userId;
+    const parsed = parseFloat(answer);
+    if (isNaN(parsed)) return;
+    // Sadece bir kez cevap verilebilir
+    if (room.bilBakalimAnswers[pid] !== undefined) return;
+    room.bilBakalimAnswers[pid] = parsed;
+    room.lastActivity = Date.now();
+
+    // Kaç oyuncu cevap verdi bildir
+    io.to(roomId).emit("bilBakalimAnswerReceived", { playerId: pid });
+
+    // Tüm oyuncular cevap verdiyse bitir
+    const allPlayerIds = room.pairs.flatMap(p => [p.p1.id, p.p2.id]);
+    const answeredCount = allPlayerIds.filter(id => room.bilBakalimAnswers[id] !== undefined).length;
+    if (answeredCount >= allPlayerIds.length) {
+      if (room.bilBakalimTimer) { clearTimeout(room.bilBakalimTimer); room.bilBakalimTimer = null; }
+      endBilBakalimQuestion(roomId);
+    }
+  });
+
   // --- DISCONNECT ---
   socket.on("disconnect", () => {
     const pid = socket.userId;
@@ -1977,6 +2068,135 @@ function clearAllRoomTimers(room) {
   if (room.isimSehirTimer) { clearTimeout(room.isimSehirTimer); room.isimSehirTimer = null; }
   if (room.sayiTahminTimer) { clearTimeout(room.sayiTahminTimer); room.sayiTahminTimer = null; }
   if (room.telepatiTimer) { clearTimeout(room.telepatiTimer); room.telepatiTimer = null; }
+  if (room.bilBakalimTimer) { clearTimeout(room.bilBakalimTimer); room.bilBakalimTimer = null; }
+}
+
+// ============ BİL BAKALIM HELPER'LARI ============
+
+function startBilBakalimQuestion(roomId) {
+  const room = rooms[roomId];
+  if (!room || room.gameStatus !== 'playing') return;
+
+  // Kullanılmamış soru seç
+  const available = BIL_BAKALIM_QUESTIONS.map((_, i) => i)
+    .filter(i => !room.bilBakalimUsedQIndices.includes(i));
+
+  if (available.length === 0) {
+    // Tüm sorular bitti, game over
+    endBilBakalimGame(roomId, 'questions_exhausted');
+    return;
+  }
+
+  const qIndex = available[Math.floor(Math.random() * available.length)];
+  room.bilBakalimUsedQIndices.push(qIndex);
+  room.bilBakalimCurrentQ = { ...BIL_BAKALIM_QUESTIONS[qIndex], index: qIndex };
+  room.bilBakalimAnswers = {};
+
+  const roundTime = room.roundTime || 20;
+
+  io.to(roomId).emit("bilBakalimQuestion", {
+    question: room.bilBakalimCurrentQ.q,
+    unit: room.bilBakalimCurrentQ.unit,
+    roundTime: roundTime,
+    questionNo: room.bilBakalimUsedQIndices.length,
+    scores: room.bilBakalimScores,
+  });
+
+  // Süre dolunca bitir
+  room.bilBakalimTimer = setTimeout(() => endBilBakalimQuestion(roomId), roundTime * 1000);
+}
+
+function endBilBakalimQuestion(roomId) {
+  const room = rooms[roomId];
+  if (!room || !room.bilBakalimCurrentQ) return;
+  if (room.bilBakalimTimer) { clearTimeout(room.bilBakalimTimer); room.bilBakalimTimer = null; }
+
+  const correctAnswer = room.bilBakalimCurrentQ.a;
+  const answers = room.bilBakalimAnswers;
+  const pairs = room.pairs;
+
+  // Her cinsiyet için kazananı bul
+  const roundWinners = {}; // pairId → points earned this round
+  pairs.forEach(p => { roundWinners[p.id] = 0; });
+
+  const genders = ['male', 'female'];
+  const genderResults = {};
+
+  genders.forEach(gender => {
+    // Her pair'den bu cinsiyetteki oyuncuyu bul
+    const contestants = pairs.map(pair => {
+      const player = pair.p1.gender === gender ? pair.p1 : (pair.p2.gender === gender ? pair.p2 : null);
+      if (!player) return null;
+      const ans = answers[player.id];
+      return {
+        pairId: pair.id,
+        playerId: player.id,
+        username: player.username,
+        answer: ans !== undefined ? ans : null,
+        diff: ans !== undefined ? Math.abs(ans - correctAnswer) : Infinity,
+      };
+    }).filter(Boolean);
+
+    if (contestants.length < 2) return; // tek çift varsa yarışma yok, puan yok
+
+    // En yakın farkı bul
+    const minDiff = Math.min(...contestants.map(c => c.diff));
+
+    if (minDiff === Infinity) {
+      // Kimse cevap vermedi
+      genderResults[gender] = { contestants, winners: [], tied: false };
+      return;
+    }
+
+    const winners = contestants.filter(c => c.diff === minDiff);
+    winners.forEach(w => { roundWinners[w.pairId] = (roundWinners[w.pairId] || 0) + 1; });
+    genderResults[gender] = { contestants, winners: winners.map(w => w.pairId), tied: winners.length > 1 };
+  });
+
+  // Puanları güncelle
+  pairs.forEach(p => {
+    room.bilBakalimScores[p.id] = (room.bilBakalimScores[p.id] || 0) + (roundWinners[p.id] || 0);
+  });
+
+  // Sonucu gönder
+  io.to(roomId).emit("bilBakalimResult", {
+    correctAnswer: correctAnswer,
+    unit: room.bilBakalimCurrentQ.unit,
+    answers: answers,
+    genderResults: genderResults,
+    roundWinners: roundWinners,
+    scores: room.bilBakalimScores,
+    targetScore: room.bilBakalimTargetScore,
+  });
+
+  // Hedef puana ulaşıldı mı?
+  const targetReached = pairs.some(p => (room.bilBakalimScores[p.id] || 0) >= room.bilBakalimTargetScore);
+  if (targetReached) {
+    setTimeout(() => endBilBakalimGame(roomId, 'target_reached'), 4000);
+  } else {
+    setTimeout(() => startBilBakalimQuestion(roomId), 5000);
+  }
+}
+
+function endBilBakalimGame(roomId, reason) {
+  const room = rooms[roomId];
+  if (!room) return;
+  room.gameStatus = 'waiting';
+
+  const sorted = [...room.pairs].sort((a, b) =>
+    (room.bilBakalimScores[b.id] || 0) - (room.bilBakalimScores[a.id] || 0)
+  );
+
+  io.to(roomId).emit("bilBakalimEnd", {
+    reason: reason,
+    scores: room.bilBakalimScores,
+    winner: sorted[0] ? sorted[0].id : null,
+    ranking: sorted.map(p => ({
+      pairId: p.id,
+      teamName: p.teamName,
+      score: room.bilBakalimScores[p.id] || 0,
+    })),
+  });
 }
 
 function isRoomEmpty(room) {

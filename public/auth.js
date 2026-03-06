@@ -123,20 +123,23 @@ async function signInAsGuest() {
     return;
   }
 
+  // Hemen loading göster — kullanıcı bekletilmesin
+  const guestBtn = document.querySelector('.auth-skip-btn');
+  const navPlayBtn = document.getElementById('nav-play-btn');
+  if (guestBtn) { guestBtn.disabled = true; guestBtn.style.opacity = '0.6'; }
+  if (navPlayBtn) { navPlayBtn.disabled = true; navPlayBtn.style.opacity = '0.6'; }
+
   try {
     await auth.signInAnonymously();
   } catch (err) {
     console.error("Guest sign-in error:", err);
-    // Firebase Anonymous auth açık değilse local bypass'a düş
-    if (_isLocalDev) {
-      _devSignIn();
-    } else {
-      Swal.fire({
-        title: t('auth_error'),
-        text: t('auth_guest_failed'),
-        icon: "error"
-      });
-    }
+    if (guestBtn) { guestBtn.disabled = false; guestBtn.style.opacity = ''; }
+    if (navPlayBtn) { navPlayBtn.disabled = false; navPlayBtn.style.opacity = ''; }
+    Swal.fire({
+      title: t('auth_error'),
+      text: t('auth_guest_failed'),
+      icon: "error"
+    });
   }
 }
 
@@ -201,7 +204,23 @@ auth && auth.onAuthStateChanged && auth.onAuthStateChanged(async (user) => {
 
   if (user) {
     currentUser = user;
-    // Token al
+
+    // Anonymous (misafir) kullanıcılar için hızlı yol:
+    // Token ve Firestore sorgusunu paralel yap, profil yoksa direkt setup'a geç
+    if (user.isAnonymous) {
+      // Token'ı arka planda al, ekranı bekletme
+      user.getIdToken().then(token => {
+        authIdToken = token;
+        startTokenRefresh();
+      }).catch(err => console.error("Token hatası:", err));
+
+      // Anonim kullanıcının profili olmayacak, direkt profil setup'a geç
+      dismissSplash(splash);
+      showScreen('profileSetup');
+      return;
+    }
+
+    // Normal kullanıcılar (Google/Facebook/Apple)
     authIdToken = await user.getIdToken();
     startTokenRefresh();
 

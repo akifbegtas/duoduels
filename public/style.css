@@ -5,7 +5,7 @@
   --accent-green: #5CB88A;
   --accent-turquoise: #3ABFBF;
   --accent-teal: #2D8F8F;
-  --card-dark: rgba(15, 15, 25, 0.7);
+  --card-dark: rgba(10, 12, 25, 0.55);
   /* Tema renkleri (varsayılan: nötr gri) */
   --theme-primary: #a8a8a8;
   --theme-secondary: #c0c0c0;
@@ -62,6 +62,18 @@ body.theme-female {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+}
+
+/* SVG intrinsic size fix — display:block can strip width */
+svg[width][height] {
+  min-width: var(--svg-w);
+  min-height: var(--svg-h);
+  flex-shrink: 0;
+}
+button svg, a svg, span svg {
+  width: auto !important;
+  min-width: 1em;
+  flex-shrink: 0;
 }
 
 /* ======= PREMIUM SWAL POPUP ======= */
@@ -168,11 +180,22 @@ body.theme-female {
 
 body {
   font-family: "Poppins", sans-serif;
-  background: var(--bg-cream);
+  background: #080b12;
   min-height: 100vh;
   min-height: 100dvh;
   overflow: hidden;
   overscroll-behavior: none;
+}
+
+/* ======= DUEL BACKGROUND CANVAS ======= */
+#duel-bg-canvas {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 0;
+  pointer-events: none;
+  display: block;
 }
 
 body.keyboard-open {
@@ -1017,6 +1040,102 @@ body.keyboard-open #lobby-screen.active {
 .ad-sidebar-right { right: 0; }
 @media (min-width: 1200px) {
   .ad-sidebar { display: block; }
+  body.game-active .ad-sidebar { display: none; }
+}
+
+/* --- BOTTOM BAR AD (collapsible) --- */
+.ad-bottombar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 900;
+  background: #111;
+  text-align: center;
+  padding: 4px 0;
+  transition: transform 0.3s ease;
+}
+.ad-bottombar.collapsed {
+  transform: translateY(100%);
+}
+.ad-bottombar-toggle {
+  position: absolute;
+  top: -28px;
+  right: 12px;
+  background: rgba(0,0,0,0.7);
+  color: #aaa;
+  border: 1px solid #333;
+  border-radius: 6px 6px 0 0;
+  font-size: 11px;
+  padding: 3px 10px;
+  cursor: pointer;
+  z-index: 901;
+}
+.ad-bottombar-toggle:hover { color: #fff; }
+body.game-active .ad-bottombar { display: none; }
+
+/* --- INTERSTITIAL AD OVERLAY --- */
+.ad-interstitial-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.85);
+  justify-content: center;
+  align-items: center;
+  flex-direction: column;
+}
+.ad-interstitial-overlay.active {
+  display: flex;
+}
+.ad-interstitial-box {
+  background: #1a1d24;
+  border-radius: 16px;
+  padding: 24px;
+  text-align: center;
+  max-width: 400px;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+}
+.ad-interstitial-box .ad-label {
+  color: #666;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 12px;
+}
+.ad-interstitial-box .ad-content {
+  min-height: 250px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ad-interstitial-timer {
+  margin-top: 16px;
+  color: #888;
+  font-size: 13px;
+}
+.ad-interstitial-timer span {
+  color: #fff;
+  font-weight: bold;
+}
+.ad-interstitial-close {
+  margin-top: 12px;
+  background: none;
+  border: 1px solid #444;
+  color: #aaa;
+  padding: 8px 24px;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 13px;
+  display: none;
+}
+.ad-interstitial-close.visible {
+  display: inline-block;
+}
+.ad-interstitial-close:hover {
+  border-color: #888;
+  color: #fff;
 }
 
 /* --- PROFILE SETUP SCREEN --- */
@@ -3704,6 +3823,7 @@ body.keyboard-open textarea:focus {
 }
 
 /* ======= YENİ PREMIUM DİNAMİK ARKA PLAN ======= */
+/* Premium BG hidden when duel canvas is active */
 .premium-bg {
   position: fixed;
   top: 0;
@@ -3713,8 +3833,9 @@ body.keyboard-open textarea:focus {
   height: 100lvh;
   z-index: 0;
   pointer-events: none;
-  background-color: var(--bg-cream);
+  background-color: transparent;
   overflow: hidden;
+  display: none;
 }
 
 .mesh-gradient {
@@ -4412,10 +4533,349 @@ body.keyboard-open textarea:focus {
   flex-shrink: 0;
 }
 .btn-icon-header:hover { background: rgba(255,255,255,0.2); color: #fff; }
-.btn-icon-header svg { display: block; }
+.btn-icon-header svg { display: block; width: 18px; height: 18px; flex-shrink: 0; }
 
 /* RTL support */
 [dir="rtl"] .lobby-header { flex-direction: row-reverse; }
 [dir="rtl"] .settings-header { flex-direction: row-reverse; }
 [dir="rtl"] .settings-avatar-row { flex-direction: row-reverse; }
 [dir="rtl"] .lobby-join-row { flex-direction: row-reverse; }
+
+/* ============================================================
+   BİL BAKALIM SCREEN
+   ============================================================ */
+
+#bilBakalim-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* --- Header: score chips + target label --- */
+.bb-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px 8px;
+  background: rgba(0,0,0,0.25);
+  border-bottom: 1px solid rgba(255,255,255,0.08);
+  flex-shrink: 0;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bb-scores {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex: 1;
+}
+
+.bb-score-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(255,255,255,0.1);
+  border: 1.5px solid rgba(255,255,255,0.15);
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 0.82rem;
+  transition: border-color 0.3s, background 0.3s;
+}
+
+.bb-score-chip.bb-score-me {
+  border-color: var(--theme-primary, #00bcd4);
+  background: rgba(0,188,212,0.12);
+}
+
+.bb-score-name {
+  color: rgba(255,255,255,0.85);
+  font-weight: 600;
+  max-width: 80px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bb-score-val {
+  color: #fff;
+  font-weight: 800;
+  font-size: 1rem;
+  min-width: 18px;
+  text-align: right;
+}
+
+.bb-target {
+  font-size: 0.78rem;
+  color: rgba(255,255,255,0.55);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* --- Question area --- */
+.bb-question-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 20px 12px;
+  text-align: center;
+  gap: 14px;
+}
+
+.bb-question-no {
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--theme-primary, #00bcd4);
+  text-transform: uppercase;
+  opacity: 0.8;
+}
+
+.bb-question-text {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1.5;
+  max-width: 480px;
+}
+
+/* Timer bar */
+.bb-timer-bar-wrap {
+  width: 100%;
+  max-width: 400px;
+  height: 6px;
+  background: rgba(255,255,255,0.12);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bb-timer-bar {
+  height: 100%;
+  width: 100%;
+  background: var(--theme-primary, #00bcd4);
+  border-radius: 4px;
+  transform-origin: left;
+  transition: background 0.5s;
+}
+
+.bb-timer-bar.danger {
+  background: #e74c3c;
+}
+
+.bb-timer-label {
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: rgba(255,255,255,0.7);
+  min-width: 28px;
+  text-align: center;
+}
+
+/* --- Answer area --- */
+.bb-answer-area {
+  padding: 12px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  flex-shrink: 0;
+  background: rgba(0,0,0,0.15);
+  border-top: 1px solid rgba(255,255,255,0.07);
+}
+
+.bb-gender-label {
+  font-size: 0.82rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.65);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.bb-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  max-width: 360px;
+}
+
+.bb-input {
+  flex: 1;
+  background: rgba(255,255,255,0.1);
+  border: 1.5px solid rgba(255,255,255,0.2);
+  border-radius: 14px;
+  color: #fff;
+  font-size: 1.3rem;
+  font-weight: 700;
+  padding: 10px 16px;
+  text-align: center;
+  outline: none;
+  transition: border-color 0.2s;
+  -moz-appearance: textfield;
+}
+
+.bb-input::-webkit-outer-spin-button,
+.bb-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.bb-input:focus {
+  border-color: var(--theme-primary, #00bcd4);
+}
+
+.bb-input:disabled {
+  opacity: 0.5;
+}
+
+.bb-unit {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.55);
+  white-space: nowrap;
+  flex-shrink: 0;
+  min-width: 32px;
+}
+
+.bb-send-btn {
+  width: 100%;
+  max-width: 360px;
+  padding: 12px;
+  background: var(--theme-primary, #00bcd4);
+  border: none;
+  border-radius: 14px;
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 800;
+  cursor: pointer;
+  letter-spacing: 0.03em;
+  transition: opacity 0.2s, transform 0.15s;
+}
+
+.bb-send-btn:active {
+  transform: scale(0.97);
+}
+
+.bb-send-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.bb-answered-status {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #2ecc71;
+  min-height: 20px;
+  text-align: center;
+}
+
+/* --- Result area --- */
+.bb-result-area {
+  padding: 16px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.bb-result-area.hidden {
+  display: none;
+}
+
+.bb-correct-answer {
+  text-align: center;
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.7);
+  background: rgba(255,255,255,0.07);
+  border-radius: 12px;
+  padding: 10px 16px;
+  font-weight: 600;
+}
+
+.bb-correct-answer strong {
+  color: #f1c40f;
+  font-size: 1.05rem;
+}
+
+.bb-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bb-gender-result {
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.bb-gender-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 7px 14px;
+  background: rgba(0,0,0,0.2);
+  color: rgba(255,255,255,0.6);
+}
+
+.bb-result-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  transition: background 0.2s;
+}
+
+.bb-result-row.bb-winner {
+  background: rgba(46,204,113,0.12);
+  border-top-color: rgba(46,204,113,0.15);
+}
+
+.bb-result-name {
+  flex: 1;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: rgba(255,255,255,0.9);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bb-winner .bb-result-name::before {
+  content: '🏆 ';
+}
+
+.bb-result-val {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: rgba(255,255,255,0.65);
+  white-space: nowrap;
+}
+
+.bb-winner .bb-result-val {
+  color: #2ecc71;
+}
+
+/* Hide answer area when result is showing, show result area */
+.bb-answer-area.hidden {
+  display: none;
+}
+
+/* Spectator: hide input, show watching message */
+.bb-watching-msg {
+  font-size: 0.9rem;
+  color: rgba(255,255,255,0.5);
+  text-align: center;
+  padding: 12px;
+  font-style: italic;
+}
+
+/* body.game-active hides ads — already handled in ad section */

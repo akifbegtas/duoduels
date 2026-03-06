@@ -196,7 +196,27 @@ const TRANSLATIONS = {
     game_tabu:           "Tabu",
     game_imposter:       "Imposter",
     game_sayi_tahmin:    "Sayı Tahmin",
+    game_bil_bakalim:    "Bil Bakalım",
     game_settings:       " - Ayarlar",
+
+    // Bil Bakalım
+    bb_question_no:      "Soru",
+    bb_target_score:     "Hedef:",
+    bb_your_turn:        "Sıra sende — tahmini yaz!",
+    bb_watching:         "İzliyorsunuz...",
+    bb_ph_answer:        "Tahminin...",
+    bb_send:             "Gönder 🎯",
+    bb_answered:         "Cevabın alındı ✓",
+    bb_opponent_answered:"Rakip cevapladı ✓",
+    bb_correct_answer:   "Doğru Cevap:",
+    bb_men_group:        "💙 Erkekler",
+    bb_women_group:      "🩷 Kadınlar",
+    bb_point_earned:     "Bu çift +1 puan kazandı!",
+    bb_tie:              "Beraberlik — puan verilmedi",
+    bb_wins:             "kazandı!",
+    bb_final_rankings:   "Final Sonuçları 🏆",
+    bb_champion:         "Şampiyon Çift",
+    bb_back_lobby:       "Lobiye Dön",
 
     // Room / Lobby
     host_label:          "KURUCU",
@@ -479,7 +499,27 @@ const TRANSLATIONS = {
     game_tabu:           "Taboo",
     game_imposter:       "Imposter",
     game_sayi_tahmin:    "Number Guess",
+    game_bil_bakalim:    "Bil Bakalım",
     game_settings:       " - Settings",
+
+    // Bil Bakalım
+    bb_question_no:      "Question",
+    bb_target_score:     "Target:",
+    bb_your_turn:        "Your turn — enter your guess!",
+    bb_watching:         "Watching...",
+    bb_ph_answer:        "Your guess...",
+    bb_send:             "Send 🎯",
+    bb_answered:         "Answer received ✓",
+    bb_opponent_answered:"Opponent answered ✓",
+    bb_correct_answer:   "Correct Answer:",
+    bb_men_group:        "💙 Men",
+    bb_women_group:      "🩷 Women",
+    bb_point_earned:     "This couple earned +1 point!",
+    bb_tie:              "Tie — no point awarded",
+    bb_wins:             "wins!",
+    bb_final_rankings:   "Final Results 🏆",
+    bb_champion:         "Champion Couple",
+    bb_back_lobby:       "Back to Lobby",
 
     // Room / Lobby
     host_label:          "HOST",
@@ -762,7 +802,27 @@ const TRANSLATIONS = {
     game_tabu:           "تابو",
     game_imposter:       "المحتال",
     game_sayi_tahmin:    "تخمين الرقم",
+    game_bil_bakalim:    "بيل بَكَلِم",
     game_settings:       " - إعدادات",
+
+    // Bil Bakalım
+    bb_question_no:      "سؤال",
+    bb_target_score:     "الهدف:",
+    bb_your_turn:        "دورك — أدخل تخمينك!",
+    bb_watching:         "يشاهد...",
+    bb_ph_answer:        "تخمينك...",
+    bb_send:             "إرسال 🎯",
+    bb_answered:         "تم استلام الإجابة ✓",
+    bb_opponent_answered:"أجاب الخصم ✓",
+    bb_correct_answer:   "الإجابة الصحيحة:",
+    bb_men_group:        "💙 الرجال",
+    bb_women_group:      "🩷 النساء",
+    bb_point_earned:     "هذا الزوج ربح نقطة!",
+    bb_tie:              "تعادل — لا نقاط",
+    bb_wins:             "فاز!",
+    bb_final_rankings:   "النتائج النهائية 🏆",
+    bb_champion:         "الزوج البطل",
+    bb_back_lobby:       "العودة إلى اللوبي",
 
     // Room / Lobby
     host_label:          "المضيف",
@@ -911,6 +971,10 @@ function applyTranslations() {
   _setText('settings-photo-sec',  t('settings_photo_sec'));
   _setText('settings-photo-btn',  t('settings_photo_btn'));
   _setText('settings-lang-sec',   t('settings_lang_sec'));
+
+  // Bil Bakalım screen (static elements)
+  _setAttr('bb-answer-input', 'placeholder', t('bb_ph_answer'));
+  _setText('bb-send-btn', t('bb_send'));
 
   // Active language highlight
   ['tr','en','ar'].forEach(l => {

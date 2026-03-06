@@ -34,14 +34,36 @@
 </head>
 
 <body>
+  <!-- Futuristic Background Canvas -->
+  <canvas id="duel-bg-canvas"></canvas>
+
   <!-- Desktop Sidebar Ads -->
   <div class="ad-sidebar ad-sidebar-left">
-    <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-6538380227236833" data-ad-slot="auto" data-ad-format="vertical" data-full-width-responsive="false"></ins>
+    <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-6538380227236833" data-ad-slot="9155874948" data-ad-format="vertical" data-full-width-responsive="false"></ins>
     <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
   </div>
   <div class="ad-sidebar ad-sidebar-right">
-    <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-6538380227236833" data-ad-slot="auto" data-ad-format="vertical" data-full-width-responsive="false"></ins>
+    <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-6538380227236833" data-ad-slot="9155874948" data-ad-format="vertical" data-full-width-responsive="false"></ins>
     <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+  </div>
+
+  <!-- Bottom Bar Ad (collapsible) -->
+  <div class="ad-bottombar" id="ad-bottombar">
+    <button class="ad-bottombar-toggle" id="ad-bottombar-toggle">▼ Gizle</button>
+    <ins class="adsbygoogle" style="display:inline-block;width:728px;max-width:100%;height:90px" data-ad-client="ca-pub-6538380227236833" data-ad-slot="8313566562"></ins>
+    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+  </div>
+
+  <!-- Interstitial Ad Overlay (oda kurulunca 5 sn gösterilir) -->
+  <div class="ad-interstitial-overlay" id="ad-interstitial">
+    <div class="ad-interstitial-box">
+      <div class="ad-label">Reklam</div>
+      <div class="ad-content">
+        <ins class="adsbygoogle" id="ad-interstitial-ins" style="display:inline-block;width:336px;height:280px" data-ad-client="ca-pub-6538380227236833" data-ad-slot="8743501898"></ins>
+      </div>
+      <div class="ad-interstitial-timer">Kapat: <span id="ad-interstitial-countdown">5</span>s</div>
+      <button class="ad-interstitial-close" id="ad-interstitial-close">Kapat ✕</button>
+    </div>
   </div>
 
   <!-- Dinamik Premium Arkaplan -->
@@ -256,11 +278,6 @@
         </div>
 
         <div class="lobby-modes">
-          <button class="lobby-mode-card" onclick="goToPassPlay()">
-            <div class="lmc-icon">🎮</div>
-            <div id="lmc-title-passplay" class="lmc-title">Tek Cihazda Oyna</div>
-            <div id="lmc-sub-passplay" class="lmc-sub">Arkadaşınla aynı telefondan</div>
-          </button>
           <button class="lobby-mode-card" onclick="goToPrivateRoom()">
             <div class="lmc-icon">👫</div>
             <div id="lmc-title-private" class="lmc-title">Özel Oda</div>
@@ -461,6 +478,11 @@
                   <h3>Sayı Tahmin</h3>
                   <p>4 haneli sayıyı tahmin et!</p>
                 </div>
+                <div class="game-card" id="card-bilBakalim-cift" onclick="selectGame('bilBakalim')">
+                  <div class="game-card-icon">🎯</div>
+                  <h3>Bil Bakalım</h3>
+                  <p>En yakın tahmini yapan çift kazanır!</p>
+                </div>
               </div>
             </div>
             <!-- Panel 1: Başbaşa -->
@@ -491,6 +513,11 @@
                   <div class="game-card-icon">🔢</div>
                   <h3>Sayı Tahmin</h3>
                   <p>4 haneli sayıyı tahmin et!</p>
+                </div>
+                <div class="game-card" id="card-bilBakalim-duo" onclick="selectGame('bilBakalim')">
+                  <div class="game-card-icon">🎯</div>
+                  <h3>Bil Bakalım</h3>
+                  <p>En yakın tahmini yapan çift kazanır!</p>
                 </div>
               </div>
             </div>
@@ -579,6 +606,24 @@
               <option value="50">50</option>
               <option value="55">55</option>
               <option value="60">60</option>
+            </select>
+          </div>
+        </div>
+        <div id="targetScoreRow" class="row-inputs" style="max-width: 300px; margin: 10px auto; display:none">
+          <div class="half-input" style="flex:1">
+            <label style="color: #fff">Hedef Puan</label>
+            <select id="targetScoreInput" style="
+                  padding: 10px;
+                  border-radius: 8px;
+                  border: none;
+                  font-size: 1rem;
+                  width: 100%;
+                  text-align: center;
+                ">
+              <option value="5">5 Puan</option>
+              <option value="10" selected>10 Puan</option>
+              <option value="15">15 Puan</option>
+              <option value="20">20 Puan</option>
             </select>
           </div>
         </div>
@@ -932,6 +977,37 @@
         <div id="imposter-game-log" class="log-container"></div>
       </div>
     </div>
+    <!-- BİL BAKALIM EKRANI -->
+    <div id="bilBakalim-screen" class="screen">
+      <div class="bb-header">
+        <div class="bb-scores" id="bb-scores"></div>
+        <div class="bb-target" id="bb-target-label"></div>
+      </div>
+
+      <div class="bb-question-area" id="bb-question-area">
+        <div class="bb-question-no" id="bb-question-no">Soru 1</div>
+        <div class="bb-question-text" id="bb-question-text">Soru yükleniyor...</div>
+        <div class="bb-timer-bar-wrap">
+          <div class="bb-timer-bar" id="bb-timer-bar"></div>
+        </div>
+        <div class="bb-timer-label" id="bb-timer-label">20</div>
+      </div>
+
+      <div class="bb-answer-area" id="bb-answer-area">
+        <div class="bb-gender-label" id="bb-gender-label"></div>
+        <div class="bb-input-row">
+          <input type="number" id="bb-answer-input" class="bb-input" placeholder="Tahminin..." autocomplete="off" />
+          <span class="bb-unit" id="bb-unit"></span>
+        </div>
+        <button class="bb-send-btn" id="bb-send-btn" onclick="sendBilBakalimAnswer()">Gönder 🎯</button>
+        <div class="bb-answered-status" id="bb-answered-status"></div>
+      </div>
+
+      <div class="bb-result-area hidden" id="bb-result-area">
+        <div class="bb-correct-answer" id="bb-correct-answer"></div>
+        <div class="bb-results-list" id="bb-results-list"></div>
+      </div>
+    </div>
   </div>
 
   <!-- PASS & PLAY SETUP EKRANI -->
@@ -1130,6 +1206,333 @@
         closeLangDropdown();
       }
     });
+  </script>
+
+  <!-- ======= DUEL BACKGROUND ANIMATION ======= -->
+  <script>
+  (function() {
+    var c = document.getElementById('duel-bg-canvas');
+    if (!c) return;
+    var ctx = c.getContext('2d');
+    var W, H, cx, cy;
+    var dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    function resize() {
+      W = window.innerWidth;
+      H = window.innerHeight;
+      cx = W / 2;
+      cy = H / 2;
+      c.width = W * dpr;
+      c.height = H * dpr;
+      c.style.width = W + 'px';
+      c.style.height = H + 'px';
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    // ---- HEXAGON GRID (static, drawn once per resize) ----
+    var hexCanvas = document.createElement('canvas');
+    var hexCtx = hexCanvas.getContext('2d');
+
+    function drawHexGrid() {
+      hexCanvas.width = c.width;
+      hexCanvas.height = c.height;
+      hexCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      hexCtx.clearRect(0, 0, W, H);
+
+      var size = 35;
+      var w = size * 2;
+      var h = Math.sqrt(3) * size;
+      hexCtx.strokeStyle = 'rgba(100, 180, 255, 0.04)';
+      hexCtx.lineWidth = 0.7;
+
+      for (var row = -1; row < H / h + 1; row++) {
+        for (var col = -1; col < W / w + 1; col++) {
+          var xOff = (row % 2) * (w * 0.75);
+          var px = col * w * 1.5 + xOff;
+          var py = row * h;
+          hexCtx.beginPath();
+          for (var i = 0; i < 6; i++) {
+            var angle = Math.PI / 180 * (60 * i - 30);
+            var hx = px + size * Math.cos(angle);
+            var hy = py + size * Math.sin(angle);
+            if (i === 0) hexCtx.moveTo(hx, hy);
+            else hexCtx.lineTo(hx, hy);
+          }
+          hexCtx.closePath();
+          hexCtx.stroke();
+        }
+      }
+    }
+    drawHexGrid();
+    window.addEventListener('resize', drawHexGrid);
+
+    // ---- ENERGY PARTICLES ----
+    var particles = [];
+    var PARTICLE_COUNT = 80;
+
+    function createParticle(side) {
+      var fromLeft = side === 'left';
+      var spread = H * 0.6;
+      var yBase = cy + (Math.random() - 0.5) * spread;
+      return {
+        x: fromLeft ? -20 : W + 20,
+        y: yBase,
+        vx: fromLeft ? (1.2 + Math.random() * 2.5) : -(1.2 + Math.random() * 2.5),
+        vy: (Math.random() - 0.5) * 1.2,
+        r: 1.2 + Math.random() * 2.5,
+        life: 0,
+        maxLife: 120 + Math.random() * 180,
+        side: side,
+        wave: Math.random() * Math.PI * 2,
+        waveAmp: 0.3 + Math.random() * 0.8,
+        waveSpeed: 0.02 + Math.random() * 0.03
+      };
+    }
+
+    for (var i = 0; i < PARTICLE_COUNT; i++) {
+      var p = createParticle(i < PARTICLE_COUNT / 2 ? 'left' : 'right');
+      p.life = Math.random() * p.maxLife;
+      p.x = p.side === 'left' ? Math.random() * W * 0.6 : W - Math.random() * W * 0.6;
+      particles.push(p);
+    }
+
+    // ---- ENERGY STREAMS (flowing curves) ----
+    var streams = [];
+    var STREAM_COUNT = 12;
+
+    function createStream(side) {
+      var fromLeft = side === 'left';
+      var yStart = cy + (Math.random() - 0.5) * H * 0.7;
+      return {
+        side: side,
+        yStart: yStart,
+        phase: Math.random() * Math.PI * 2,
+        speed: 0.008 + Math.random() * 0.015,
+        amplitude: 30 + Math.random() * 80,
+        thickness: 0.8 + Math.random() * 1.5,
+        opacity: 0.08 + Math.random() * 0.18,
+        length: 0.3 + Math.random() * 0.35
+      };
+    }
+
+    for (var i = 0; i < STREAM_COUNT; i++) {
+      streams.push(createStream(i < STREAM_COUNT / 2 ? 'left' : 'right'));
+    }
+
+    // ---- COLLISION SPARKS ----
+    var sparks = [];
+    var sparkTimer = 0;
+
+    function emitSparks() {
+      var count = 3 + Math.floor(Math.random() * 5);
+      for (var i = 0; i < count; i++) {
+        var angle = Math.random() * Math.PI * 2;
+        var speed = 1 + Math.random() * 3;
+        sparks.push({
+          x: cx + (Math.random() - 0.5) * 60,
+          y: cy + (Math.random() - 0.5) * 60,
+          vx: Math.cos(angle) * speed,
+          vy: Math.sin(angle) * speed,
+          life: 0,
+          maxLife: 30 + Math.random() * 40,
+          r: 0.8 + Math.random() * 1.5,
+          hue: Math.random() > 0.5 ? 190 : 15
+        });
+      }
+    }
+
+    // ---- MAIN LOOP ----
+    var t = 0;
+    var lastTime = 0;
+    var running = true;
+
+    function frame(now) {
+      if (!running) return;
+      requestAnimationFrame(frame);
+
+      // Throttle to ~30fps for performance
+      if (now - lastTime < 30) return;
+      lastTime = now;
+
+      t++;
+      ctx.clearRect(0, 0, W, H);
+
+      // 1) Deep background gradient
+      var bg = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(W, H) * 0.75);
+      bg.addColorStop(0, '#0c1028');
+      bg.addColorStop(0.5, '#080e1e');
+      bg.addColorStop(1, '#040610');
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, W, H);
+
+      // 2) Hexagonal grid layer
+      ctx.globalAlpha = 1;
+      ctx.drawImage(hexCanvas, 0, 0, W, H);
+
+      // 3) Large ambient glow — LEFT (cyan)
+      ctx.globalAlpha = 0.12 + Math.sin(t * 0.015) * 0.03;
+      var glowL = ctx.createRadialGradient(0, cy, 0, 0, cy, W * 0.55);
+      glowL.addColorStop(0, 'rgba(0, 230, 255, 0.3)');
+      glowL.addColorStop(0.4, 'rgba(0, 150, 255, 0.08)');
+      glowL.addColorStop(1, 'transparent');
+      ctx.fillStyle = glowL;
+      ctx.fillRect(0, 0, W, H);
+
+      // 4) Large ambient glow — RIGHT (orange/red)
+      ctx.globalAlpha = 0.12 + Math.cos(t * 0.018) * 0.03;
+      var glowR = ctx.createRadialGradient(W, cy, 0, W, cy, W * 0.55);
+      glowR.addColorStop(0, 'rgba(255, 80, 20, 0.3)');
+      glowR.addColorStop(0.4, 'rgba(255, 40, 0, 0.08)');
+      glowR.addColorStop(1, 'transparent');
+      ctx.fillStyle = glowR;
+      ctx.fillRect(0, 0, W, H);
+      ctx.globalAlpha = 1;
+
+      // 5) Energy streams
+      ctx.lineCap = 'round';
+      for (var si = 0; si < streams.length; si++) {
+        var s = streams[si];
+        s.phase += s.speed;
+        var fromLeft = s.side === 'left';
+
+        ctx.beginPath();
+        ctx.globalAlpha = s.opacity;
+        ctx.lineWidth = s.thickness;
+
+        var startX = fromLeft ? 0 : W;
+        var endX = fromLeft ? W * (0.5 + s.length * 0.5) : W * (0.5 - s.length * 0.5);
+        var steps = 60;
+        for (var j = 0; j <= steps; j++) {
+          var prog = j / steps;
+          var x = startX + (endX - startX) * prog;
+          var fadeIn = Math.min(prog * 4, 1);
+          var fadeOut = Math.min((1 - prog) * 3, 1);
+          var fade = fadeIn * fadeOut;
+          var waveY = Math.sin(s.phase + prog * 6) * s.amplitude * fade;
+          var y = s.yStart + waveY + Math.sin(s.phase * 0.7 + prog * 3) * 15;
+          if (j === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+
+        if (fromLeft) {
+          ctx.strokeStyle = 'rgba(0, 220, 255, ' + s.opacity + ')';
+          ctx.shadowColor = 'rgba(0, 200, 255, 0.4)';
+        } else {
+          ctx.strokeStyle = 'rgba(255, 80, 30, ' + s.opacity + ')';
+          ctx.shadowColor = 'rgba(255, 60, 10, 0.4)';
+        }
+        ctx.shadowBlur = 8;
+        ctx.stroke();
+        ctx.shadowBlur = 0;
+      }
+      ctx.globalAlpha = 1;
+
+      // 6) Particles
+      for (var pi = 0; pi < particles.length; pi++) {
+        var p = particles[pi];
+        p.life++;
+        p.wave += p.waveSpeed;
+        p.x += p.vx;
+        p.y += p.vy + Math.sin(p.wave) * p.waveAmp;
+
+        if (p.life >= p.maxLife || p.x < -30 || p.x > W + 30) {
+          particles[pi] = createParticle(p.side);
+          continue;
+        }
+
+        var lifeRatio = p.life / p.maxLife;
+        var alpha = Math.sin(lifeRatio * Math.PI) * 0.7;
+
+        // Attract towards center as they approach mid-screen
+        var distToCenterX = cx - p.x;
+        var pullStrength = 0;
+        if (p.side === 'left' && p.x > W * 0.3) pullStrength = 0.02;
+        if (p.side === 'right' && p.x < W * 0.7) pullStrength = 0.02;
+        p.vy += (cy - p.y) * pullStrength * 0.01;
+        p.vy *= 0.98;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        if (p.side === 'left') {
+          ctx.fillStyle = 'rgba(0, 220, 255, ' + alpha + ')';
+          ctx.shadowColor = 'rgba(0, 220, 255, 0.6)';
+        } else {
+          ctx.fillStyle = 'rgba(255, 90, 30, ' + alpha + ')';
+          ctx.shadowColor = 'rgba(255, 70, 20, 0.6)';
+        }
+        ctx.shadowBlur = 6;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      // 7) Center collision glow (pulsing)
+      var pulse = 0.5 + Math.sin(t * 0.04) * 0.3 + Math.sin(t * 0.07) * 0.2;
+      var collGlow = ctx.createRadialGradient(cx, cy, 0, cx, cy, 120);
+      collGlow.addColorStop(0, 'rgba(200, 160, 255, ' + (0.08 * pulse) + ')');
+      collGlow.addColorStop(0.3, 'rgba(120, 100, 200, ' + (0.04 * pulse) + ')');
+      collGlow.addColorStop(1, 'transparent');
+      ctx.fillStyle = collGlow;
+      ctx.fillRect(cx - 150, cy - 150, 300, 300);
+
+      // 8) Collision sparks
+      sparkTimer++;
+      if (sparkTimer > 20 + Math.random() * 40) {
+        emitSparks();
+        sparkTimer = 0;
+      }
+
+      for (var si2 = sparks.length - 1; si2 >= 0; si2--) {
+        var sp = sparks[si2];
+        sp.life++;
+        sp.x += sp.vx;
+        sp.y += sp.vy;
+        sp.vx *= 0.96;
+        sp.vy *= 0.96;
+
+        if (sp.life >= sp.maxLife) {
+          sparks.splice(si2, 1);
+          continue;
+        }
+
+        var spAlpha = (1 - sp.life / sp.maxLife) * 0.8;
+        var color;
+        if (sp.hue > 100) {
+          color = 'rgba(0, 230, 255, ' + spAlpha + ')';
+        } else {
+          color = 'rgba(255, 120, 40, ' + spAlpha + ')';
+        }
+        ctx.beginPath();
+        ctx.arc(sp.x, sp.y, sp.r * (1 - sp.life / sp.maxLife), 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 4;
+        ctx.fill();
+        ctx.shadowBlur = 0;
+      }
+
+      // 9) Subtle vignette
+      var vig = ctx.createRadialGradient(cx, cy, W * 0.25, cx, cy, W * 0.8);
+      vig.addColorStop(0, 'transparent');
+      vig.addColorStop(1, 'rgba(0, 0, 0, 0.4)');
+      ctx.fillStyle = vig;
+      ctx.fillRect(0, 0, W, H);
+    }
+
+    requestAnimationFrame(frame);
+
+    // Pause when tab hidden
+    document.addEventListener('visibilitychange', function() {
+      if (document.hidden) {
+        running = false;
+      } else {
+        running = true;
+        lastTime = 0;
+        requestAnimationFrame(frame);
+      }
+    });
+  })();
   </script>
 </body>
 
