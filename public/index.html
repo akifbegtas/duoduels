@@ -31,6 +31,15 @@
   <!-- Firebase runtime config (opsiyonel — varsa firebase-config.js'ten önce yüklenir) -->
   <script src="firebase-runtime-config.js" onerror=""></script>
   <script src="translations.js?v=2"></script>
+  <script>
+    // Platform detection: capacitor:// = iOS native, content:// or file:// = Android native
+    (function() {
+      var proto = window.location.protocol;
+      if (proto === 'capacitor:' || proto === 'ionic:' || proto === 'file:' || proto === 'content:') {
+        document.documentElement.classList.add('is-native-app');
+      }
+    })();
+  </script>
 </head>
 
 <body>
@@ -155,12 +164,35 @@
       </h1>
     </header>
 
+    <!-- Native Settings (sadece iOS/Android) -->
+    <div class="native-settings" id="native-settings" style="display:none">
+      <button class="native-settings-btn" onclick="toggleNativeSettings()">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="#fff"><path d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 00.12-.61l-1.92-3.32a.49.49 0 00-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54a.484.484 0 00-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96a.49.49 0 00-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.05.3-.07.62-.07.94s.02.64.07.94l-2.03 1.58a.49.49 0 00-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6A3.6 3.6 0 1115.6 12 3.611 3.611 0 0112 15.6z"/></svg>
+      </button>
+      <div class="native-settings-menu" id="native-settings-menu">
+        <!-- Dil satırı -->
+        <div class="native-settings-row" onclick="toggleNativeLangSub()">
+          <span class="native-settings-row-label">Dil</span>
+          <span class="native-settings-row-value" id="native-lang-value">Türkçe</span>
+          <svg class="native-settings-chevron" id="native-lang-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+        <div class="native-lang-sub" id="native-lang-sub" style="display:none">
+          <button class="native-settings-item" onclick="setLanguage('tr'); updateNativeLang('Türkçe')">🇹🇷 Türkçe</button>
+          <button class="native-settings-item" onclick="setLanguage('en'); updateNativeLang('English')">🇬🇧 English</button>
+          <button class="native-settings-item" onclick="setLanguage('ar'); updateNativeLang('العربية')">🇸🇦 العربية</button>
+        </div>
+      </div>
+    </div>
+
     <!-- AUTH EKRANI -->
     <div id="auth-screen" class="screen active">
 
       <!-- Slogan -->
       <div class="auth-hero">
         <h2 class="auth-slogan" id="auth-slogan">Çiftler için en eğlenceli bilgi yarışması!</h2>
+        <h1 class="auth-title-animated" id="auth-title-animated">
+          <span>D</span><span>u</span><span>o</span><span>D</span><span>u</span><span>e</span><span>l</span><span>s</span>
+        </h1>
       </div>
 
       <div class="card auth-card">
@@ -264,11 +296,6 @@
           <img id="lobby-avatar" class="lobby-avatar" src="" alt="" onclick="openSettings()" style="cursor:pointer" />
           <h2><span id="lobby-welcome-text">Hoşgeldin,</span> <span id="lobby-username-greeting"></span></h2>
           <div class="lobby-header-btns">
-            <button class="btn-icon-header" onclick="openSettings()" title="Ayarlar">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 15.5A3.5 3.5 0 0 1 8.5 12 3.5 3.5 0 0 1 12 8.5a3.5 3.5 0 0 1 3.5 3.5 3.5 3.5 0 0 1-3.5 3.5m7.43-2.92c.04-.34.07-.69.07-1.08s-.03-.73-.07-1.08l2.32-1.81c.21-.16.27-.45.13-.69l-2.2-3.81c-.13-.24-.42-.32-.66-.24l-2.74 1.1c-.57-.44-1.18-.81-1.86-1.08L14.21 2.1C14.16 1.84 13.92 1.64 13.65 1.64h-3.3c-.27 0-.5.2-.55.46L9.34 4.69c-.68.27-1.3.64-1.86 1.08L4.74 4.67c-.24-.09-.53 0-.66.24L1.88 8.72c-.14.23-.08.53.13.69l2.32 1.81C4.29 11.57 4.26 11.91 4.26 12.3s.03.73.07 1.08L2.01 15.19c-.21.16-.27.45-.13.69l2.2 3.81c.13.24.42.32.66.24l2.74-1.1c.57.44 1.18.81 1.86 1.08l.46 2.59c.05.26.28.46.55.46h3.3c.27 0 .5-.2.55-.46l.46-2.59c.68-.27 1.3-.64 1.86-1.08l2.74 1.1c.24.09.53 0 .66-.24l2.2-3.81c.14-.23.08-.53-.13-.69l-2.32-1.81z"/>
-              </svg>
-            </button>
             <button class="btn-signout" onclick="signOut()" title="Çıkış Yap">
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
@@ -278,15 +305,15 @@
         </div>
 
         <div class="lobby-modes">
-          <button class="lobby-mode-card" onclick="goToPrivateRoom()">
-            <div class="lmc-icon">👫</div>
-            <div id="lmc-title-private" class="lmc-title">Özel Oda</div>
-            <div id="lmc-sub-private" class="lmc-sub">QR veya kodla davet et</div>
+          <button class="lobby-mode-card lobby-mode-card-big" onclick="goToPrivateRoom()">
+            <div class="lmc-icon-big">👫</div>
+            <div id="lmc-title-private" class="lmc-title-big">Özel Oda</div>
+            <div id="lmc-sub-private" class="lmc-sub-big">QR veya kod ile arkadaşlarını davet et</div>
           </button>
-          <button class="lobby-mode-card" onclick="goToMatchmaking()">
-            <div class="lmc-icon">🌐</div>
-            <div id="lmc-title-random" class="lmc-title">Rastgele Eşleş</div>
-            <div id="lmc-sub-random" class="lmc-sub">Online rakip bul</div>
+          <button class="lobby-mode-card lobby-mode-card-big" onclick="goToMatchmaking()">
+            <div class="lmc-icon-big">🌐</div>
+            <div id="lmc-title-random" class="lmc-title-big">Rastgele Eşleş</div>
+            <div id="lmc-sub-random" class="lmc-sub-big">Online partner bul ve diğer çiftlerle yarış</div>
           </button>
         </div>
 
@@ -341,7 +368,7 @@
     <div id="matchmaking-screen" class="screen">
       <!-- Aşama 1: Mod + Oyun Seçimi -->
       <div id="mm-select-phase" class="mm-select-container">
-        <button class="btn-back-corner" onclick="showScreen('lobby')">Geri</button>
+        <button class="btn-back-corner" onclick="showScreen('lobby')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>Geri</button>
         <h2 class="select-title">Oyun Ara</h2>
         <div class="matchmaking-content">
           <div class="mm-mode-select">
@@ -426,7 +453,7 @@
     <!-- OYUN SEÇİM EKRANI -->
     <div id="game-select-screen" class="screen">
       <div class="game-select-container">
-        <button class="btn-back-corner" onclick="goToMainMenu()">Geri</button>
+        <button class="btn-back-corner" onclick="goToMainMenu()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>Geri</button>
         <h2 class="select-title">Oyun Seç</h2>
         <div class="mode-toggle-container" id="mode-toggle">
           <button class="mode-btn active" id="mode-btn-cift" onclick="selectMode('cift')">
@@ -1013,7 +1040,7 @@
   <!-- PASS & PLAY SETUP EKRANI -->
   <div id="passplay-setup-screen" class="screen">
     <div class="card lobby-card">
-      <button class="btn-back-corner" onclick="showScreen('lobby')">Geri</button>
+      <button class="btn-back-corner" onclick="showScreen('lobby')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>Geri</button>
       <h2 class="auth-title" style="margin-top:8px">Tek Cihazda Oyna</h2>
 
       <div class="pp-names-row">
@@ -1098,6 +1125,21 @@
           const { SplashScreen } = window.Capacitor.Plugins;
           await SplashScreen.hide();
         } catch (e) { }
+
+        // Native uygulamada gereksiz öğeleri gizle
+        // Navbar tamamen gizle (native'de gereksiz)
+        var authNavbar = document.getElementById('auth-navbar');
+        if (authNavbar) authNavbar.style.display = 'none';
+        // Native settings butonunu göster
+        var nativeSettings = document.getElementById('native-settings');
+        if (nativeSettings) nativeSettings.style.display = 'block';
+        // Store badge'leri (zaten uygulamadayız)
+        var storeBadges = document.querySelector('.auth-store-badges');
+        if (storeBadges) storeBadges.style.display = 'none';
+        // Web reklamları (AdSense native'de çalışmaz)
+        document.querySelectorAll('.ad-sidebar, .ad-bottombar, .ad-interstitial-overlay').forEach(function(el) {
+          el.style.display = 'none';
+        });
       });
     }
     // Splash güvenlik ağı: 2.5 saniye içinde JS'den dismiss gelmezse zorla kaldır
@@ -1187,6 +1229,32 @@
       var el = document.getElementById('how-to-play-overlay');
       el.style.display = el.style.display === 'none' ? 'flex' : 'none';
     }
+    function toggleNativeSettings() {
+      var menu = document.getElementById('native-settings-menu');
+      menu.classList.toggle('open');
+      // Dil sub menüsünü kapat
+      if (!menu.classList.contains('open')) {
+        var sub = document.getElementById('native-lang-sub');
+        if (sub) sub.style.display = 'none';
+        var chev = document.getElementById('native-lang-chevron');
+        if (chev) chev.style.transform = '';
+      }
+    }
+    function toggleNativeLangSub() {
+      var sub = document.getElementById('native-lang-sub');
+      var chev = document.getElementById('native-lang-chevron');
+      if (sub.style.display === 'none') {
+        sub.style.display = 'block';
+        if (chev) chev.style.transform = 'rotate(180deg)';
+      } else {
+        sub.style.display = 'none';
+        if (chev) chev.style.transform = '';
+      }
+    }
+    function updateNativeLang(label) {
+      var el = document.getElementById('native-lang-value');
+      if (el) el.textContent = label;
+    }
     function toggleLangDropdown() {
       document.getElementById('nav-lang-menu').classList.toggle('open');
     }
@@ -1205,6 +1273,10 @@
       if (!e.target.closest('.nav-lang-dropdown')) {
         closeLangDropdown();
       }
+      if (!e.target.closest('.native-settings')) {
+        var nsm = document.getElementById('native-settings-menu');
+        if (nsm) nsm.classList.remove('open');
+      }
     });
   </script>
 
@@ -1216,6 +1288,25 @@
     var ctx = c.getContext('2d');
     var W, H, cx, cy;
     var dpr = Math.min(window.devicePixelRatio || 1, 2);
+
+    // Theme-aware colors — updated by updateBgTheme()
+    var bgTheme = {
+      leftR: 80, leftG: 120, leftB: 200,   // default muted blue
+      rightR: 120, rightG: 80, rightB: 180  // default muted purple
+    };
+    window.updateBgTheme = function(gender) {
+      if (gender === 'male') {
+        bgTheme.leftR = 0;   bgTheme.leftG = 242; bgTheme.leftB = 254;  // #00f2fe
+        bgTheme.rightR = 79;  bgTheme.rightG = 172; bgTheme.rightB = 254; // #4facfe
+      } else if (gender === 'female') {
+        bgTheme.leftR = 232; bgTheme.leftG = 67;  bgTheme.leftB = 147;  // #e84393
+        bgTheme.rightR = 168; bgTheme.rightG = 85;  bgTheme.rightB = 247; // #a855f7
+      } else {
+        bgTheme.leftR = 80;  bgTheme.leftG = 120; bgTheme.leftB = 200;
+        bgTheme.rightR = 120; bgTheme.rightG = 80;  bgTheme.rightB = 180;
+      }
+      drawHexGrid(); // hex grid renklerini güncelle
+    };
 
     function resize() {
       W = window.innerWidth;
@@ -1244,7 +1335,10 @@
       var size = 35;
       var w = size * 2;
       var h = Math.sqrt(3) * size;
-      hexCtx.strokeStyle = 'rgba(100, 180, 255, 0.04)';
+      var midR = Math.round((bgTheme.leftR + bgTheme.rightR) / 2);
+      var midG = Math.round((bgTheme.leftG + bgTheme.rightG) / 2);
+      var midB = Math.round((bgTheme.leftB + bgTheme.rightB) / 2);
+      hexCtx.strokeStyle = 'rgba(' + midR + ',' + midG + ',' + midB + ', 0.04)';
       hexCtx.lineWidth = 0.7;
 
       for (var row = -1; row < H / h + 1; row++) {
@@ -1371,20 +1465,20 @@
       ctx.globalAlpha = 1;
       ctx.drawImage(hexCanvas, 0, 0, W, H);
 
-      // 3) Large ambient glow — LEFT (cyan)
+      // 3) Large ambient glow — LEFT
       ctx.globalAlpha = 0.12 + Math.sin(t * 0.015) * 0.03;
       var glowL = ctx.createRadialGradient(0, cy, 0, 0, cy, W * 0.55);
-      glowL.addColorStop(0, 'rgba(0, 230, 255, 0.3)');
-      glowL.addColorStop(0.4, 'rgba(0, 150, 255, 0.08)');
+      glowL.addColorStop(0, 'rgba(' + bgTheme.leftR + ',' + bgTheme.leftG + ',' + bgTheme.leftB + ', 0.3)');
+      glowL.addColorStop(0.4, 'rgba(' + bgTheme.leftR + ',' + bgTheme.leftG + ',' + bgTheme.leftB + ', 0.08)');
       glowL.addColorStop(1, 'transparent');
       ctx.fillStyle = glowL;
       ctx.fillRect(0, 0, W, H);
 
-      // 4) Large ambient glow — RIGHT (orange/red)
+      // 4) Large ambient glow — RIGHT
       ctx.globalAlpha = 0.12 + Math.cos(t * 0.018) * 0.03;
       var glowR = ctx.createRadialGradient(W, cy, 0, W, cy, W * 0.55);
-      glowR.addColorStop(0, 'rgba(255, 80, 20, 0.3)');
-      glowR.addColorStop(0.4, 'rgba(255, 40, 0, 0.08)');
+      glowR.addColorStop(0, 'rgba(' + bgTheme.rightR + ',' + bgTheme.rightG + ',' + bgTheme.rightB + ', 0.3)');
+      glowR.addColorStop(0.4, 'rgba(' + bgTheme.rightR + ',' + bgTheme.rightG + ',' + bgTheme.rightB + ', 0.08)');
       glowR.addColorStop(1, 'transparent');
       ctx.fillStyle = glowR;
       ctx.fillRect(0, 0, W, H);
@@ -1417,11 +1511,11 @@
         }
 
         if (fromLeft) {
-          ctx.strokeStyle = 'rgba(0, 220, 255, ' + s.opacity + ')';
-          ctx.shadowColor = 'rgba(0, 200, 255, 0.4)';
+          ctx.strokeStyle = 'rgba(' + bgTheme.leftR + ',' + bgTheme.leftG + ',' + bgTheme.leftB + ',' + s.opacity + ')';
+          ctx.shadowColor = 'rgba(' + bgTheme.leftR + ',' + bgTheme.leftG + ',' + bgTheme.leftB + ', 0.4)';
         } else {
-          ctx.strokeStyle = 'rgba(255, 80, 30, ' + s.opacity + ')';
-          ctx.shadowColor = 'rgba(255, 60, 10, 0.4)';
+          ctx.strokeStyle = 'rgba(' + bgTheme.rightR + ',' + bgTheme.rightG + ',' + bgTheme.rightB + ',' + s.opacity + ')';
+          ctx.shadowColor = 'rgba(' + bgTheme.rightR + ',' + bgTheme.rightG + ',' + bgTheme.rightB + ', 0.4)';
         }
         ctx.shadowBlur = 8;
         ctx.stroke();
@@ -1456,11 +1550,11 @@
         ctx.beginPath();
         ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
         if (p.side === 'left') {
-          ctx.fillStyle = 'rgba(0, 220, 255, ' + alpha + ')';
-          ctx.shadowColor = 'rgba(0, 220, 255, 0.6)';
+          ctx.fillStyle = 'rgba(' + bgTheme.leftR + ',' + bgTheme.leftG + ',' + bgTheme.leftB + ',' + alpha + ')';
+          ctx.shadowColor = 'rgba(' + bgTheme.leftR + ',' + bgTheme.leftG + ',' + bgTheme.leftB + ', 0.6)';
         } else {
-          ctx.fillStyle = 'rgba(255, 90, 30, ' + alpha + ')';
-          ctx.shadowColor = 'rgba(255, 70, 20, 0.6)';
+          ctx.fillStyle = 'rgba(' + bgTheme.rightR + ',' + bgTheme.rightG + ',' + bgTheme.rightB + ',' + alpha + ')';
+          ctx.shadowColor = 'rgba(' + bgTheme.rightR + ',' + bgTheme.rightG + ',' + bgTheme.rightB + ', 0.6)';
         }
         ctx.shadowBlur = 6;
         ctx.fill();
@@ -1499,9 +1593,9 @@
         var spAlpha = (1 - sp.life / sp.maxLife) * 0.8;
         var color;
         if (sp.hue > 100) {
-          color = 'rgba(0, 230, 255, ' + spAlpha + ')';
+          color = 'rgba(' + bgTheme.leftR + ',' + bgTheme.leftG + ',' + bgTheme.leftB + ',' + spAlpha + ')';
         } else {
-          color = 'rgba(255, 120, 40, ' + spAlpha + ')';
+          color = 'rgba(' + bgTheme.rightR + ',' + bgTheme.rightG + ',' + bgTheme.rightB + ',' + spAlpha + ')';
         }
         ctx.beginPath();
         ctx.arc(sp.x, sp.y, sp.r * (1 - sp.life / sp.maxLife), 0, Math.PI * 2);

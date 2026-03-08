@@ -1132,7 +1132,7 @@ io.on("connection", (socket) => {
 
     // TEK MOD
     if (room.gameMode === "tek") {
-      if (room.gameType !== "pictionary") {
+      if (room.gameType !== "pictionary" && room.gameType !== "imposter") {
         socket.emit("gameError", serverT('tek_pictionary', socket.lang));
         return;
       }
