@@ -5062,6 +5062,26 @@ body.keyboard-open textarea:focus {
 .is-native-app .ad-bottombar,
 .is-native-app .ad-interstitial-overlay { display: none !important; }
 .is-native-app .native-settings { display: block !important; }
+.is-native-app #auth-screen.active {
+  justify-content: flex-start;
+  min-height: 0 !important;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-top: calc(40px + env(safe-area-inset-top));
+  padding-bottom: calc(40px + env(safe-area-inset-bottom, 20px));
+}
+.is-native-app #profile-setup-screen.active {
+  justify-content: flex-start;
+  min-height: 0 !important;
+  height: 100vh;
+  height: 100dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-top: calc(40px + env(safe-area-inset-top));
+  padding-bottom: calc(40px + env(safe-area-inset-bottom, 20px));
+}
 .is-native-app .auth-hero { padding-top: 0; margin-bottom: 12px; }
 .is-native-app .auth-slogan { display: none !important; }
 .is-native-app .auth-title-animated { display: block !important; }

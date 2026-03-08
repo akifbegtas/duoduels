@@ -89,7 +89,7 @@
   <div id="connection-status" class="connection-status" style="display:none"></div>
   <!-- Animasyonlu Splash Screen -->
   <div id="app-splash" class="splash-screen-bg">
-    <img src="apple-touch-icon.png" alt="DuoDuels" class="splash-logo" />
+    <img src="logoduoduels.png" alt="DuoDuels" class="splash-logo" />
     <div class="splash-title">DuoDuels</div>
     <div class="splash-dots"><span></span><span></span><span></span></div>
   </div>
@@ -103,7 +103,7 @@
   <!-- Auth Navbar (outside main-container for full width) -->
   <nav class="auth-navbar" id="auth-navbar">
     <div class="auth-navbar-left">
-      <img src="apple-touch-icon.png" alt="DuoDuels" class="auth-navbar-logo" />
+      <img src="logoduoduels.png" alt="DuoDuels" class="auth-navbar-logo" />
       <span class="auth-navbar-brand">DuoDuels</span>
     </div>
     <div class="auth-navbar-right">
@@ -197,7 +197,7 @@
 
       <div class="card auth-card">
         <div class="auth-logo-container">
-          <img src="apple-touch-icon.png" alt="DuoDuels" class="auth-logo" />
+          <img src="logoduoduels.png" alt="DuoDuels" class="auth-logo" />
         </div>
         <p id="auth-subtitle" class="auth-subtitle">Oynamak için giriş yap</p>
 
@@ -1368,8 +1368,8 @@
 
     function createParticle(side) {
       var fromLeft = side === 'left';
-      var spread = H * 0.6;
-      var yBase = cy + (Math.random() - 0.5) * spread;
+      var spread = H * 1.0;
+      var yBase = Math.random() * H;
       return {
         x: fromLeft ? -20 : W + 20,
         y: yBase,

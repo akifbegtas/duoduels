@@ -434,19 +434,56 @@ function enterLobby() {
 // --- SIGN OUT ---
 async function signOut() {
   try {
+    const wasGuestLocal = _isGuestLocal;
+    const wasAnonymous = currentUser && currentUser.isAnonymous;
+    const userRef = auth ? auth.currentUser : null;
+
     if (typeof socket !== 'undefined' && socket && socket.connected) {
       socket.disconnect();
     }
     currentRoom = null;
     _isGuestLocal = false;
     sessionStorage.removeItem("duoduels_room");
+    // Tüm guest profillerini temizle
+    localStorage.removeItem('dd_guest_profile');
+    localStorage.removeItem('dd_dev_profile');
     // Temayı sıfırla
     document.body.classList.remove('theme-male', 'theme-female');
     if (typeof updateSvgColors === 'function') updateSvgColors(null);
-    await auth.signOut();
-    // onAuthStateChanged auth ekranına yönlendirecek
+    if (typeof window.updateBgTheme === 'function') window.updateBgTheme(null);
+
+    // State'i temizle
+    currentUser = null;
+    userProfile = null;
+    authIdToken = null;
+    stopTokenRefresh();
+
+    if (wasGuestLocal || !auth) {
+      showScreen('auth');
+      return;
+    }
+
+    // Anonim kullanıcıyı tamamen sil (persistence'ın geri getirmemesi için)
+    if (wasAnonymous && userRef) {
+      try {
+        await userRef.delete();
+      } catch (delErr) {
+        console.warn("Anonim kullanıcı silinemedi, signOut yapılıyor:", delErr);
+        await auth.signOut();
+      }
+    } else {
+      await auth.signOut();
+    }
+
+    // Garanti: auth ekranına geç
+    showScreen('auth');
   } catch (err) {
     console.error("Çıkış hatası:", err);
+    // Her halükarda auth ekranına dön
+    currentUser = null;
+    userProfile = null;
+    authIdToken = null;
+    showScreen('auth');
   }
 }
 

@@ -179,6 +179,8 @@ function applyGenderTheme(gender) {
   }
   // SVG arka plan renklerini güncelle
   updateSvgColors(gender);
+  // Canvas arka plan renklerini güncelle
+  if (typeof window.updateBgTheme === 'function') window.updateBgTheme(gender);
 }
 
 function updateSvgColors(gender) {
