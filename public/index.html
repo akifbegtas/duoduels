@@ -173,8 +173,7 @@
         <!-- Dil satırı -->
         <div class="native-settings-row" onclick="toggleNativeLangSub()">
           <span class="native-settings-row-label">Dil</span>
-          <span class="native-settings-row-value" id="native-lang-value">Türkçe</span>
-          <svg class="native-settings-chevron" id="native-lang-chevron" viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+          <span class="native-settings-row-value"><span id="native-lang-value">Türkçe</span> <svg class="native-settings-chevron" id="native-lang-chevron" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
         </div>
         <div class="native-lang-sub" id="native-lang-sub" style="display:none">
           <button class="native-settings-item" onclick="setLanguage('tr'); updateNativeLang('Türkçe')">🇹🇷 Türkçe</button>
@@ -231,7 +230,7 @@
         <div class="auth-skip-divider">
           <span id="auth-or-text">veya</span>
         </div>
-        <button class="auth-skip-btn" onclick="signInAsGuest()">
+        <button class="auth-skip-btn auth-btn-guest" onclick="signInAsGuest()">
           <span id="btn-text-guest">Misafir Olarak Devam Et</span>
         </button>
 
@@ -1310,13 +1309,13 @@
 
     function resize() {
       W = window.innerWidth;
-      H = window.innerHeight;
+      H = Math.max(window.innerHeight, screen.height, document.documentElement.clientHeight);
       cx = W / 2;
       cy = H / 2;
       c.width = W * dpr;
       c.height = H * dpr;
-      c.style.width = W + 'px';
-      c.style.height = H + 'px';
+      c.style.width = '';
+      c.style.height = '';
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     }
     resize();
