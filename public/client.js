@@ -158,8 +158,20 @@ function showScreen(name) {
   // Toggle auth navbar & header visibility
   var authNav = document.getElementById('auth-navbar');
   var mainHeader = document.getElementById('main-header');
+  var headerScreens = ['lobby', 'gameSelect', 'gameSettings', 'game', 'isimSehir', 'pictionary', 'tabu', 'imposter', 'sayiTahmin', 'bilBakalim', 'waiting', 'passplaySetup'];
   if (authNav) authNav.style.display = (name === 'auth') ? 'flex' : 'none';
-  if (mainHeader) mainHeader.style.display = (name === 'auth') ? 'none' : '';
+  if (mainHeader) mainHeader.style.display = headerScreens.includes(name) ? '' : 'none';
+  // Explicitly hide animated title when leaving auth screen
+  var animTitle = document.getElementById('auth-title-animated');
+  if (animTitle) {
+    if (name === 'auth') {
+      animTitle.style.removeProperty('display');
+      animTitle.style.removeProperty('visibility');
+    } else {
+      animTitle.style.setProperty('display', 'none', 'important');
+      animTitle.style.setProperty('visibility', 'hidden', 'important');
+    }
+  }
 }
 
 // --- TEMA DEĞİŞTİRME (cinsiyet seçimine göre) ---
@@ -171,7 +183,7 @@ function applyGenderTheme(gender) {
     document.body.classList.add("theme-female");
   }
   // Username input'a cinsiyet bazlı border
-  const usernameInput = document.getElementById("username");
+  const usernameInput = document.getElementById("setup-username");
   if (usernameInput) {
     usernameInput.classList.remove("gender-border-male", "gender-border-female");
     if (gender === "male") usernameInput.classList.add("gender-border-male");
@@ -206,6 +218,24 @@ document.addEventListener("DOMContentLoaded", () => {
   // Başlangıçta nötr tema (gri) - body'de hiç class yok
   updateSvgColors(null);
 
+  // iOS WKWebView: input'a focus olunca native scroll view'i sıfırla
+  if (isNative) {
+    document.addEventListener('focusin', function() {
+      setTimeout(function() {
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      }, 80);
+    });
+    document.addEventListener('focusout', function() {
+      setTimeout(function() {
+        window.scrollTo(0, 0);
+        document.documentElement.scrollTop = 0;
+        document.body.scrollTop = 0;
+      }, 80);
+    });
+  }
+
   // Profile setup ekranındaki cinsiyet seçimi
   const genderRadios = document.querySelectorAll('input[name="setup-gender"]');
   genderRadios.forEach(radio => {
@@ -229,7 +259,7 @@ function showHint(msg, target) {
     if (gs) gs.classList.add("gender-error");
   } else {
     if (ih) { ih.textContent = msg; ih.classList.remove("hidden"); }
-    const inp = document.getElementById("username");
+    const inp = document.getElementById("setup-username");
     if (inp) inp.classList.add("input-error");
   }
 }
@@ -238,7 +268,7 @@ function hideHint() {
   const gh = document.getElementById("gender-hint");
   if (ih) ih.classList.add("hidden");
   if (gh) gh.classList.add("hidden");
-  const inp = document.getElementById("username");
+  const inp = document.getElementById("setup-username");
   if (inp) inp.classList.remove("input-error");
   const gs = document.querySelector(".gender-selection");
   if (gs) gs.classList.remove("gender-error");
@@ -289,13 +319,16 @@ function selectPassPlayGame(gameType) {
   _ppCurrentPlayer = 'p1';
   _ppSecretDoneP1 = false;
 
+  // Bug 1 fix: compute passPlayP2Id BEFORE emitting createRoom
+  const _myIdForPP = typeof getMyPlayerId === 'function' ? getMyPlayerId() : (socket && socket.userId ? socket.userId : '');
+  passPlayP2Id = 'passplay_' + _myIdForPP;
+
   const data = {
     username: p1Name, gender: p1Gender,
     gameType: gameType, gameMode: 'duo',
     coupleCount: 1, roundCount: rounds, roundTime: 30,
     passPlay: true, p2Username: p2Name, p2Gender: p2Gender
   };
-  passPlayP2Id = 'passplay_' + (typeof getMyPlayerId === 'function' ? getMyPlayerId() : (socket && socket.userId ? socket.userId : ''));
 
   function doEmit() {
     socket.emit('createRoom', data);
@@ -436,9 +469,9 @@ function selectGame(type) {
     pendingRoomData.maxPlayers = tekVal;
   }
 
-  // Imposter en az 3 kişi gerektirir - 2 kişi seçiliyse sıfırla
+  // Imposter en az 3 kişi gerektirir - sadece tek modda kontrol et
   const tekCount2 = document.getElementById("tekCount2");
-  if (tekCount2) {
+  if (tekCount2 && selectedMode === "tek") {
     if (type === "imposter") {
       tekCount2.disabled = true;
       tekCount2.style.display = "none";
@@ -548,6 +581,10 @@ function confirmGameSettings() {
 
   if (!socket || !socket.connected) {
     connectSocket();
+    if (!socket) {
+      Swal.fire({ title: t('conn_lost'), text: t('conn_reconnecting'), icon: "warning", timer: 3000, showConfirmButton: false });
+      return;
+    }
     socket.once("connect", doEmit);
     return;
   }
@@ -620,6 +657,10 @@ function findMatch() {
     Swal.fire({ title: t('mm_select_game'), icon: "warning", customClass: { popup: "swal-premium" }, background: "rgba(15,12,40,0.95)", color: "#fff" });
     return;
   }
+  if (!socket || !socket.connected) {
+    Swal.fire({ title: t('conn_lost'), icon: "warning", timer: 2000, showConfirmButton: false });
+    return;
+  }
   socket.emit("findMatch", {
     username: username,
     gender: gender,
@@ -652,41 +693,7 @@ function resetMatchmakingScreen() {
   if (wcancelBtn) wcancelBtn.style.display = "";
 }
 
-// Matchmaking socket listeners - tüm listener'lar setupSocketListeners() içinde
-
-function setupSocketListeners() {
-  if (_socketListenersAttached) return;
-  _socketListenersAttached = true;
-
-socket.on("matchSearching", function(data) {
-  const txt = document.getElementById("mm-waiting-text");
-  if (txt && data.message) txt.textContent = data.message;
-});
-
-socket.on("matchFound", function(data) {
-  // Eşleşme bulundu — odaya katıl
-  currentRoom = data.roomId;
-  sessionStorage.setItem("duoduels_room", data.roomId);
-  isHost = data.isHost || false;
-  window._currentGameType = data.gameType;
-  // Bekleme ekranında "Eşleşme bulundu!" göster
-  var wtitle = document.querySelector(".mm-waiting-title");
-  var wsub = document.getElementById("mm-waiting-text");
-  var wcancelBtn = document.querySelector(".mm-cancel-btn");
-  if (wtitle) wtitle.textContent = t('mm_match_found');
-  if (wsub) wsub.textContent = data.players.map(function(p) { return p.username; }).join(" vs ") + " — " + data.gameType;
-  if (wcancelBtn) wcancelBtn.style.display = "none";
-});
-
-socket.on("matchCancelled", function() {
-  showScreen("lobby");
-});
-
-socket.on("autoStartGame", function(roomId) {
-  // Matchmaking sonrası otomatik oyun başlat
-  socket.emit("startGame", roomId);
-});
-
+// --- GLOBAL NAVİGASYON FONKSİYONLARI (socket bağlantısından bağımsız, her zaman erişilebilir) ---
 function copyRoomCode() {
   const el = document.getElementById("displayRoomCode");
   const code = el.innerText;
@@ -736,12 +743,47 @@ function goToMainMenu() {
 }
 
 function joinTeamSlot(idx, slot) {
-  socket.emit("selectTeam", { roomId: currentRoom, teamIndex: idx, slot });
+  if (socket) socket.emit("selectTeam", { roomId: currentRoom, teamIndex: idx, slot });
 }
 
 function startGame() {
-  socket.emit("startGame", currentRoom);
+  if (socket) socket.emit("startGame", currentRoom);
 }
+
+// Matchmaking socket listeners - tüm listener'lar setupSocketListeners() içinde
+
+function setupSocketListeners() {
+  if (_socketListenersAttached) return;
+  _socketListenersAttached = true;
+
+socket.on("matchSearching", function(data) {
+  const txt = document.getElementById("mm-waiting-text");
+  if (txt && data.message) txt.textContent = data.message;
+});
+
+socket.on("matchFound", function(data) {
+  // Eşleşme bulundu — odaya katıl
+  currentRoom = data.roomId;
+  sessionStorage.setItem("duoduels_room", data.roomId);
+  isHost = data.isHost || false;
+  window._currentGameType = data.gameType;
+  // Bekleme ekranında "Eşleşme bulundu!" göster
+  var wtitle = document.querySelector(".mm-waiting-title");
+  var wsub = document.getElementById("mm-waiting-text");
+  var wcancelBtn = document.querySelector(".mm-cancel-btn");
+  if (wtitle) wtitle.textContent = t('mm_match_found');
+  if (wsub) wsub.textContent = data.players.map(function(p) { return p.username; }).join(" vs ") + " — " + data.gameType;
+  if (wcancelBtn) wcancelBtn.style.display = "none";
+});
+
+socket.on("matchCancelled", function() {
+  showScreen("lobby");
+});
+
+socket.on("autoStartGame", function(roomId) {
+  // Matchmaking sonrası otomatik oyun başlat
+  socket.emit("startGame", roomId);
+});
 
 // --- OYUN (TELEPATİ) ---
 function sendWord(auto) {
@@ -970,8 +1012,15 @@ function hideConnectionStatus() {
 })();
 
 // --- SOCKET ---
-socket.on("connect", () => {
+socket.on("connect", async () => {
   myPlayerId = getMyPlayerId();
+  // Bug 6 fix: refresh token on reconnect to avoid stale token after disconnect
+  if (typeof currentUser !== 'undefined' && currentUser && !currentUser.isAnonymous && typeof authIdToken !== 'undefined') {
+    try {
+      authIdToken = await currentUser.getIdToken(false);
+      socket.auth.token = authIdToken;
+    } catch (e) { console.warn("Token refresh on reconnect failed:", e); }
+  }
   // Saved room varsa recover et
   const savedRoom = sessionStorage.getItem("duoduels_room");
   if (!currentRoom && savedRoom) currentRoom = savedRoom;
@@ -1005,8 +1054,17 @@ socket.on("connect_error", async (err) => {
       socket.connect();
     } catch (e) {
       console.error("Token refresh failed:", e);
+      Swal.fire({ title: t('error'), text: t('conn_lost'), icon: 'error', timer: 3000, showConfirmButton: false });
     }
+  } else if (err.message !== 'Authentication required') {
+    // Show user-visible error for non-auth errors (Bug 8 fix)
+    showConnectionStatus('disconnected');
   }
+});
+socket.on("error", (err) => {
+  // Bug 8 fix: handle generic socket errors with user-visible message
+  console.error("Socket error:", err);
+  showConnectionStatus('disconnected');
 });
 socket.on("rejoinSuccess", (data) => {
   hideConnectionStatus();
@@ -1021,6 +1079,7 @@ socket.on("rejoinSuccess", (data) => {
       tabu: "tabu",
       imposter: "imposter",
       sayiTahmin: "sayiTahmin",
+      bilBakalim: "bilBakalim",
     };
     const screen = screenMap[data.gameType];
     if (screen) {
@@ -1065,9 +1124,7 @@ socket.on("roomCreated", (id) => {
 
   // Pass & Play: auto-start game since both players are ready
   if (passPlayActive) {
-    // Update passPlayP2Id with the actual socket userId
-    const myId = typeof getMyPlayerId === 'function' ? getMyPlayerId() : socket.userId;
-    passPlayP2Id = 'passplay_' + myId;
+    // passPlayP2Id was already set before createRoom was emitted (Bug 1 fix)
     // Host can start immediately
     setTimeout(() => {
       if (currentRoom) socket.emit('startGame', currentRoom);
@@ -1170,7 +1227,7 @@ socket.on("updateLobby", (data) => {
     // Çift mod: takım kartları
     data.teams.forEach((t, i) => {
       div.innerHTML += `<div class="team-card">
-              <div class="team-title">${t.name}</div>
+              <div class="team-title">${escapeHtml(t.name)}</div>
               <div class="slots-container">
                   ${renderSlot(t.p1, i, "p1", data.hostId)}
                   ${renderSlot(t.p2, i, "p2", data.hostId)}
@@ -3485,6 +3542,12 @@ window.toggleMMGame       = toggleMMGame;
 window.goBackToGameSelect = goBackToGameSelect;
 window.confirmGameSettings= confirmGameSettings;
 window.showScreen         = showScreen;
+// Navigation functions (socket-independent, always available)
+window.goToMainMenu       = goToMainMenu;
+window.startGame          = startGame;
+window.joinTeamSlot       = joinTeamSlot;
+window.copyRoomCode       = copyRoomCode;
+window.shareWhatsApp      = shareWhatsApp;
 
 // --- SESSION RECOVERY ---
 // Session recovery artık auth.js'deki onAuthStateChanged ve connectSocket tarafından yönetiliyor

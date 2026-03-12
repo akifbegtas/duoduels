@@ -33,9 +33,14 @@
   <script src="translations.js?v=2"></script>
   <script>
     // Platform detection: capacitor:// = iOS native, content:// or file:// = Android native
+    // Also handles custom scheme (e.g., 'DuoDuels://localhost') via window.Capacitor
     (function() {
       var proto = window.location.protocol;
-      if (proto === 'capacitor:' || proto === 'ionic:' || proto === 'file:' || proto === 'content:') {
+      var isNativeProto = proto === 'capacitor:' || proto === 'ionic:' || proto === 'file:' || proto === 'content:';
+      var isCapacitor = typeof window !== 'undefined' && window.Capacitor &&
+                        typeof window.Capacitor.isNativePlatform === 'function' &&
+                        window.Capacitor.isNativePlatform();
+      if (isNativeProto || isCapacitor) {
         document.documentElement.classList.add('is-native-app');
       }
     })();
@@ -584,6 +589,11 @@
                   <h3>Sayı Tahmin</h3>
                   <p>4 haneli sayıyı tahmin et!</p>
                 </div>
+                <div class="game-card" id="card-imposter-tek" onclick="selectGame('imposter')">
+                  <div class="game-card-icon">🕵️</div>
+                  <h3>Imposter</h3>
+                  <p>Aranızdaki yabancıyı bul!</p>
+                </div>
               </div>
             </div>
           </div>
@@ -1034,10 +1044,9 @@
         <div class="bb-results-list" id="bb-results-list"></div>
       </div>
     </div>
-  </div>
 
-  <!-- PASS & PLAY SETUP EKRANI -->
-  <div id="passplay-setup-screen" class="screen">
+    <!-- PASS & PLAY SETUP EKRANI -->
+    <div id="passplay-setup-screen" class="screen">
     <div class="card lobby-card">
       <button class="btn-back-corner" onclick="showScreen('lobby')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>Geri</button>
       <h2 class="auth-title" style="margin-top:8px">Tek Cihazda Oyna</h2>
@@ -1103,7 +1112,7 @@
   <script src="socket.io.min.js"></script>
   <script src="firebase-config.js?v=3"></script>
   <script src="auth.js?v=5"></script>
-  <script src="client.js?v=38"></script>
+  <script src="client.js?v=39"></script>
   <script>
     // Capacitor plugin'lerini başlat (native ortamda)
     if (window.Capacitor && window.Capacitor.isNativePlatform()) {
