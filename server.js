@@ -12,7 +12,7 @@ const SERVER_MESSAGES = {
     only_host_start: "Sadece kurucu oyunu başlatabilir!",
     imposter_tek: "Imposter sadece tek modda oynanabilir!",
     imposter_min3: "Imposter için en az 3 oyuncu gerekli!",
-    tek_pictionary: "Tek modda sadece Resim Çiz oynanabilir!",
+    tek_pictionary: "Tek modda sadece Resim Çiz ve Imposter oynanabilir!",
     min2_players: "En az 2 oyuncu gerekli!",
     not_enough_teams: "Yeterli takım yok!",
     only_host_settings: "Sadece kurucu ayarları değiştirebilir!",
@@ -27,7 +27,7 @@ const SERVER_MESSAGES = {
     only_host_start: "Only the host can start the game!",
     imposter_tek: "Imposter can only be played in single mode!",
     imposter_min3: "Imposter requires at least 3 players!",
-    tek_pictionary: "Only Pictionary is available in single mode!",
+    tek_pictionary: "Only Pictionary and Imposter are available in single mode!",
     min2_players: "At least 2 players required!",
     not_enough_teams: "Not enough teams!",
     only_host_settings: "Only the host can change settings!",
@@ -42,7 +42,7 @@ const SERVER_MESSAGES = {
     only_host_start: "فقط المضيف يمكنه بدء اللعبة!",
     imposter_tek: "المحتال متاح فقط في الوضع الفردي!",
     imposter_min3: "المحتال يتطلب 3 لاعبين على الأقل!",
-    tek_pictionary: "فقط الرسم متاح في الوضع الفردي!",
+    tek_pictionary: "فقط الرسم وImposter متاحان في الوضع الفردي!",
     min2_players: "يجب وجود لاعبين على الأقل!",
     not_enough_teams: "لا توجد فرق كافية!",
     only_host_settings: "فقط المضيف يمكنه تغيير الإعدادات!",
@@ -92,7 +92,11 @@ const ALLOWED_ORIGINS = [
 const io = new Server(server, {
   cors: {
     origin: function (origin, callback) {
-      if (!origin || ALLOWED_ORIGINS.includes(origin)) {
+      // S1 fix: only allow !origin (no Origin header) in development mode
+      if (!origin && process.env.NODE_ENV === 'development') {
+        return callback(null, true);
+      }
+      if (origin && ALLOWED_ORIGINS.includes(origin)) {
         callback(null, true);
       } else {
         callback(new Error('Not allowed by CORS'));
@@ -112,12 +116,12 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Content-Security-Policy',
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.gstatic.com https://apis.google.com; " +
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.gstatic.com https://apis.google.com https://pagead2.googlesyndication.com; " +
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
     "font-src https://fonts.gstatic.com; " +
-    "img-src 'self' data: https://*.googleusercontent.com https://*.facebook.com; " +
-    "connect-src 'self' wss://duoduels.onrender.com wss://duoduels.com wss://www.duoduels.com https://duoduels-599689373205.europe-west1.run.app wss://duoduels-599689373205.europe-west1.run.app wss://duoduels-efwwv7zyia-ew.a.run.app ws://localhost:3000 ws://127.0.0.1:3000 https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com; " +
-    "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com https://www.facebook.com https://appleid.apple.com;"
+    "img-src 'self' data: https://*.googleusercontent.com https://*.facebook.com https://*.googlesyndication.com https://*.doubleclick.net; " +
+    "connect-src 'self' wss://duoduels.onrender.com wss://duoduels.com wss://www.duoduels.com https://duoduels-599689373205.europe-west1.run.app wss://duoduels-599689373205.europe-west1.run.app wss://duoduels-efwwv7zyia-ew.a.run.app ws://localhost:3000 ws://127.0.0.1:3000 https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.googlesyndication.com https://*.doubleclick.net; " +
+    "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com https://www.facebook.com https://appleid.apple.com https://*.googlesyndication.com https://*.doubleclick.net;"
   );
   next();
 });
@@ -148,10 +152,36 @@ setInterval(() => {
 
 app.use(express.static(path.join(__dirname, "public")));
 
+app.get("/terms", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "terms.html"));
+});
+
+app.get("/privacy", (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "privacy.html"));
+});
+
 // --- Input Validation Helpers ---
 const VALID_GAME_TYPES = ['telepati', 'isimSehir', 'pictionary', 'tabu', 'sayiTahmin', 'imposter', 'bilBakalim'];
 const VALID_GENDERS = ['male', 'female'];
 const VALID_GAME_MODES = ['cift', 'duo', 'tek'];
+const MODE_GAME_TYPES = {
+  cift: ['telepati', 'isimSehir', 'pictionary', 'tabu', 'sayiTahmin', 'bilBakalim'],
+  duo: ['telepati', 'isimSehir', 'pictionary', 'tabu', 'sayiTahmin', 'bilBakalim'],
+  tek: ['pictionary', 'imposter'],
+};
+const MATCHMAKING_MODE_GAME_TYPES = {
+  cift: MODE_GAME_TYPES.cift,
+  duo: MODE_GAME_TYPES.duo,
+  tek: ['pictionary'],
+};
+
+function isGameSupportedForMode(gameType, gameMode) {
+  return !!(MODE_GAME_TYPES[gameMode] && MODE_GAME_TYPES[gameMode].includes(gameType));
+}
+
+function getMatchmakingGamesForMode(gameMode) {
+  return MATCHMAKING_MODE_GAME_TYPES[gameMode] || [];
+}
 
 // --- Bot Player Helpers ---
 const BOT_NAMES_FEMALE = ['Zeynep', 'Ayşe', 'Selin', 'Elif', 'Merve'];
@@ -215,7 +245,10 @@ function scheduleBotAction(roomId, actionFn, minDelay = 800, maxDelay = 2500) {
 
 function sanitizeString(str, maxLength = 50) {
   if (typeof str !== 'string') return '';
-  return str.trim().substring(0, maxLength);
+  // S2 fix: strip HTML tags to prevent injection. Data is JSON-transported so
+  // we strip angle-bracket tags but preserve other characters to avoid double-encoding
+  // when the client calls escapeHtml() on display.
+  return str.trim().substring(0, maxLength).replace(/<[^>]*>/g, '');
 }
 
 function isValidRoomId(id) {
@@ -461,7 +494,7 @@ function createMatchRoom(mode, players) {
     }
   });
 
-  // 2 saniye sonra oyunu otomatik başlat
+  // 2 saniye sonra oyunu otomatik başlat (Bug 3 fix: already guarded with rooms[roomId] check)
   setTimeout(() => {
     const room = rooms[roomId];
     if (!room) return;
@@ -473,18 +506,9 @@ function autoStartGame(roomId) {
   const room = rooms[roomId];
   if (!room) return;
 
-  room.gameStatus = "playing";
-
-  if (room.gameType === 'telepati' || room.gameType === 'isimSehir' || room.gameType === 'sayiTahmin' || room.gameType === 'tabu' || room.gameType === 'bilBakalim') {
-    if (room.gameMode === 'tek') {
-      // Tek mod — şimdilik sadece pictionary destekli, diğerleri duo/cift gibi çalışsın
-    }
-    // Duo/Cift modlarında pairs oluştur ve ilk round'u başlat
-    // startGame event'ini simüle et — host'un socketId'sini bulup startGame emit edelim
-    const hostSocket = findHostSocket(room);
-    if (hostSocket) {
-      hostSocket.emit("autoStartGame", roomId);
-    }
+  const hostSocket = findHostSocket(room);
+  if (hostSocket) {
+    hostSocket.emit("autoStartGame", roomId);
   }
 }
 
@@ -848,8 +872,9 @@ io.on("connection", (socket) => {
       return;
     }
 
+    const allowedMatchmakingGames = getMatchmakingGamesForMode(mode);
     const selectedGames = Array.isArray(data.selectedGames)
-      ? data.selectedGames.filter(g => VALID_GAME_TYPES.includes(g))
+      ? data.selectedGames.filter(g => VALID_GAME_TYPES.includes(g) && allowedMatchmakingGames.includes(g))
       : [];
 
     if (selectedGames.length === 0) {
@@ -873,8 +898,14 @@ io.on("connection", (socket) => {
 
     checkForMatch(mode);
 
+    // Bug L2 fix: register cleanup listeners BEFORE scheduling the timer
+    let botTimer = null;
+    const clearBotTimer = () => { if (botTimer) { clearTimeout(botTimer); botTimer = null; } };
+    socket.once('cancelMatchmaking', clearBotTimer);
+    socket.once('disconnect', clearBotTimer);
+
     // 15sn sonra hâlâ bekleniyorsa bot ile eşleştir
-    const botTimer = setTimeout(() => {
+    botTimer = setTimeout(() => {
       const stillInQueue = matchmakingQueue[mode][gender].find(p => p.playerId === pid);
       if (!stillInQueue) return;
       removeFromMatchmaking(pid);
@@ -884,9 +915,6 @@ io.on("connection", (socket) => {
       createMatchRoom(mode, [humanPlayer, botPlayer]);
       console.log(`Bot eşleşmesi: ${username} vs ${botPlayer.username}`);
     }, 15000);
-
-    socket.once('cancelMatchmaking', () => clearTimeout(botTimer));
-    socket.once('disconnect', () => clearTimeout(botTimer));
   });
 
   socket.on("cancelMatchmaking", () => {
@@ -903,6 +931,11 @@ io.on("connection", (socket) => {
     const gameMode = VALID_GAME_MODES.includes(data.gameMode) ? data.gameMode : "cift";
     const username = sanitizeString(data.username, 12) || "Oyuncu";
     const gender = VALID_GENDERS.includes(data.gender) ? data.gender : "male";
+
+    if (!isGameSupportedForMode(gameType, gameMode)) {
+      socket.emit("gameError", serverT('tek_pictionary', socket.lang));
+      return;
+    }
 
     let count = parseInt(data.coupleCount);
     if (gameMode === "duo") {
@@ -990,7 +1023,7 @@ io.on("connection", (socket) => {
       sayiTahminGuesses: {},
       sayiTahminCurrentTurn: null, // p1 or p2
       sayiTahminRound: 1,
-      sayiTahminDigitCount: Math.min(Math.max(parseInt(data.digitCount) || 4, 3), 6),
+      sayiTahminDigitCount: Math.max(3, Math.min(6, parseInt(data.digitCount) || 4)), // Bug L4 fix: double-clamped
       sayiTahminTimer: null,
       sayiTahminTieCount: 0,
       // Bil Bakalım specific
@@ -1126,7 +1159,7 @@ io.on("connection", (socket) => {
         roundTime: room.roundTime,
       });
 
-      setTimeout(() => startImposterRound(roomId), 2000);
+      setTimeout(() => { if (!rooms[roomId]) return; startImposterRound(roomId); }, 2000); // Bug 3 fix
       return;
     }
 
@@ -1155,7 +1188,7 @@ io.on("connection", (socket) => {
       });
 
       updatePictionaryLeaderboard(roomId);
-      setTimeout(() => startPictionaryRound(roomId), 2000);
+      setTimeout(() => { if (!rooms[roomId]) return; startPictionaryRound(roomId); }, 2000); // Bug 3 fix
       return;
     }
 
@@ -1175,7 +1208,8 @@ io.on("connection", (socket) => {
       }
     });
 
-    if (validPairs.length < 1) {
+    const minimumPairCount = room.gameMode === "cift" ? 2 : 1;
+    if (validPairs.length < minimumPairCount) {
       socket.emit("gameError", serverT('not_enough_teams', socket.lang));
       return;
     }
@@ -1197,6 +1231,7 @@ io.on("connection", (socket) => {
       updatePictionaryLeaderboard(roomId);
 
       setTimeout(() => {
+        if (!rooms[roomId]) return; // Bug 3 fix
         startPictionaryRound(roomId);
       }, 2000);
     } else if (room.gameType === "isimSehir") {
@@ -1214,6 +1249,7 @@ io.on("connection", (socket) => {
       updateIsimSehirLeaderboard(roomId);
 
       setTimeout(() => {
+        if (!rooms[roomId]) return; // Bug 3 fix
         startIsimSehirRound(roomId);
       }, 2000);
     } else if (room.gameType === "tabu") {
@@ -1229,6 +1265,7 @@ io.on("connection", (socket) => {
       updateTabuLeaderboard(roomId);
 
       setTimeout(() => {
+        if (!rooms[roomId]) return; // Bug 3 fix
         startTabuTurn(roomId);
       }, 2000);
     } else if (room.gameType === "sayiTahmin") {
@@ -1251,6 +1288,7 @@ io.on("connection", (socket) => {
       });
 
       setTimeout(() => {
+        if (!rooms[roomId]) return; // Bug 3 fix
         startSayiTahminSecretPhase(roomId);
       }, 1200);
     } else if (room.gameType === "bilBakalim") {
@@ -1271,7 +1309,7 @@ io.on("connection", (socket) => {
         })),
       });
 
-      setTimeout(() => startBilBakalimQuestion(roomId), 2500);
+      setTimeout(() => { if (!rooms[roomId]) return; startBilBakalimQuestion(roomId); }, 2500); // Bug 3 fix
     } else {
       // Telepati
       io.to(roomId).emit("gameInit", {
@@ -1282,6 +1320,7 @@ io.on("connection", (socket) => {
       updateLeaderboard(roomId);
 
       setTimeout(() => {
+        if (!rooms[roomId]) return; // Bug 3 fix
         startTurn(roomId);
       }, 2000);
     }
@@ -1326,6 +1365,9 @@ io.on("connection", (socket) => {
     const w2 = room.moves[currentPair.id][currentPair.p2.id];
 
     if (w1 !== undefined && w2 !== undefined) {
+      // Bug 14 fix: guard against duplicate result processing
+      if (room.scoreLocked) return;
+      room.scoreLocked = true;
       // Clear server-side timeout
       if (room.telepatiTimer) { clearTimeout(room.telepatiTimer); room.telepatiTimer = null; }
       currentPair.currentTurnAttempts++;
@@ -1351,11 +1393,12 @@ io.on("connection", (socket) => {
         // Check if game is already over before scheduling nextTurn
         const alive = room.pairs.filter((p) => !p.isEliminated);
         if (alive.length > 1) {
-          setTimeout(() => nextTurn(roomId), 2000);
+          setTimeout(() => { if (!rooms[roomId]) return; nextTurn(roomId); }, 2000); // Bug 3 fix
         } else if (alive.length === 1) {
           const winner = alive[0];
           const winnerIds = [winner.p1.id, winner.p2.id];
           setTimeout(() => {
+            if (!rooms[roomId]) return; // Bug 3 fix
             io.to(roomId).emit("telepatiGameOver", {
               winnerTeam: winner.teamName,
               winnerP1: winner.p1.username,
@@ -1366,15 +1409,18 @@ io.on("connection", (socket) => {
             });
             room.gameStatus = "finished";
             setTimeout(() => {
+              if (!rooms[roomId]) return; // Bug 3 fix
               room.gameStatus = "waiting";
               emitBackToSelect(roomId);
             }, 7000);
           }, 2000);
         } else {
           setTimeout(() => {
+            if (!rooms[roomId]) return; // Bug 3 fix
             io.to(roomId).emit("gameOver", serverT('all_eliminated'));
             room.gameStatus = "finished";
             setTimeout(() => {
+              if (!rooms[roomId]) return; // Bug 3 fix
               room.gameStatus = "waiting";
               emitBackToSelect(roomId);
             }, 5000);
@@ -1384,6 +1430,7 @@ io.on("connection", (socket) => {
       }
 
       setTimeout(() => {
+        if (!rooms[roomId]) return; // Bug 3 fix
         io.to(roomId).emit("spectatorUpdate", result);
         room.moves[currentPair.id] = {};
 
@@ -1495,6 +1542,7 @@ io.on("connection", (socket) => {
       room.categoryIndex = CATEGORIES.length - 1; // Son kategoriye atla
       console.log(`[IS] Both submitted! Results:`, allResults.map(r => `${r.category}: ${r.p1Word} vs ${r.p2Word} = ${r.match}`));
       setTimeout(() => {
+        if (!rooms[roomId]) return; // Bug 3 fix
         console.log(`[IS] Emitting isimSehirAllResults to room ${roomId}`);
         io.to(roomId).emit("isimSehirAllResults", {
           results: allResults,
@@ -1504,6 +1552,7 @@ io.on("connection", (socket) => {
         // Animasyon süresi: sonuç başına 2.8sn + 0.5sn buffer
         const animDelay = allResults.length * 2800 + 500;
         setTimeout(() => {
+          if (!rooms[roomId]) return; // Bug 3 fix
           nextIsimSehirStep(roomId);
         }, animDelay);
       }, 500);
@@ -1513,7 +1562,8 @@ io.on("connection", (socket) => {
   // --- PICTIONARY: DRAW DATA ---
   socket.on("drawData", (data) => {
     const room = getValidRoom(data.roomId);
-    if (!room || room.gameType !== "pictionary") return;
+    // Bug 4 fix: reject drawData if game is not actively playing
+    if (!room || room.gameType !== "pictionary" || room.gameStatus !== "playing") return;
     // Relay to everyone else in room
     socket.to(data.roomId).emit("drawData", data);
   });
@@ -1528,7 +1578,9 @@ io.on("connection", (socket) => {
     )
       return;
 
-    const cleanGuess = guess.trim().toLocaleUpperCase("tr-TR");
+    const cleanGuess = sanitizeString(guess, 50).toLocaleUpperCase("tr-TR");
+    if (!cleanGuess) return;
+
     const word = room._currentPictionaryWord;
     if (!word) return;
 
@@ -1711,7 +1763,7 @@ io.on("connection", (socket) => {
       });
 
       // Next word
-      setTimeout(() => nextTabuWord(roomId), 1000);
+      setTimeout(() => { if (!rooms[roomId]) return; nextTabuWord(roomId); }, 1000); // Bug 3 fix
     }
   });
 
@@ -1739,8 +1791,12 @@ io.on("connection", (socket) => {
       return;
 
     const pid = socket.userId;
-    const player = room.players.find((p) => p.id === pid);
+    const player = room.players ? room.players.find((p) => p.id === pid) : null;
     if (!player) return;
+
+    // Bug 13 fix: defensive initialization of imposter state
+    room.imposterSubmissions1 = room.imposterSubmissions1 || {};
+    room.imposterSubmissions2 = room.imposterSubmissions2 || {};
 
     const subs =
       room.imposterPhase === "write1"
@@ -1772,8 +1828,10 @@ io.on("connection", (socket) => {
     if (room.imposterPhase !== "vote") return;
 
     const pid = socket.userId;
-    const player = room.players.find((p) => p.id === pid);
+    const player = room.players ? room.players.find((p) => p.id === pid) : null;
     if (!player) return;
+    // Bug 13 fix: defensive initialization of imposterVotes
+    room.imposterVotes = room.imposterVotes || {};
     if (room.imposterVotes[pid]) return;
     if (pid === votedPlayerId) return;
     // Validate voted player exists in room
@@ -1835,6 +1893,7 @@ io.on("connection", (socket) => {
       if (room.sayiTahminTimer) { clearTimeout(room.sayiTahminTimer); room.sayiTahminTimer = null; }
       room.sayiTahminGuesses[pairKey] = { p1: [], p2: [] };
       setTimeout(() => {
+        if (!rooms[roomId]) return; // Bug 3 fix
         startSayiTahminGuessPhase(roomId);
       }, 1000);
     }
@@ -1935,13 +1994,17 @@ io.on("connection", (socket) => {
 
   // --- ODA AYARLARINI GÜNCELLE (oyun bitince tekrar seçim) ---
   // --- ODADAN AYRILMA ---
-  socket.on("leaveRoom", (roomId) => {
+  socket.on("leaveRoom", (roomId, ack) => {
     if (typeof roomId === 'string') roomId = roomId.toUpperCase().trim();
     const room = getValidRoom(roomId);
-    if (!room) return;
+    if (!room) {
+      if (typeof ack === 'function') ack(false);
+      return;
+    }
     const pid = socket.userId;
     socket.leave(roomId);
     removePlayerFromRoom(roomId, pid);
+    if (typeof ack === 'function') ack(true);
   });
 
   // --- ODA AYARLARINI GÜNCELLE (oyun bitince tekrar seçim) ---
@@ -1954,10 +2017,17 @@ io.on("connection", (socket) => {
       return;
     }
 
-    room.gameType = VALID_GAME_TYPES.includes(data.gameType) ? data.gameType : "telepati";
+    const nextGameType = VALID_GAME_TYPES.includes(data.gameType) ? data.gameType : room.gameType;
+    if (!isGameSupportedForMode(nextGameType, room.gameMode)) {
+      socket.emit("gameError", serverT('tek_pictionary', socket.lang));
+      return;
+    }
+
+    room.gameType = nextGameType;
     room.roundCount = Math.min(Math.max(parseInt(data.roundCount) || 5, 1), 20);
     room.roundTime = Math.min(Math.max(parseInt(data.roundTime) || 10, 5), 120);
     if (data.digitCount) room.sayiTahminDigitCount = Math.min(Math.max(parseInt(data.digitCount) || 4, 3), 6);
+    if (data.targetScore) room.bilBakalimTargetScore = Math.min(Math.max(parseInt(data.targetScore) || 10, 5), 20);
 
     io.to(data.roomId).emit("joinedRoom", data.roomId);
     emitLobbyUpdate(data.roomId);
@@ -1972,7 +2042,8 @@ io.on("connection", (socket) => {
       return;
     }
     const player = findPlayerInRoom(room, pid);
-    if (!player) {
+    // Bug 16 fix: ensure the player was actually disconnected from this room (not a new joiner exploiting rejoin)
+    if (!player || player.disconnected !== true) {
       socket.emit("rejoinFailed");
       return;
     }
@@ -2035,6 +2106,7 @@ io.on("connection", (socket) => {
       io.to(roomId).emit("playerDisconnected", { playerId: pid, username: player.username });
 
       setTimeout(() => {
+        // Bug 3 & 7 fix: check room still exists and player result is non-null
         const r = rooms[roomId];
         if (!r) return;
         const p = findPlayerInRoom(r, pid);
@@ -2172,9 +2244,9 @@ function endBilBakalimQuestion(roomId) {
   // Hedef puana ulaşıldı mı?
   const targetReached = pairs.some(p => (room.bilBakalimScores[p.id] || 0) >= room.bilBakalimTargetScore);
   if (targetReached) {
-    setTimeout(() => endBilBakalimGame(roomId, 'target_reached'), 4000);
+    setTimeout(() => { if (!rooms[roomId]) return; endBilBakalimGame(roomId, 'target_reached'); }, 4000); // Bug 3 fix
   } else {
-    setTimeout(() => startBilBakalimQuestion(roomId), 5000);
+    setTimeout(() => { if (!rooms[roomId]) return; startBilBakalimQuestion(roomId); }, 5000); // Bug 3 fix
   }
 }
 
@@ -2251,6 +2323,8 @@ function removePlayerFromRoom(roomId, pid) {
   // Check if room is empty
   if (isRoomEmpty(room)) {
     clearAllRoomTimers(room);
+    // Bug 15 fix: clean up playerSockets for all players in the room
+    _cleanupRoomPlayerSockets(room);
     delete rooms[roomId];
     console.log(`Oda silindi (boş): ${roomId}`);
     return;
@@ -2269,6 +2343,7 @@ function removePlayerFromRoom(roomId, pid) {
     } else {
       // No eligible host, destroy room
       clearAllRoomTimers(room);
+      _cleanupRoomPlayerSockets(room); // Bug 15 fix
       io.to(roomId).emit("hostLeft");
       delete rooms[roomId];
       console.log(`Oda silindi (host yok): ${roomId}`);
@@ -2279,14 +2354,32 @@ function removePlayerFromRoom(roomId, pid) {
   emitLobbyUpdate(roomId);
 }
 
+// Bug 15 fix: helper to remove all room player entries from playerSockets map
+function _cleanupRoomPlayerSockets(room) {
+  if (!room) return;
+  if (room.gameMode === 'tek') {
+    (room.players || []).forEach(p => { if (p && p.id) delete playerSockets[p.id]; });
+  } else {
+    (room.teams || []).forEach(t => {
+      if (t.p1 && t.p1.id) delete playerSockets[t.p1.id];
+      if (t.p2 && t.p2.id) delete playerSockets[t.p2.id];
+    });
+  }
+  (room.spectators || []).forEach(p => { if (p && p.id) delete playerSockets[p.id]; });
+}
+
 // ============ TELEPATİ FONKSİYONLARI ============
 
 function nextTurn(roomId) {
   const room = rooms[roomId];
   if (!room) return;
+  // Bug 2 fix: guard against empty pairs
+  if (!room.pairs || room.pairs.length === 0) return;
 
+  // Bug 9 fix: capture roundCount snapshot before loop to avoid stale value
+  const totalRoundsSnapshot = room.roundCount;
   // İteratif olarak sıradaki elenmeyen çifti bul
-  const maxIterations = room.pairs.length * (room.roundCount + 1);
+  const maxIterations = room.pairs.length * (totalRoundsSnapshot + 1);
   for (let i = 0; i < maxIterations; i++) {
     room.currentPairIndex++;
 
@@ -2294,7 +2387,7 @@ function nextTurn(roomId) {
       room.currentPairIndex = 0;
       room.currentRound++;
 
-      if (room.currentRound > room.roundCount) {
+      if (room.currentRound > totalRoundsSnapshot) {
         // En az hata yapan takım kazanır
         const sorted = [...room.pairs].sort(
           (a, b) => a.totalAttempts - b.totalAttempts,
@@ -2310,6 +2403,7 @@ function nextTurn(roomId) {
         });
         room.gameStatus = "finished";
         setTimeout(() => {
+          if (!rooms[roomId]) return; // Bug 3 fix
           room.gameStatus = "waiting";
           emitBackToSelect(roomId);
         }, 7000);
@@ -2326,6 +2420,7 @@ function nextTurn(roomId) {
         io.to(roomId).emit("gameOver", serverT('all_eliminated'));
         room.gameStatus = "finished";
         setTimeout(() => {
+          if (!rooms[roomId]) return; // Bug 3 fix
           room.gameStatus = "waiting";
           emitBackToSelect(roomId);
         }, 5000);
@@ -2344,6 +2439,7 @@ function nextTurn(roomId) {
         });
         room.gameStatus = "finished";
         setTimeout(() => {
+          if (!rooms[roomId]) return; // Bug 3 fix
           room.gameStatus = "waiting";
           emitBackToSelect(roomId);
         }, 7000);
@@ -2352,7 +2448,7 @@ function nextTurn(roomId) {
       continue;
     }
 
-    setTimeout(() => startTurn(roomId), 1500);
+    setTimeout(() => { if (!rooms[roomId]) return; startTurn(roomId); }, 1500); // Bug 3 fix
     return;
   }
 }
@@ -2360,8 +2456,11 @@ function nextTurn(roomId) {
 function startTurn(roomId) {
   const room = rooms[roomId];
   if (!room) return;
+  if (!room.pairs || room.pairs.length === 0) return; // Bug 2 fix
   const p = room.pairs[room.currentPairIndex];
+  if (!p) return; // Bug 2 fix
 
+  room.scoreLocked = false; // Bug 14 fix: reset lock for new turn
   p.currentTurnAttempts = 0;
   room.moves[p.id] = {};
 
@@ -2402,14 +2501,15 @@ function startTurn(roomId) {
           io.to(roomId).emit('spectatorUpdate', result);
           io.to(roomId).emit('gameOver', pair.teamName + " " + serverT('eliminated'));
           const alive = room.pairs.filter(x => !x.isEliminated);
-          if (alive.length > 1) setTimeout(() => nextTurn(roomId), 2000);
+          if (alive.length > 1) setTimeout(() => { if (!rooms[roomId]) return; nextTurn(roomId); }, 2000); // Bug 3 fix
           else if (alive.length === 1) {
             const winner = alive[0];
-            setTimeout(() => { io.to(roomId).emit('telepatiGameOver', { winnerTeam: winner.teamName, winnerP1: winner.p1.username, winnerP2: winner.p2.username, winnerIds: [winner.p1.id, winner.p2.id], winnerScore: winner.totalAttempts, lastStanding: true }); room.gameStatus = 'finished'; setTimeout(() => { room.gameStatus = 'waiting'; emitBackToSelect(roomId); }, 7000); }, 2000);
-          } else { setTimeout(() => { io.to(roomId).emit('gameOver', serverT('all_eliminated')); room.gameStatus = 'finished'; setTimeout(() => { room.gameStatus = 'waiting'; emitBackToSelect(roomId); }, 5000); }, 2000); }
+            setTimeout(() => { if (!rooms[roomId]) return; io.to(roomId).emit('telepatiGameOver', { winnerTeam: winner.teamName, winnerP1: winner.p1.username, winnerP2: winner.p2.username, winnerIds: [winner.p1.id, winner.p2.id], winnerScore: winner.totalAttempts, lastStanding: true }); room.gameStatus = 'finished'; setTimeout(() => { if (!rooms[roomId]) return; room.gameStatus = 'waiting'; emitBackToSelect(roomId); }, 7000); }, 2000); // Bug 3 fix
+          } else { setTimeout(() => { if (!rooms[roomId]) return; io.to(roomId).emit('gameOver', serverT('all_eliminated')); room.gameStatus = 'finished'; setTimeout(() => { if (!rooms[roomId]) return; room.gameStatus = 'waiting'; emitBackToSelect(roomId); }, 5000); }, 2000); } // Bug 3 fix
           return;
         }
         setTimeout(() => {
+          if (!rooms[roomId]) return; // Bug 3 fix
           io.to(roomId).emit('spectatorUpdate', result);
           room.moves[pair.id] = {};
           if (isMatch) { io.to(getSocketId(pair.p1.id)).to(getSocketId(pair.p2.id)).emit('levelFinished', { success: true }); nextTurn(roomId); }
@@ -2421,15 +2521,17 @@ function startTurn(roomId) {
   // Server-side timeout: auto-submit for players who don't respond
   if (room.telepatiTimer) clearTimeout(room.telepatiTimer);
   room.telepatiTimer = setTimeout(() => {
-    if (!room || room.gameStatus !== "playing") return;
-    const currentPair = room.pairs[room.currentPairIndex];
+    // Bug 3 fix: check room still exists via rooms map
+    const r = rooms[roomId];
+    if (!r || r.gameStatus !== "playing") return;
+    const currentPair = r.pairs ? r.pairs[r.currentPairIndex] : null;
     if (!currentPair) return;
-    if (!room.moves[currentPair.id]) room.moves[currentPair.id] = {};
-    if (room.moves[currentPair.id][currentPair.p1.id] === undefined) room.moves[currentPair.id][currentPair.p1.id] = "⏰";
-    if (room.moves[currentPair.id][currentPair.p2.id] === undefined) room.moves[currentPair.id][currentPair.p2.id] = "⏰";
+    if (!r.moves[currentPair.id]) r.moves[currentPair.id] = {};
+    if (r.moves[currentPair.id][currentPair.p1.id] === undefined) r.moves[currentPair.id][currentPair.p1.id] = "⏰";
+    if (r.moves[currentPair.id][currentPair.p2.id] === undefined) r.moves[currentPair.id][currentPair.p2.id] = "⏰";
     // Trigger result processing
-    const w1 = room.moves[currentPair.id][currentPair.p1.id];
-    const w2 = room.moves[currentPair.id][currentPair.p2.id];
+    const w1 = r.moves[currentPair.id][currentPair.p1.id];
+    const w2 = r.moves[currentPair.id][currentPair.p2.id];
     currentPair.currentTurnAttempts++;
     currentPair.totalAttempts++;
     updateLeaderboard(roomId);
@@ -2440,38 +2542,40 @@ function startTurn(roomId) {
       currentPair.isEliminated = true;
       io.to(roomId).emit("spectatorUpdate", result);
       io.to(roomId).emit("gameOver", currentPair.teamName + " " + serverT('eliminated'));
-      const alive = room.pairs.filter((p) => !p.isEliminated);
+      const alive = r.pairs.filter((p) => !p.isEliminated);
       if (alive.length > 1) {
-        setTimeout(() => nextTurn(roomId), 2000);
+        setTimeout(() => { if (!rooms[roomId]) return; nextTurn(roomId); }, 2000); // Bug 3 fix
       } else if (alive.length === 1) {
         const winner = alive[0];
         const winnerIds = [winner.p1.id, winner.p2.id];
         setTimeout(() => {
+          if (!rooms[roomId]) return; // Bug 3 fix
           io.to(roomId).emit("telepatiGameOver", {
             winnerTeam: winner.teamName, winnerP1: winner.p1.username, winnerP2: winner.p2.username,
             winnerIds: winnerIds, winnerScore: winner.totalAttempts, lastStanding: true,
           });
-          room.gameStatus = "finished";
-          setTimeout(() => { room.gameStatus = "waiting"; emitBackToSelect(roomId); }, 7000);
+          r.gameStatus = "finished";
+          setTimeout(() => { if (!rooms[roomId]) return; r.gameStatus = "waiting"; emitBackToSelect(roomId); }, 7000);
         }, 2000);
       } else {
         setTimeout(() => {
+          if (!rooms[roomId]) return; // Bug 3 fix
           io.to(roomId).emit("gameOver", serverT('all_eliminated'));
-          room.gameStatus = "finished";
-          setTimeout(() => { room.gameStatus = "waiting"; emitBackToSelect(roomId); }, 5000);
+          r.gameStatus = "finished";
+          setTimeout(() => { if (!rooms[roomId]) return; r.gameStatus = "waiting"; emitBackToSelect(roomId); }, 5000);
         }, 2000);
       }
       return;
     }
 
     io.to(roomId).emit("spectatorUpdate", result);
-    room.moves[currentPair.id] = {};
+    r.moves[currentPair.id] = {};
   }, (room.roundTime + 3) * 1000);
 }
 
 function updateLeaderboard(roomId) {
   const room = rooms[roomId];
-  if (!room) return;
+  if (!room || !room.pairs || room.pairs.length === 0) return; // Bug L1 fix
 
   const sorted = [...room.pairs].sort(
     (a, b) => a.totalAttempts - b.totalAttempts,
@@ -2516,6 +2620,7 @@ function startIsimSehirRound(roomId) {
   const pair = room.pairs[room.currentPairIndex];
   // Harf animasyonu sonrası 3 inputu birden aç
   setTimeout(() => {
+    if (!rooms[roomId]) return; // Bug 3 fix
     io.to(roomId).emit("allCategoriesStart", {
       letter: letter,
       categories: CATEGORIES,
@@ -2527,6 +2632,7 @@ function startIsimSehirRound(roomId) {
     // Server-side timeout: auto-submit for players who don't respond
     if (room.isimSehirTimer) clearTimeout(room.isimSehirTimer);
     room.isimSehirTimer = setTimeout(() => {
+      if (!rooms[roomId]) return; // Bug 3 fix
       autoSubmitIsimSehir(roomId);
     }, (room.roundTime + 3) * 1000);
   }, 3500);
@@ -2571,7 +2677,7 @@ function autoSubmitIsimSehir(roomId) {
     room.categoryIndex = CATEGORIES.length - 1;
     io.to(roomId).emit("isimSehirAllResults", { results: allResults, p1: currentPair.p1, p2: currentPair.p2 });
     const animDelay = allResults.length * 2800 + 500;
-    setTimeout(() => { nextIsimSehirStep(roomId); }, animDelay);
+    setTimeout(() => { if (!rooms[roomId]) return; nextIsimSehirStep(roomId); }, animDelay); // Bug 3 fix
   }
 }
 
@@ -2618,6 +2724,7 @@ function nextIsimSehirStep(roomId) {
     // Server-side timeout for new pair
     if (room.isimSehirTimer) clearTimeout(room.isimSehirTimer);
     room.isimSehirTimer = setTimeout(() => {
+      if (!rooms[roomId]) return; // Bug 3 fix
       autoSubmitIsimSehir(roomId);
     }, (room.roundTime + 3) * 1000);
     return;
@@ -2640,6 +2747,7 @@ function nextIsimSehirStep(roomId) {
     );
     room.gameStatus = "finished";
     setTimeout(() => {
+      if (!rooms[roomId]) return; // Bug 3 fix
       room.gameStatus = "waiting";
       emitBackToSelect(roomId);
     }, 5000);
@@ -2648,13 +2756,14 @@ function nextIsimSehirStep(roomId) {
 
   io.to(roomId).emit("roundChanged", room.currentRound);
   setTimeout(() => {
+    if (!rooms[roomId]) return; // Bug 3 fix
     startIsimSehirRound(roomId);
   }, 2000);
 }
 
 function updateIsimSehirLeaderboard(roomId) {
   const room = rooms[roomId];
-  if (!room) return;
+  if (!room || !room.pairs || room.pairs.length === 0) return; // Bug L1 fix
 
   const sorted = [...room.pairs].sort(
     (a, b) =>
@@ -2759,6 +2868,7 @@ function startPictionaryRound(roomId) {
   // 45s timer
   if (room.pictionaryTimer) clearTimeout(room.pictionaryTimer);
   room.pictionaryTimer = setTimeout(() => {
+    if (!rooms[roomId]) return; // Bug 3 fix
     endPictionaryRound(roomId);
   }, 45000);
 }
@@ -2798,6 +2908,7 @@ function endPictionaryRound(roomId) {
 
   if (room.currentRound > room.roundCount) {
     setTimeout(() => {
+      if (!rooms[roomId]) return; // Bug 3 fix
       if (room.gameMode === "tek") {
         const sorted = [...room.soloPlayers].sort(
           (a, b) =>
@@ -2826,6 +2937,7 @@ function endPictionaryRound(roomId) {
       room.gameStatus = "finished";
       // Oyun bittikten sonra lobiye dön
       setTimeout(() => {
+        if (!rooms[roomId]) return; // Bug 3 fix
         room.gameStatus = "waiting";
         emitBackToSelect(roomId);
       }, 5000);
@@ -2841,6 +2953,7 @@ function endPictionaryRound(roomId) {
     io.to(roomId).emit("roundChanged", room.currentRound);
   }
   setTimeout(() => {
+    if (!rooms[roomId]) return; // Bug 3 fix
     startPictionaryRound(roomId);
   }, 3000);
 }
@@ -2915,6 +3028,7 @@ function startTabuTurn(roomId) {
   // Start timer
   if (room.tabuTimer) clearTimeout(room.tabuTimer);
   room.tabuTimer = setTimeout(() => {
+    if (!rooms[roomId]) return; // Bug 3 fix
     endTabuTurn(roomId);
   }, room.roundTime * 1000);
 }
@@ -2962,6 +3076,7 @@ function nextTabuWord(roomId) {
 function endTabuTurn(roomId) {
   const room = rooms[roomId];
   if (!room || room.gameStatus !== "playing") return;
+  if (!room.pairs || room.pairs.length === 0) return; // Bug L1 fix
 
   if (room.tabuTimer) {
     clearTimeout(room.tabuTimer);
@@ -2985,6 +3100,7 @@ function endTabuTurn(roomId) {
     if (room.currentRound > room.roundCount) {
       // Game over
       setTimeout(() => {
+        if (!rooms[roomId]) return; // Bug 3 fix
         const sorted = [...room.pairs].sort(
           (a, b) => (room.tabuScores[b.id] || 0) - (room.tabuScores[a.id] || 0),
         );
@@ -2996,6 +3112,7 @@ function endTabuTurn(roomId) {
         );
         room.gameStatus = "finished";
         setTimeout(() => {
+          if (!rooms[roomId]) return; // Bug 3 fix
           room.gameStatus = "waiting";
           emitBackToSelect(roomId);
         }, 5000);
@@ -3007,13 +3124,14 @@ function endTabuTurn(roomId) {
   }
 
   setTimeout(() => {
+    if (!rooms[roomId]) return; // Bug 3 fix
     startTabuTurn(roomId);
   }, 3000);
 }
 
 function updateTabuLeaderboard(roomId) {
   const room = rooms[roomId];
-  if (!room) return;
+  if (!room || !room.pairs || room.pairs.length === 0) return; // Bug L1 fix
 
   const sorted = [...room.pairs].sort(
     (a, b) => (room.tabuScores[b.id] || 0) - (room.tabuScores[a.id] || 0),
@@ -3088,6 +3206,7 @@ function startImposterRound(roomId) {
   // Timer
   if (room.imposterTimer) clearTimeout(room.imposterTimer);
   room.imposterTimer = setTimeout(() => {
+    if (!rooms[roomId]) return; // Bug 3 fix
     endImposterPhase(roomId);
   }, room.roundTime * 1000);
 }
@@ -3124,12 +3243,14 @@ function endImposterPhase(roomId) {
     // Faz 2 başlat
     room.imposterPhase = "write2";
     setTimeout(() => {
+      if (!rooms[roomId]) return; // Bug 3 fix
       io.to(roomId).emit("imposterPhase2Start", {
         roundTime: room.roundTime,
       });
 
       if (room.imposterTimer) clearTimeout(room.imposterTimer);
       room.imposterTimer = setTimeout(() => {
+        if (!rooms[roomId]) return; // Bug 3 fix
         endImposterPhase(roomId);
       }, room.roundTime * 1000);
     }, 3000);
@@ -3161,6 +3282,7 @@ function endImposterPhase(roomId) {
 
     room.imposterPhase = "vote";
     setTimeout(() => {
+      if (!rooms[roomId]) return; // Bug 3 fix
       const playerList = room.players.map((p) => ({
         playerId: p.id,
         username: p.username,
@@ -3263,6 +3385,7 @@ function endImposterVoting(roomId) {
   room.currentRound++;
   if (room.currentRound > room.roundCount) {
     setTimeout(() => {
+      if (!rooms[roomId]) return; // Bug 3 fix
       // Determine winner by score
       const scoreList = room.players.map(p => ({
         playerId: p.id,
@@ -3276,6 +3399,7 @@ function endImposterVoting(roomId) {
       });
       room.gameStatus = "finished";
       setTimeout(() => {
+        if (!rooms[roomId]) return; // Bug 3 fix
         room.gameStatus = "waiting";
         emitBackToSelect(roomId);
       }, 5000);
@@ -3284,8 +3408,9 @@ function endImposterVoting(roomId) {
   }
 
   setTimeout(() => {
+    if (!rooms[roomId]) return; // Bug 3 fix
     io.to(roomId).emit("roundChanged", room.currentRound);
-    setTimeout(() => startImposterRound(roomId), 2000);
+    setTimeout(() => { if (!rooms[roomId]) return; startImposterRound(roomId); }, 2000); // Bug 3 fix
   }, 8000);
 }
 
@@ -3335,6 +3460,7 @@ function startSayiTahminSecretPhase(roomId) {
   // Server-side timeout for secret phase (60 seconds)
   if (room.sayiTahminTimer) clearTimeout(room.sayiTahminTimer);
   room.sayiTahminTimer = setTimeout(() => {
+    if (!rooms[roomId]) return; // Bug 3 fix
     autoSubmitSayiTahminSecret(roomId);
   }, 63000);
 }
@@ -3402,6 +3528,7 @@ function startSayiTahminGuessPhase(roomId) {
   // Server-side timeout for guess phase (90 seconds per guess round)
   if (room.sayiTahminTimer) clearTimeout(room.sayiTahminTimer);
   room.sayiTahminTimer = setTimeout(() => {
+    if (!rooms[roomId]) return; // Bug 3 fix
     autoSubmitSayiTahminGuess(roomId);
   }, 93000);
 }
@@ -3434,8 +3561,8 @@ function resolveSayiTahminGuessRound(roomId) {
       const p1Secret = room.sayiTahminSecrets[pairKey][currentPair.p1.id];
       const p2Secret = room.sayiTahminSecrets[pairKey][currentPair.p2.id];
       io.to(roomId).emit("sayiTahminTie", { p1Name: currentPair.p1.username, p2Name: currentPair.p2.username, p1Secret, p2Secret, guessCount: pending.p1.guessCount, currentRound: room.currentRound, pairId: pairKey, teamName: currentPair.teamName });
-      if (room.sayiTahminTieCount >= 3) { room.sayiTahminTieCount = 0; setTimeout(() => { nextSayiTahminStep(roomId); }, 3500); }
-      else { setTimeout(() => { startSayiTahminSecretPhase(roomId); }, 3500); }
+      if (room.sayiTahminTieCount >= 3) { room.sayiTahminTieCount = 0; setTimeout(() => { if (!rooms[roomId]) return; nextSayiTahminStep(roomId); }, 3500); } // Bug 3 fix
+      else { setTimeout(() => { if (!rooms[roomId]) return; startSayiTahminSecretPhase(roomId); }, 3500); } // Bug 3 fix
       return;
     }
     let winnerId, winnerName, loserName, winnerGuess, targetSecretForWinner, winnerGuessCount;
@@ -3451,17 +3578,18 @@ function resolveSayiTahminGuessRound(roomId) {
     if (room.sayiTahminScores) room.sayiTahminScores[winnerId] = (room.sayiTahminScores[winnerId] || 0) + 1;
     const winnerSecret = room.sayiTahminSecrets[pairKey][winnerId];
     io.to(roomId).emit("sayiTahminWin", { winnerName, winnerId, loserName, guess: winnerGuess, targetSecret: targetSecretForWinner, winnerSecret, guessCount: winnerGuessCount, pairId: pairKey, teamName: currentPair.teamName });
-    setTimeout(() => { nextSayiTahminStep(roomId); }, 3500);
+    setTimeout(() => { if (!rooms[roomId]) return; nextSayiTahminStep(roomId); }, 3500); // Bug 3 fix
     return;
   }
 
   // Kimse bilmediyse yeni round başlat
   setTimeout(() => {
+    if (!rooms[roomId]) return; // Bug 3 fix
     io.to(getSocketId(currentPair.p1.id)).emit("sayiTahminNextRoundReady");
     io.to(getSocketId(currentPair.p2.id)).emit("sayiTahminNextRoundReady");
     room.spectators.forEach(s => { io.to(getSocketId(s.id)).emit("sayiTahminNextRoundReady"); });
     if (room.sayiTahminTimer) clearTimeout(room.sayiTahminTimer);
-    room.sayiTahminTimer = setTimeout(() => { autoSubmitSayiTahminGuess(roomId); }, 93000);
+    room.sayiTahminTimer = setTimeout(() => { if (!rooms[roomId]) return; autoSubmitSayiTahminGuess(roomId); }, 93000); // Bug 3 fix
     // Bot: schedule next guess if bot in pair
     const botP = currentPair.p1.isBot ? currentPair.p1 : (currentPair.p2.isBot ? currentPair.p2 : null);
     if (botP) {
@@ -3502,7 +3630,7 @@ function autoSubmitSayiTahminSecret(roomId) {
   if (!room.sayiTahminSecrets[pairKey][pair.p1.id]) room.sayiTahminSecrets[pairKey][pair.p1.id] = randomDigits(dc);
   if (!room.sayiTahminSecrets[pairKey][pair.p2.id]) room.sayiTahminSecrets[pairKey][pair.p2.id] = randomDigits(dc);
   room.sayiTahminGuesses[pairKey] = { p1: [], p2: [] };
-  setTimeout(() => { startSayiTahminGuessPhase(roomId); }, 1000);
+  setTimeout(() => { if (!rooms[roomId]) return; startSayiTahminGuessPhase(roomId); }, 1000); // Bug 3 fix
 }
 
 function autoSubmitSayiTahminGuess(roomId) {
@@ -3521,6 +3649,7 @@ function nextSayiTahminStep(roomId) {
   if (room.currentPairIndex < room.pairs.length) {
     // Next pair
     setTimeout(() => {
+      if (!rooms[roomId]) return; // Bug 3 fix
       startSayiTahminSecretPhase(roomId);
     }, 1000);
     return;
@@ -3545,6 +3674,7 @@ function nextSayiTahminStep(roomId) {
     });
     room.gameStatus = "finished";
     setTimeout(() => {
+      if (!rooms[roomId]) return; // Bug 3 fix
       room.gameStatus = "waiting";
       emitBackToSelect(roomId);
     }, 5000);
@@ -3553,6 +3683,7 @@ function nextSayiTahminStep(roomId) {
 
   io.to(roomId).emit("roundChanged", room.currentRound);
   setTimeout(() => {
+    if (!rooms[roomId]) return; // Bug 3 fix
     startSayiTahminSecretPhase(roomId);
   }, 1200);
 }

@@ -289,6 +289,15 @@ let passPlayP2Id = null;
 let _ppCurrentPlayer = 'p1'; // 'p1' | 'p2'
 let _ppSecretDoneP1 = false;
 
+function resetPassPlayState() {
+  passPlayActive = false;
+  passPlayP1Name = '';
+  passPlayP2Name = '';
+  passPlayP2Id = null;
+  _ppCurrentPlayer = 'p1';
+  _ppSecretDoneP1 = false;
+}
+
 function goToPassPlay() {
   if (!userProfile) return;
   showScreen('passplaySetup');
@@ -296,6 +305,7 @@ function goToPassPlay() {
 
 function goToPrivateRoom() {
   if (!userProfile) return;
+  resetPassPlayState();
   pendingRoomData = { username: userProfile.username, gender: userProfile.gender };
   showScreen("gameSelect");
   selectMode("duo");
@@ -406,6 +416,7 @@ function closeQrScanner() {
 
 function createRoom() {
   if (!userProfile) return;
+  resetPassPlayState();
   pendingRoomData = { username: userProfile.username, gender: userProfile.gender };
   showScreen("gameSelect");
   selectMode("cift");
@@ -426,6 +437,11 @@ function selectMode(mode) {
 
 function selectGame(type) {
   if (!pendingRoomData) return;
+
+  if (selectedMode === "tek" && type !== "pictionary" && type !== "imposter") {
+    Swal.fire({ title: t('warning'), text: t('err_tek_pictionary'), icon: 'warning' });
+    return;
+  }
 
   if (selectedMode === "cift") {
     const ciftVal = document.getElementById("ciftCountSelect").value;
@@ -610,6 +626,7 @@ function joinRoom() {
 
 function goToMatchmaking() {
   if (!userProfile) return;
+  resetPassPlayState();
   if (typeof requireAuthForMultiplayer === 'function') {
     requireAuthForMultiplayer(function() {
       var selectPhase = document.getElementById("mm-select-phase");
@@ -629,11 +646,32 @@ function goToMatchmaking() {
 
 // --- MATCHMAKING ---
 let selectedMMMode = "duo";
+const MATCHMAKING_MODE_GAMES = {
+  duo: ['telepati', 'isimSehir', 'pictionary', 'sayiTahmin', 'tabu'],
+  cift: ['telepati', 'isimSehir', 'pictionary', 'sayiTahmin', 'tabu'],
+  tek: ['pictionary'],
+};
+
+function refreshMatchmakingGameAvailability() {
+  const allowedGames = new Set(MATCHMAKING_MODE_GAMES[selectedMMMode] || []);
+  document.querySelectorAll("#mm-game-grid input[type='checkbox']").forEach((checkbox) => {
+    const chip = checkbox.closest('.mm-game-chip');
+    const isAllowed = allowedGames.has(checkbox.value);
+    if (!isAllowed) checkbox.checked = false;
+    checkbox.disabled = !isAllowed;
+    if (chip) {
+      chip.classList.toggle('selected', checkbox.checked);
+      chip.style.opacity = isAllowed ? '' : '0.45';
+      chip.style.filter = isAllowed ? '' : 'grayscale(1)';
+    }
+  });
+}
 
 function selectMMMode(mode) {
   selectedMMMode = mode;
   document.querySelectorAll(".mm-mode-btn").forEach(b => b.classList.remove("active"));
   document.querySelector('.mm-mode-btn[data-mode="' + mode + '"]').classList.add("active");
+  refreshMatchmakingGameAvailability();
 }
 
 function toggleMMGame(checkbox) {
@@ -650,8 +688,9 @@ function findMatch() {
   const username = userProfile.username;
   const gender = userProfile.gender;
   const selectedGames = [];
+  const allowedGames = new Set(MATCHMAKING_MODE_GAMES[selectedMMMode] || []);
   document.querySelectorAll("#mm-game-grid input[type='checkbox']:checked").forEach(cb => {
-    selectedGames.push(cb.value);
+    if (allowedGames.has(cb.value)) selectedGames.push(cb.value);
   });
   if (selectedGames.length === 0) {
     Swal.fire({ title: t('mm_select_game'), icon: "warning", customClass: { popup: "swal-premium" }, background: "rgba(15,12,40,0.95)", color: "#fff" });
@@ -732,13 +771,28 @@ async function shareWhatsApp() {
   window.open(whatsappUrl, "_blank");
 }
 
+async function leaveCurrentRoom() {
+  if (!currentRoom || !socket || !socket.connected) return false;
+
+  return await new Promise((resolve) => {
+    let settled = false;
+    const finish = (didLeave) => {
+      if (settled) return;
+      settled = true;
+      resolve(didLeave);
+    };
+
+    socket.emit("leaveRoom", currentRoom, () => finish(true));
+    setTimeout(() => finish(false), 500);
+  });
+}
+
 function goToMainMenu() {
-  if (currentRoom && socket) {
-    socket.emit("leaveRoom", currentRoom);
-  }
+  leaveCurrentRoom();
   currentRoom = null;
   sessionStorage.removeItem("duoduels_room");
   pendingRoomData = null;
+  resetPassPlayState();
   showScreen("lobby");
 }
 
@@ -1095,6 +1149,7 @@ socket.on("rejoinSuccess", (data) => {
 });
 socket.on("rejoinFailed", () => {
   hideConnectionStatus();
+  resetPassPlayState();
   currentRoom = null;
   sessionStorage.removeItem("duoduels_room");
   showScreen("lobby");
@@ -1165,6 +1220,7 @@ socket.on("playerReconnected", (data) => {
 
 socket.on("hostLeft", () => {
   clearInterval(timerInterval);
+  resetPassPlayState();
   currentRoom = null;
   sessionStorage.removeItem("duoduels_room");
   amIPlaying = false;
@@ -3521,6 +3577,8 @@ socket.on("sayiTahminGameOver", (data) => {
 
 } // end setupSocketListeners
 
+refreshMatchmakingGameAvailability();
+
 // --- GLOBAL EXPORTS (HTML onclick handlers) ---
 // openSettings, handleAvatarChange → auth.js global
 // setLanguage → translations.js global
@@ -3542,6 +3600,8 @@ window.toggleMMGame       = toggleMMGame;
 window.goBackToGameSelect = goBackToGameSelect;
 window.confirmGameSettings= confirmGameSettings;
 window.showScreen         = showScreen;
+window.leaveCurrentRoom   = leaveCurrentRoom;
+window.resetPassPlayState = resetPassPlayState;
 // Navigation functions (socket-independent, always available)
 window.goToMainMenu       = goToMainMenu;
 window.startGame          = startGame;

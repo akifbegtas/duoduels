@@ -151,6 +151,17 @@ function _devShowScreen(name) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
   const el = document.getElementById(name + '-screen') || document.getElementById(name);
   if (el) el.classList.add('active');
+  // Explicitly hide animated title when leaving auth screen
+  const animTitle = document.getElementById('auth-title-animated');
+  if (animTitle) {
+    if (name === 'auth' || name === 'auth-screen') {
+      animTitle.style.removeProperty('display');
+      animTitle.style.removeProperty('visibility');
+    } else {
+      animTitle.style.setProperty('display', 'none', 'important');
+      animTitle.style.setProperty('visibility', 'hidden', 'important');
+    }
+  }
 }
 
 function _devSignIn() {
@@ -182,6 +193,7 @@ if (_isLocalDev) {
 
   // 2 saniye içinde splash hâlâ ekrandaysa zorla kaldır
   setTimeout(function() {
+    if (_devModeActive) return; // Dev modda auth ekranına dönme
     const splash = document.getElementById('app-splash');
     if (splash) {
       dismissSplash(splash);
@@ -406,11 +418,11 @@ function enterLobby() {
   const greetEl = document.getElementById('lobby-username-greeting');
   if (greetEl) greetEl.textContent = userProfile.username;
 
-  // Avatar
+  // Avatar — Bug 17 fix: validate URL starts with https:// before assigning
   const avatarEl = document.getElementById('lobby-avatar');
   if (avatarEl) {
     const photo = userProfile.photoURL || currentUser.photoURL || '';
-    if (photo) {
+    if (photo && (photo.startsWith('https://') || photo.startsWith('data:image/'))) {
       avatarEl.src = photo;
       avatarEl.onerror = () => { avatarEl.src = _anonymousAvatarSvg(); };
     } else {
@@ -438,6 +450,13 @@ async function signOut() {
     const wasAnonymous = currentUser && currentUser.isAnonymous;
     const userRef = auth ? auth.currentUser : null;
 
+    if (typeof leaveCurrentRoom === 'function') {
+      try {
+        await leaveCurrentRoom();
+      } catch (leaveErr) {
+        console.warn("Odadan ayrılma isteği tamamlanamadı:", leaveErr);
+      }
+    }
     if (typeof socket !== 'undefined' && socket && socket.connected) {
       socket.disconnect();
     }
@@ -447,6 +466,7 @@ async function signOut() {
     // Tüm guest profillerini temizle
     localStorage.removeItem('dd_guest_profile');
     localStorage.removeItem('dd_dev_profile');
+    if (typeof resetPassPlayState === 'function') resetPassPlayState();
     // Temayı sıfırla
     document.body.classList.remove('theme-male', 'theme-female');
     if (typeof updateSvgColors === 'function') updateSvgColors(null);
@@ -487,7 +507,7 @@ async function signOut() {
   }
 }
 
-// --- TOKEN REFRESH (50 dakikada bir) ---
+// --- TOKEN REFRESH (45 dakikada bir — Bug 6 fix: 50 yerine 45 dk, token 60dk'da expire) ---
 function startTokenRefresh() {
   stopTokenRefresh();
   _tokenRefreshTimer = setInterval(async () => {
@@ -502,7 +522,7 @@ function startTokenRefresh() {
         console.error("Token yenileme hatası:", err);
       }
     }
-  }, 50 * 60 * 1000); // 50 dakika
+  }, 45 * 60 * 1000); // 45 dakika (Bug 6 fix)
 }
 
 function stopTokenRefresh() {
