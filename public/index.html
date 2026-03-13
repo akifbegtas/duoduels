@@ -51,16 +51,6 @@
   <!-- Futuristic Background Canvas -->
   <canvas id="duel-bg-canvas"></canvas>
 
-  <!-- Desktop Sidebar Ads -->
-  <div class="ad-sidebar ad-sidebar-left">
-    <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-6538380227236833" data-ad-slot="9155874948" data-ad-format="vertical" data-full-width-responsive="false"></ins>
-    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
-  </div>
-  <div class="ad-sidebar ad-sidebar-right">
-    <ins class="adsbygoogle" style="display:block" data-ad-client="ca-pub-6538380227236833" data-ad-slot="9155874948" data-ad-format="vertical" data-full-width-responsive="false"></ins>
-    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
-  </div>
-
   <!-- Bottom Bar Ad (collapsible) -->
   <div class="ad-bottombar" id="ad-bottombar">
     <button class="ad-bottombar-toggle" id="ad-bottombar-toggle">▼ Gizle</button>
@@ -319,6 +309,22 @@
             <div id="lmc-title-random" class="lmc-title-big">Rastgele Eşleş</div>
             <div id="lmc-sub-random" class="lmc-sub-big">Online partner bul ve diğer çiftlerle yarış</div>
           </button>
+          <button class="lobby-mode-card lobby-mode-card-big" onclick="showScreen('friends')">
+            <div class="lmc-icon-big">👥</div>
+            <div id="lmc-title-friends" class="lmc-title-big">Arkadaşlar</div>
+            <div id="lmc-sub-friends" class="lmc-sub-big">Arkadaş ekle, davet et</div>
+            <span id="friend-request-badge" class="friend-badge" style="display:none">0</span>
+          </button>
+          <button class="lobby-mode-card lobby-mode-card-big" onclick="showScreen('stats')">
+            <div class="lmc-icon-big">📊</div>
+            <div id="lmc-title-stats" class="lmc-title-big">İstatistikler</div>
+            <div id="lmc-sub-stats" class="lmc-sub-big">Oyun geçmişin ve başarıların</div>
+          </button>
+          <button class="lobby-mode-card lobby-mode-card-big" onclick="showScreen('leaderboard')">
+            <div class="lmc-icon-big">🏆</div>
+            <div id="lmc-title-leaderboard" class="lmc-title-big">Liderlik Tablosu</div>
+            <div id="lmc-sub-leaderboard" class="lmc-sub-big">En iyi oyuncuları gör</div>
+          </button>
         </div>
 
         <div class="lobby-join-row">
@@ -366,8 +372,210 @@
             <button id="lang-btn-ar" class="lang-btn" onclick="setLanguage('ar')">🇸🇦</button>
           </div>
         </div>
+
+        <!-- Ses / Sound -->
+        <div class="settings-section">
+          <div id="settings-sound-sec" class="settings-section-title">Ses Efektleri</div>
+          <div class="settings-toggle-row">
+            <label class="toggle-switch">
+              <input type="checkbox" id="sound-toggle" checked onchange="SoundManager.toggle(this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+            <span id="settings-sound-label" class="toggle-label">Ses efektleri</span>
+          </div>
+          <div class="settings-toggle-row" style="margin-top:8px">
+            <label class="toggle-switch">
+              <input type="checkbox" id="haptics-toggle" checked onchange="SoundManager.toggleHaptics(this.checked)">
+              <span class="toggle-slider"></span>
+            </label>
+            <span id="settings-haptics-label" class="toggle-label">Titreşim</span>
+          </div>
+        </div>
       </div>
     </div>
+
+    <!-- ARKADAŞLAR EKRANI -->
+    <div id="friends-screen" class="screen">
+      <div class="card friends-card">
+        <div class="friends-header">
+          <button class="btn-back-corner-inline" onclick="showScreen('lobby')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+          </button>
+          <h2 id="friends-title">Arkadaşlar</h2>
+        </div>
+
+        <!-- My Friend Code -->
+        <div class="friend-code-section">
+          <div class="friend-code-label" id="friends-code-label">Arkadaş Kodun</div>
+          <div class="friend-code-display">
+            <span id="my-friend-code" class="friend-code-value">--------</span>
+            <button class="btn-copy-code" onclick="copyFriendCode()" id="friends-copy-btn">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Add Friend -->
+        <div class="friend-add-section">
+          <input type="text" id="friend-code-input" class="big-input" placeholder="Arkadaş kodunu gir" maxlength="8" style="text-transform:uppercase" />
+          <button class="btn-secondary" onclick="sendFriendRequestUI()" id="friends-send-btn">Ekle</button>
+        </div>
+
+        <!-- Tabs -->
+        <div class="friends-tabs">
+          <button class="friends-tab active" id="friends-tab-list" onclick="switchFriendsTab('list')">Arkadaşlar</button>
+          <button class="friends-tab" id="friends-tab-requests" onclick="switchFriendsTab('requests')">
+            İstekler <span id="friends-req-count" class="friends-req-badge" style="display:none">0</span>
+          </button>
+        </div>
+
+        <!-- Friend List -->
+        <div id="friends-list-panel" class="friends-panel">
+          <div id="friends-list-container" class="friends-list">
+            <p id="friends-empty-msg" class="friends-empty">Henüz arkadaşın yok.</p>
+          </div>
+        </div>
+
+        <!-- Requests Panel -->
+        <div id="friends-requests-panel" class="friends-panel" style="display:none">
+          <div id="friends-requests-container" class="friends-list">
+            <p id="friends-requests-empty-msg" class="friends-empty">Bekleyen istek yok.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- LİDERLİK TABLOSU EKRANI -->
+    <div id="leaderboard-screen" class="screen">
+      <div class="card leaderboard-card">
+        <div class="leaderboard-header">
+          <button class="btn-back-corner-inline" onclick="showScreen('lobby')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+          </button>
+          <h2 id="leaderboard-title">Liderlik Tablosu</h2>
+        </div>
+
+        <!-- Tabs: Global / Friends -->
+        <div class="leaderboard-tabs">
+          <button class="lb-tab active" id="lb-tab-global" onclick="switchLeaderboardTab('global')">
+            <span id="lb-tab-global-text">Global</span>
+          </button>
+          <button class="lb-tab" id="lb-tab-friends" onclick="switchLeaderboardTab('friends')">
+            <span id="lb-tab-friends-text">Arkadaşlar</span>
+          </button>
+        </div>
+
+        <!-- Sort by -->
+        <div class="leaderboard-sort">
+          <select id="lb-sort-select" class="lb-select" onchange="loadLeaderboard()">
+            <option value="gamesWon" id="lb-sort-wins">En Çok Galibiyet</option>
+            <option value="gamesPlayed" id="lb-sort-played">En Çok Oyun</option>
+            <option value="bestWinStreak" id="lb-sort-streak">En İyi Seri</option>
+          </select>
+        </div>
+
+        <!-- Leaderboard List -->
+        <div id="leaderboard-list" class="leaderboard-list">
+          <p id="lb-empty" class="friends-empty">Yükleniyor...</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- İSTATİSTİK EKRANI -->
+    <div id="stats-screen" class="screen">
+      <div class="card stats-card">
+        <div class="stats-header">
+          <button class="btn-back-corner-inline" onclick="showScreen('lobby')">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <polyline points="15 18 9 12 15 6"/>
+            </svg>
+          </button>
+          <h2 id="stats-title">İstatistikler</h2>
+        </div>
+
+        <!-- Overview Stats -->
+        <div class="stats-overview">
+          <div class="stat-box">
+            <div class="stat-number" id="stat-games-played">0</div>
+            <div class="stat-label" id="stat-label-played">Oyun</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-number" id="stat-games-won">0</div>
+            <div class="stat-label" id="stat-label-won">Galibiyet</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-number" id="stat-win-rate">0%</div>
+            <div class="stat-label" id="stat-label-winrate">Kazanma</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-number" id="stat-best-streak">0</div>
+            <div class="stat-label" id="stat-label-streak">En İyi Seri</div>
+          </div>
+        </div>
+
+        <!-- Game Type Breakdown -->
+        <h3 class="stats-section-title" id="stats-by-game-title">Oyun Türlerine Göre</h3>
+        <div id="stats-by-game" class="stats-by-game">
+          <!-- Dynamically filled -->
+        </div>
+
+        <!-- Achievements -->
+        <h3 class="stats-section-title" id="stats-ach-title">Başarımlar</h3>
+        <div id="stats-achievements" class="stats-achievements">
+          <!-- Dynamically filled -->
+        </div>
+
+        <!-- Recent Games -->
+        <h3 class="stats-section-title" id="stats-recent-title">Son Oyunlar</h3>
+        <div id="stats-recent-games" class="stats-recent-games">
+          <p id="stats-no-games" class="friends-empty">Henüz oyun geçmişi yok.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- OYUN DAVET TOAST (floating, tüm ekranlarda görünür) -->
+    <div id="game-invite-toast" class="game-invite-toast" style="display:none">
+      <div class="invite-toast-content">
+        <img id="invite-toast-avatar" class="invite-toast-avatar" src="" alt="" />
+        <div class="invite-toast-text">
+          <strong id="invite-toast-username"></strong>
+          <span id="invite-toast-msg">seni oyuna davet ediyor!</span>
+        </div>
+      </div>
+      <div class="invite-toast-actions">
+        <button class="btn-invite-accept" onclick="acceptGameInvite()">Katıl</button>
+        <button class="btn-invite-decline" onclick="declineGameInvite()">Reddet</button>
+      </div>
+    </div>
+
+    <!-- EMOJI REACTION BUTTON & PANEL -->
+    <button id="reaction-btn" class="reaction-floating-btn" onclick="toggleReactionPanel()" style="display:none">
+      <span>😄</span>
+    </button>
+    <div id="reaction-panel" class="reaction-panel" style="display:none">
+      <div class="reaction-grid">
+        <button class="reaction-emoji" onclick="sendReaction('👏')">👏</button>
+        <button class="reaction-emoji" onclick="sendReaction('😂')">😂</button>
+        <button class="reaction-emoji" onclick="sendReaction('😮')">😮</button>
+        <button class="reaction-emoji" onclick="sendReaction('🔥')">🔥</button>
+        <button class="reaction-emoji" onclick="sendReaction('❤️')">❤️</button>
+        <button class="reaction-emoji" onclick="sendReaction('🤔')">🤔</button>
+        <button class="reaction-emoji" onclick="sendReaction('😎')">😎</button>
+        <button class="reaction-emoji" onclick="sendReaction('🎉')">🎉</button>
+        <button class="reaction-emoji" onclick="sendReaction('💀')">💀</button>
+        <button class="reaction-emoji" onclick="sendReaction('🤣')">🤣</button>
+        <button class="reaction-emoji" onclick="sendReaction('👀')">👀</button>
+        <button class="reaction-emoji" onclick="sendReaction('💪')">💪</button>
+      </div>
+    </div>
+    <!-- REACTION OVERLAY (animated emojis appear here) -->
+    <div id="reaction-overlay" class="reaction-overlay"></div>
 
     <div id="matchmaking-screen" class="screen">
       <!-- Aşama 1: Mod + Oyun Seçimi -->
@@ -444,6 +652,7 @@
           <div id="member-message" class="hidden">
             <p>Kurucunun oyunu başlatması bekleniyor...</p>
           </div>
+          <button class="btn-invite-friends" onclick="showInviteFriendsPopup()" id="btn-invite-friends" style="display:none">👥 Arkadaş Davet Et</button>
           <button class="btn-back-subtle" onclick="goToMainMenu()">Ana Menü</button>
         </div>
       </div>
@@ -1145,7 +1354,7 @@
         var storeBadges = document.querySelector('.auth-store-badges');
         if (storeBadges) storeBadges.style.display = 'none';
         // Web reklamları (AdSense native'de çalışmaz)
-        document.querySelectorAll('.ad-sidebar, .ad-bottombar, .ad-interstitial-overlay').forEach(function(el) {
+        document.querySelectorAll('.ad-bottombar, .ad-interstitial-overlay').forEach(function(el) {
           el.style.display = 'none';
         });
       });

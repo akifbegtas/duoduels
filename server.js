@@ -503,10 +503,183 @@ function findHostSocket(room) {
 // --- Player Identity ---
 const playerSockets = {}; // playerId -> socketId
 
+// --- Online Presence Tracking ---
+const onlineUsers = new Map(); // uid -> { socketId, status, username, gender, photoURL }
+
 function getSocketId(playerId) {
   // Return mapped socket ID, or a non-existent room name to silently drop
   return playerSockets[playerId] || "__disconnected__";
 }
+
+// --- Firestore Admin DB Reference ---
+const adminDb = firebaseAuthEnabled ? admin.firestore() : null;
+
+// --- Game Stats Persistence ---
+async function saveGameResult(roomId) {
+  if (!adminDb) return;
+  const room = rooms[roomId];
+  if (!room || !room.gameType) return;
+
+  try {
+    const gameType = room.gameType;
+    const gameMode = room.gameMode;
+    const now = admin.firestore.FieldValue.serverTimestamp();
+    const increment = admin.firestore.FieldValue.increment(1);
+
+    // Collect all player UIDs and their scores
+    let playerResults = []; // { uid, username, score, isWinner }
+
+    if (gameMode === 'tek') {
+      // Solo mode games (imposter, pictionary solo)
+      const scores = gameType === 'imposter' ? room.imposterScores :
+                     gameType === 'pictionary' ? room.pictionaryScores : {};
+      const players = room.players || [];
+      let maxScore = -Infinity;
+      players.forEach(p => {
+        const s = scores[p.id] || 0;
+        if (s > maxScore) maxScore = s;
+      });
+      players.forEach(p => {
+        const s = scores[p.id] || 0;
+        playerResults.push({
+          uid: p.id,
+          username: p.username,
+          score: s,
+          isWinner: s === maxScore && maxScore > 0,
+        });
+      });
+    } else {
+      // Team/duo mode - extract scores by game type
+      const pairs = room.pairs || [];
+      let scores = {};
+      if (gameType === 'telepati') {
+        // Telepati: lower totalAttempts is better
+        pairs.forEach(p => { scores[p.id] = p.totalAttempts || 0; });
+        let minScore = Infinity;
+        pairs.filter(p => !p.isEliminated).forEach(p => {
+          if ((scores[p.id] || 0) < minScore) minScore = scores[p.id] || 0;
+        });
+        pairs.forEach(pair => {
+          const isWin = !pair.isEliminated && (scores[pair.id] || 0) === minScore;
+          if (pair.p1) playerResults.push({ uid: pair.p1.id, username: pair.p1.username, score: scores[pair.id] || 0, isWinner: isWin });
+          if (pair.p2) playerResults.push({ uid: pair.p2.id, username: pair.p2.username, score: scores[pair.id] || 0, isWinner: isWin });
+        });
+      } else if (gameType === 'isimSehir') {
+        scores = room.isimSehirScores || {};
+        let maxScore = -Infinity;
+        pairs.forEach(p => { if ((scores[p.id] || 0) > maxScore) maxScore = scores[p.id] || 0; });
+        pairs.forEach(pair => {
+          const s = scores[pair.id] || 0;
+          const isWin = s === maxScore && maxScore > 0;
+          if (pair.p1) playerResults.push({ uid: pair.p1.id, username: pair.p1.username, score: s, isWinner: isWin });
+          if (pair.p2) playerResults.push({ uid: pair.p2.id, username: pair.p2.username, score: s, isWinner: isWin });
+        });
+      } else if (gameType === 'pictionary') {
+        scores = room.pictionaryScores || {};
+        let maxScore = -Infinity;
+        pairs.forEach(p => { if ((scores[p.id] || 0) > maxScore) maxScore = scores[p.id] || 0; });
+        pairs.forEach(pair => {
+          const s = scores[pair.id] || 0;
+          const isWin = s === maxScore && maxScore > 0;
+          if (pair.p1) playerResults.push({ uid: pair.p1.id, username: pair.p1.username, score: s, isWinner: isWin });
+          if (pair.p2) playerResults.push({ uid: pair.p2.id, username: pair.p2.username, score: s, isWinner: isWin });
+        });
+      } else if (gameType === 'tabu') {
+        scores = room.tabuScores || {};
+        let maxScore = -Infinity;
+        pairs.forEach(p => { if ((scores[p.id] || 0) > maxScore) maxScore = scores[p.id] || 0; });
+        pairs.forEach(pair => {
+          const s = scores[pair.id] || 0;
+          const isWin = s === maxScore && maxScore > 0;
+          if (pair.p1) playerResults.push({ uid: pair.p1.id, username: pair.p1.username, score: s, isWinner: isWin });
+          if (pair.p2) playerResults.push({ uid: pair.p2.id, username: pair.p2.username, score: s, isWinner: isWin });
+        });
+      } else if (gameType === 'sayiTahmin') {
+        scores = room.sayiTahminScores || {};
+        let maxScore = -Infinity;
+        pairs.forEach(p => {
+          const p1s = scores[p.p1?.id] || 0;
+          const p2s = scores[p.p2?.id] || 0;
+          if (p1s > maxScore) maxScore = p1s;
+          if (p2s > maxScore) maxScore = p2s;
+        });
+        pairs.forEach(pair => {
+          if (pair.p1) {
+            const s = scores[pair.p1.id] || 0;
+            playerResults.push({ uid: pair.p1.id, username: pair.p1.username, score: s, isWinner: s === maxScore && maxScore > 0 });
+          }
+          if (pair.p2) {
+            const s = scores[pair.p2.id] || 0;
+            playerResults.push({ uid: pair.p2.id, username: pair.p2.username, score: s, isWinner: s === maxScore && maxScore > 0 });
+          }
+        });
+      } else if (gameType === 'bilBakalim') {
+        scores = room.bilBakalimScores || {};
+        let maxScore = -Infinity;
+        pairs.forEach(p => { if ((scores[p.id] || 0) > maxScore) maxScore = scores[p.id] || 0; });
+        pairs.forEach(pair => {
+          const s = scores[pair.id] || 0;
+          const isWin = s === maxScore && maxScore > 0;
+          if (pair.p1) playerResults.push({ uid: pair.p1.id, username: pair.p1.username, score: s, isWinner: isWin });
+          if (pair.p2) playerResults.push({ uid: pair.p2.id, username: pair.p2.username, score: s, isWinner: isWin });
+        });
+      }
+    }
+
+    // Filter out bot/dev players (only save real Firebase UIDs)
+    playerResults = playerResults.filter(p => p.uid && !p.uid.startsWith('dev_') && !p.uid.startsWith('passplay_') && !p.uid.startsWith('bot_'));
+
+    if (playerResults.length === 0) return;
+
+    // Save game result document
+    const gameResultRef = adminDb.collection('gameResults').doc();
+    await gameResultRef.set({
+      gameType,
+      gameMode,
+      roomId,
+      players: playerResults.map(p => ({ uid: p.uid, username: p.username, score: p.score, isWinner: p.isWinner })),
+      roundCount: room.roundCount || 1,
+      createdAt: now,
+    });
+
+    // Update each player's stats
+    const batch = adminDb.batch();
+    playerResults.forEach(p => {
+      const userRef = adminDb.collection('users').doc(p.uid);
+      const statsUpdate = {
+        'stats.gamesPlayed': increment,
+        [`stats.gamesByType.${gameType}`]: increment,
+        'stats.lastPlayedAt': now,
+      };
+      if (p.isWinner) {
+        statsUpdate['stats.gamesWon'] = increment;
+      }
+      batch.set(userRef, statsUpdate, { merge: true });
+    });
+    await batch.commit();
+
+    // Update win streaks separately (requires reading current value)
+    for (const p of playerResults) {
+      try {
+        const userRef = adminDb.collection('users').doc(p.uid);
+        const userDoc = await userRef.get();
+        const stats = userDoc.exists ? (userDoc.data().stats || {}) : {};
+        if (p.isWinner) {
+          const newStreak = (stats.currentWinStreak || 0) + 1;
+          const bestStreak = Math.max(newStreak, stats.bestWinStreak || 0);
+          await userRef.set({ stats: { currentWinStreak: newStreak, bestWinStreak: bestStreak } }, { merge: true });
+        } else {
+          await userRef.set({ stats: { currentWinStreak: 0 } }, { merge: true });
+        }
+      } catch (e) { /* streak update non-critical */ }
+    }
+
+    console.log(`Game result saved: ${gameType} (${gameMode}) - ${playerResults.length} players`);
+  } catch (err) {
+    console.error('Error saving game result:', err);
+  }
+}
+
 const TURKISH_LETTERS = [
   "A",
   "B",
@@ -2020,8 +2193,416 @@ io.on("connection", (socket) => {
   });
 
   // --- DISCONNECT ---
+  // ============ ARKADAŞ SİSTEMİ ============
+
+  // Set online status on connect
+  socket.on("setOnline", async (data) => {
+    try {
+      const uid = socket.userId;
+      if (!uid) return;
+      onlineUsers.set(uid, {
+        socketId: socket.id,
+        status: 'online',
+        username: sanitizeString(data.username, 12) || '',
+        gender: data.gender || '',
+        photoURL: data.photoURL || ''
+      });
+
+      // Notify online friends
+      if (adminDb) {
+        try {
+          const friendsSnap = await adminDb.collection('users').doc(uid).collection('friends').get();
+          friendsSnap.forEach(doc => {
+            const friendUid = doc.id;
+            const friendOnline = onlineUsers.get(friendUid);
+            if (friendOnline) {
+              io.to(friendOnline.socketId).emit("friendStatusChanged", { friendUid: uid, status: 'online', username: data.username });
+            }
+          });
+        } catch (e) { /* silent */ }
+      }
+    } catch (e) { console.error("setOnline error:", e.message); }
+  });
+
+  // Get friend list with online statuses
+  socket.on("getFriendList", async () => {
+    try {
+      const uid = socket.userId;
+      if (!uid || !adminDb) { socket.emit("friendListUpdate", { friends: [] }); return; }
+
+      const friendsSnap = await adminDb.collection('users').doc(uid).collection('friends').get();
+      const friends = [];
+      friendsSnap.forEach(doc => {
+        const data = doc.data();
+        const online = onlineUsers.get(doc.id);
+        friends.push({
+          uid: doc.id,
+          username: data.username || '',
+          photoURL: data.photoURL || '',
+          gender: data.gender || '',
+          onlineStatus: online ? online.status : 'offline',
+          addedAt: data.addedAt
+        });
+      });
+
+      // Sort: online first, then alphabetical
+      friends.sort((a, b) => {
+        if (a.onlineStatus !== 'offline' && b.onlineStatus === 'offline') return -1;
+        if (a.onlineStatus === 'offline' && b.onlineStatus !== 'offline') return 1;
+        return (a.username || '').localeCompare(b.username || '');
+      });
+
+      socket.emit("friendListUpdate", { friends });
+    } catch (e) {
+      console.error("getFriendList error:", e.message);
+      socket.emit("friendListUpdate", { friends: [] });
+    }
+  });
+
+  // Get pending friend requests
+  socket.on("getPendingRequests", async () => {
+    try {
+      const uid = socket.userId;
+      if (!uid || !adminDb) { socket.emit("pendingRequestsUpdate", { requests: [] }); return; }
+
+      const snap = await adminDb.collection('friendRequests')
+        .where('toUid', '==', uid)
+        .where('status', '==', 'pending')
+        .orderBy('createdAt', 'desc')
+        .limit(50)
+        .get();
+
+      const requests = [];
+      snap.forEach(doc => {
+        const data = doc.data();
+        requests.push({
+          requestId: doc.id,
+          fromUid: data.fromUid,
+          fromUsername: data.fromUsername || '',
+          fromPhotoURL: data.fromPhotoURL || '',
+          fromGender: data.fromGender || '',
+          createdAt: data.createdAt
+        });
+      });
+
+      socket.emit("pendingRequestsUpdate", { requests });
+    } catch (e) {
+      console.error("getPendingRequests error:", e.message);
+      socket.emit("pendingRequestsUpdate", { requests: [] });
+    }
+  });
+
+  // Send friend request by friend code
+  socket.on("sendFriendRequest", async ({ friendCode }) => {
+    try {
+      const uid = socket.userId;
+      if (!uid || !adminDb || !friendCode) {
+        socket.emit("friendRequestResult", { success: false, error: 'invalid' });
+        return;
+      }
+
+      const code = sanitizeString(friendCode, 8).toUpperCase();
+
+      // Find user by friendCode
+      const userSnap = await adminDb.collection('users').where('friendCode', '==', code).limit(1).get();
+      if (userSnap.empty) {
+        socket.emit("friendRequestResult", { success: false, error: 'not_found' });
+        return;
+      }
+
+      const targetDoc = userSnap.docs[0];
+      const targetUid = targetDoc.id;
+      const targetData = targetDoc.data();
+
+      // Can't add yourself
+      if (targetUid === uid) {
+        socket.emit("friendRequestResult", { success: false, error: 'self' });
+        return;
+      }
+
+      // Check if already friends
+      const existingFriend = await adminDb.collection('users').doc(uid).collection('friends').doc(targetUid).get();
+      if (existingFriend.exists) {
+        socket.emit("friendRequestResult", { success: false, error: 'already_friends' });
+        return;
+      }
+
+      // Check if pending request already exists (either direction)
+      const existingReq1 = await adminDb.collection('friendRequests')
+        .where('fromUid', '==', uid).where('toUid', '==', targetUid).where('status', '==', 'pending')
+        .limit(1).get();
+      if (!existingReq1.empty) {
+        socket.emit("friendRequestResult", { success: false, error: 'already_sent' });
+        return;
+      }
+      const existingReq2 = await adminDb.collection('friendRequests')
+        .where('fromUid', '==', targetUid).where('toUid', '==', uid).where('status', '==', 'pending')
+        .limit(1).get();
+      if (!existingReq2.empty) {
+        socket.emit("friendRequestResult", { success: false, error: 'already_sent' });
+        return;
+      }
+
+      // Get sender profile
+      const senderDoc = await adminDb.collection('users').doc(uid).get();
+      const senderData = senderDoc.exists ? senderDoc.data() : {};
+
+      // Create friend request
+      const reqRef = await adminDb.collection('friendRequests').add({
+        fromUid: uid,
+        toUid: targetUid,
+        fromUsername: senderData.username || '',
+        fromPhotoURL: senderData.photoURL || '',
+        fromGender: senderData.gender || '',
+        status: 'pending',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        updatedAt: admin.firestore.FieldValue.serverTimestamp()
+      });
+
+      socket.emit("friendRequestResult", { success: true, targetUsername: targetData.username });
+
+      // Notify target if online
+      const targetOnline = onlineUsers.get(targetUid);
+      if (targetOnline) {
+        io.to(targetOnline.socketId).emit("friendRequestReceived", {
+          requestId: reqRef.id,
+          from: { uid, username: senderData.username || '', photoURL: senderData.photoURL || '', gender: senderData.gender || '' }
+        });
+      }
+    } catch (e) {
+      console.error("sendFriendRequest error:", e.message);
+      socket.emit("friendRequestResult", { success: false, error: 'server_error' });
+    }
+  });
+
+  // Respond to friend request (accept/reject)
+  socket.on("respondFriendRequest", async ({ requestId, accept }) => {
+    try {
+      const uid = socket.userId;
+      if (!uid || !adminDb || !requestId) return;
+
+      const reqRef = adminDb.collection('friendRequests').doc(requestId);
+      const reqDoc = await reqRef.get();
+      if (!reqDoc.exists) return;
+
+      const reqData = reqDoc.data();
+      if (reqData.toUid !== uid || reqData.status !== 'pending') return;
+
+      if (accept) {
+        // Update request status
+        await reqRef.update({ status: 'accepted', updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+
+        // Get both profiles
+        const [senderDoc, receiverDoc] = await Promise.all([
+          adminDb.collection('users').doc(reqData.fromUid).get(),
+          adminDb.collection('users').doc(uid).get()
+        ]);
+        const senderData = senderDoc.exists ? senderDoc.data() : {};
+        const receiverData = receiverDoc.exists ? receiverDoc.data() : {};
+
+        // Create friend entries in both directions (batch)
+        const batch = adminDb.batch();
+        batch.set(adminDb.collection('users').doc(uid).collection('friends').doc(reqData.fromUid), {
+          username: senderData.username || '',
+          photoURL: senderData.photoURL || '',
+          gender: senderData.gender || '',
+          addedAt: admin.firestore.FieldValue.serverTimestamp(),
+          status: 'accepted'
+        });
+        batch.set(adminDb.collection('users').doc(reqData.fromUid).collection('friends').doc(uid), {
+          username: receiverData.username || '',
+          photoURL: receiverData.photoURL || '',
+          gender: receiverData.gender || '',
+          addedAt: admin.firestore.FieldValue.serverTimestamp(),
+          status: 'accepted'
+        });
+        // Increment friend counts
+        batch.update(adminDb.collection('users').doc(uid), {
+          friendCount: admin.firestore.FieldValue.increment(1)
+        });
+        batch.update(adminDb.collection('users').doc(reqData.fromUid), {
+          friendCount: admin.firestore.FieldValue.increment(1)
+        });
+        await batch.commit();
+
+        socket.emit("friendRequestResponded", { requestId, accepted: true });
+
+        // Notify sender if online
+        const senderOnline = onlineUsers.get(reqData.fromUid);
+        if (senderOnline) {
+          io.to(senderOnline.socketId).emit("friendRequestAccepted", {
+            friendUid: uid,
+            username: receiverData.username || '',
+            photoURL: receiverData.photoURL || '',
+            gender: receiverData.gender || ''
+          });
+        }
+      } else {
+        await reqRef.update({ status: 'rejected', updatedAt: admin.firestore.FieldValue.serverTimestamp() });
+        socket.emit("friendRequestResponded", { requestId, accepted: false });
+      }
+    } catch (e) {
+      console.error("respondFriendRequest error:", e.message);
+    }
+  });
+
+  // Remove friend
+  socket.on("removeFriend", async ({ friendUid }) => {
+    try {
+      const uid = socket.userId;
+      if (!uid || !adminDb || !friendUid) return;
+
+      const batch = adminDb.batch();
+      batch.delete(adminDb.collection('users').doc(uid).collection('friends').doc(friendUid));
+      batch.delete(adminDb.collection('users').doc(friendUid).collection('friends').doc(uid));
+      batch.update(adminDb.collection('users').doc(uid), { friendCount: admin.firestore.FieldValue.increment(-1) });
+      batch.update(adminDb.collection('users').doc(friendUid), { friendCount: admin.firestore.FieldValue.increment(-1) });
+      await batch.commit();
+
+      socket.emit("friendRemoveResult", { success: true, friendUid });
+
+      // Notify the other user if online
+      const friendOnline = onlineUsers.get(friendUid);
+      if (friendOnline) {
+        io.to(friendOnline.socketId).emit("friendRemoved", { friendUid: uid });
+      }
+    } catch (e) {
+      console.error("removeFriend error:", e.message);
+    }
+  });
+
+  // Invite friend to room
+  socket.on("inviteFriendToRoom", ({ friendUid, roomId }) => {
+    try {
+      const uid = socket.userId;
+      if (!uid || !friendUid || !roomId) return;
+
+      const room = rooms[roomId];
+      if (!room) return;
+
+      const senderInfo = onlineUsers.get(uid);
+      const friendOnline = onlineUsers.get(friendUid);
+      if (!friendOnline) {
+        socket.emit("gameError", "Arkadaşın çevrimdışı.");
+        return;
+      }
+
+      io.to(friendOnline.socketId).emit("gameInviteReceived", {
+        from: { uid, username: senderInfo ? senderInfo.username : '', photoURL: senderInfo ? senderInfo.photoURL : '' },
+        roomId: roomId,
+        gameType: room.gameType || ''
+      });
+
+      socket.emit("inviteSent", { friendUid });
+    } catch (e) {
+      console.error("inviteFriendToRoom error:", e.message);
+    }
+  });
+
+  // ============ ŞİKAYET & ENGELLEME ============
+  socket.on("reportUser", async ({ targetUid, reason }) => {
+    if (!adminDb) return;
+    const uid = socket.userId;
+    if (!uid || !targetUid || uid === targetUid) return;
+    try {
+      await adminDb.collection('reports').add({
+        reporterUid: uid,
+        targetUid,
+        reason: (reason || '').substring(0, 200),
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        status: 'pending',
+      });
+      socket.emit("reportSuccess");
+    } catch (e) {
+      console.error("reportUser error:", e.message);
+    }
+  });
+
+  socket.on("blockUser", async ({ targetUid }) => {
+    if (!adminDb) return;
+    const uid = socket.userId;
+    if (!uid || !targetUid || uid === targetUid) return;
+    try {
+      await adminDb.collection('users').doc(uid).set({
+        blockedUsers: admin.firestore.FieldValue.arrayUnion(targetUid)
+      }, { merge: true });
+      socket.emit("blockSuccess", { targetUid });
+    } catch (e) {
+      console.error("blockUser error:", e.message);
+    }
+  });
+
+  socket.on("unblockUser", async ({ targetUid }) => {
+    if (!adminDb) return;
+    const uid = socket.userId;
+    if (!uid || !targetUid) return;
+    try {
+      await adminDb.collection('users').doc(uid).set({
+        blockedUsers: admin.firestore.FieldValue.arrayRemove(targetUid)
+      }, { merge: true });
+      socket.emit("unblockSuccess", { targetUid });
+    } catch (e) {
+      console.error("unblockUser error:", e.message);
+    }
+  });
+
+  socket.on("getBlockedUsers", async () => {
+    if (!adminDb) { socket.emit("blockedUsersList", []); return; }
+    const uid = socket.userId;
+    if (!uid) return;
+    try {
+      const doc = await adminDb.collection('users').doc(uid).get();
+      socket.emit("blockedUsersList", doc.exists ? (doc.data().blockedUsers || []) : []);
+    } catch (e) {
+      socket.emit("blockedUsersList", []);
+    }
+  });
+
+  // ============ EMOJİ TEPKİLERİ ============
+  socket.on("sendReaction", ({ roomId, emoji }) => {
+    if (!roomId || !emoji || !rooms[roomId]) return;
+    const pid = socket.userId;
+    // Find username
+    const room = rooms[roomId];
+    let username = '';
+    if (room.gameMode === 'tek') {
+      const p = room.players.find(pl => pl.id === pid);
+      if (p) username = p.username;
+    } else {
+      for (const t of room.teams) {
+        if (t.p1 && t.p1.id === pid) { username = t.p1.username; break; }
+        if (t.p2 && t.p2.id === pid) { username = t.p2.username; break; }
+      }
+      if (!username) {
+        const sp = room.spectators.find(s => s.id === pid);
+        if (sp) username = sp.username;
+      }
+    }
+    // Broadcast to room (except sender)
+    socket.to(roomId).emit("reactionReceived", { emoji, username, senderId: pid });
+  });
+
+  // ============ BAĞLANTI KOPMA ============
+
   socket.on("disconnect", () => {
     const pid = socket.userId;
+
+    // Online presence'dan çıkar ve arkadaşlara bildir
+    if (pid && onlineUsers.has(pid)) {
+      onlineUsers.delete(pid);
+      // Notify friends about offline status (async, non-blocking)
+      if (adminDb) {
+        adminDb.collection('users').doc(pid).collection('friends').get().then(snap => {
+          snap.forEach(doc => {
+            const friendOnline = onlineUsers.get(doc.id);
+            if (friendOnline) {
+              io.to(friendOnline.socketId).emit("friendStatusChanged", { friendUid: pid, status: 'offline' });
+            }
+          });
+        }).catch(() => {});
+      }
+    }
+
     // Matchmaking kuyruğundan çıkar
     removeFromMatchmaking(pid);
     for (const roomId of Object.keys(rooms)) {
@@ -3561,6 +4142,9 @@ function emitBackToSelect(roomId) {
   const room = rooms[roomId];
   if (!room) return;
 
+  // Save game stats before resetting state
+  saveGameResult(roomId).catch(() => {});
+
   // Oyun state'ini sıfırla
   room.currentRound = 1;
   room.currentPairIndex = 0;
@@ -3686,6 +4270,15 @@ setInterval(() => {
     console.log(`Oda temizliği: ${cleaned} oda silindi. Aktif odalar: ${Object.keys(rooms).length}`);
   }
 }, 5 * 60 * 1000);
+
+// Global error handlers to prevent crashes
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err.message);
+  console.error(err.stack);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled Rejection:', reason);
+});
 
 const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => console.log(`Sunucu ${PORT} portunda!`));

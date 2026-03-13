@@ -56,6 +56,30 @@ function configureAuthProviderVisibility() {
 // --- SIGN IN METHODS ---
 async function signInWithGoogle() {
   if (!_enabledProviders.has("google")) return;
+  const platform = detectAuthPlatform();
+
+  // iOS/Android: Capacitor Google Auth plugin (native)
+  if (platform === 'ios' || platform === 'android') {
+    try {
+      // GoogleAuth plugin'den import
+      const { GoogleAuth } = window.Capacitor.Plugins;
+      if (!GoogleAuth) throw new Error('GoogleAuth plugin not available');
+
+      const googleUser = await GoogleAuth.signIn();
+      // idToken ile Firebase'e giriş yap
+      const idToken = googleUser.authentication.idToken;
+      const credential = firebase.auth.GoogleAuthProvider.credential(idToken);
+      await auth.signInWithCredential(credential);
+    } catch (err) {
+      // Kullanıcı iptal ettiyse sessizce dön
+      if (err.message && (err.message.includes('canceled') || err.message.includes('cancelled') || err.message.includes('12501'))) return;
+      console.error("Native Google sign-in error:", err);
+      Swal.fire({ title: t('auth_error'), text: err.message || 'Google giriş hatası', icon: "error" });
+    }
+    return;
+  }
+
+  // Web: Firebase popup/redirect
   const provider = new firebase.auth.GoogleAuthProvider();
   try {
     await auth.signInWithPopup(provider);
@@ -229,8 +253,14 @@ auth && auth.onAuthStateChanged && auth.onAuthStateChanged(async (user) => {
       const doc = await db.collection('users').doc(user.uid).get();
       if (doc.exists) {
         userProfile = doc.data();
-        // lastLogin güncelle
-        db.collection('users').doc(user.uid).update({ lastLogin: firebase.firestore.FieldValue.serverTimestamp() });
+        // lastLogin güncelle + friendCode yoksa üret (eski kullanıcılar için)
+        const updateData = { lastLogin: firebase.firestore.FieldValue.serverTimestamp() };
+        if (!userProfile.friendCode) {
+          const code = await _getUniqueFriendCode();
+          updateData.friendCode = code;
+          userProfile.friendCode = code;
+        }
+        db.collection('users').doc(user.uid).update(updateData);
         enterLobby();
       } else {
         // İlk kez giriş - profil oluştur ekranı
@@ -276,6 +306,30 @@ function dismissSplash(splash) {
   }, 600);
 }
 
+// --- FRIEND CODE GENERATION ---
+function _generateFriendCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < 8; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+async function _getUniqueFriendCode() {
+  // Local/dev mode - generate without uniqueness check
+  if ((_isGuestLocal || (_isLocalDev && !authIdToken)) && !authIdToken) {
+    return _generateFriendCode();
+  }
+  // Firestore uniqueness check (max 5 attempts)
+  for (let i = 0; i < 5; i++) {
+    const code = _generateFriendCode();
+    const snap = await db.collection('users').where('friendCode', '==', code).limit(1).get();
+    if (snap.empty) return code;
+  }
+  return _generateFriendCode(); // fallback
+}
+
 // --- PROFILE SAVE ---
 async function saveProfile() {
   const usernameInput = document.getElementById('setup-username');
@@ -295,11 +349,14 @@ async function saveProfile() {
     return;
   }
 
+  const friendCode = await _getUniqueFriendCode();
+
   const profileData = {
     username: username,
     gender: genderEl.value,
     email: currentUser.email || '',
     photoURL: currentUser.photoURL || '',
+    friendCode: friendCode,
   };
 
   // Local guest veya dev — Firestore yerine localStorage kullan
@@ -314,7 +371,10 @@ async function saveProfile() {
   const profileDataWithTimestamps = {
     ...profileData,
     createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-    lastLogin: firebase.firestore.FieldValue.serverTimestamp()
+    lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
+    friendCount: 0,
+    onlineStatus: 'online',
+    lastSeen: firebase.firestore.FieldValue.serverTimestamp()
   };
 
   try {
@@ -586,8 +646,32 @@ function _compressImage(file, maxSize, quality) {
   });
 }
 
+// --- INITIALIZE CAPACITOR GOOGLE AUTH PLUGIN ---
+function _initGoogleAuthPlugin() {
+  const platform = detectAuthPlatform();
+  if (platform === 'ios' || platform === 'android') {
+    try {
+      const { GoogleAuth } = window.Capacitor.Plugins;
+      if (GoogleAuth && typeof GoogleAuth.initialize === 'function') {
+        GoogleAuth.initialize({
+          clientId: '694845091148-ovbmiqcunpc5de2ng2rafue2lt6dcdhf.apps.googleusercontent.com',
+          scopes: ['profile', 'email'],
+          grantOfflineAccess: true
+        });
+        console.log('GoogleAuth plugin initialized');
+      }
+    } catch (e) {
+      console.warn('GoogleAuth plugin init failed:', e);
+    }
+  }
+}
+
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", configureAuthProviderVisibility);
+  document.addEventListener("DOMContentLoaded", () => {
+    configureAuthProviderVisibility();
+    _initGoogleAuthPlugin();
+  });
 } else {
   configureAuthProviderVisibility();
+  _initGoogleAuthPlugin();
 }
