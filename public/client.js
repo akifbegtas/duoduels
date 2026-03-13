@@ -1,3 +1,129 @@
+// --- SOUND MANAGER (Web Audio API) ---
+const SoundManager = (() => {
+  let _enabled = localStorage.getItem('soundEnabled') !== 'false';
+  let _hapticsEnabled = localStorage.getItem('hapticsEnabled') !== 'false';
+  let _ctx = null;
+
+  function getCtx() {
+    if (!_ctx) {
+      try { _ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) {}
+    }
+    if (_ctx && _ctx.state === 'suspended') _ctx.resume().catch(() => {});
+    return _ctx;
+  }
+
+  function play(type) {
+    if (!_enabled) return;
+    const ctx = getCtx();
+    if (!ctx) return;
+    try {
+      const now = ctx.currentTime;
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      switch(type) {
+        case 'click':
+          osc.type = 'sine'; osc.frequency.value = 800;
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+          osc.start(now); osc.stop(now + 0.08);
+          break;
+        case 'correct':
+          osc.type = 'sine'; osc.frequency.value = 523;
+          gain.gain.setValueAtTime(0.2, now);
+          osc.frequency.setValueAtTime(659, now + 0.1);
+          osc.frequency.setValueAtTime(784, now + 0.2);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+          osc.start(now); osc.stop(now + 0.35);
+          break;
+        case 'wrong':
+          osc.type = 'square'; osc.frequency.value = 200;
+          gain.gain.setValueAtTime(0.15, now);
+          osc.frequency.setValueAtTime(150, now + 0.15);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+          osc.start(now); osc.stop(now + 0.3);
+          break;
+        case 'timer':
+          osc.type = 'sine'; osc.frequency.value = 1000;
+          gain.gain.setValueAtTime(0.1, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+          osc.start(now); osc.stop(now + 0.05);
+          break;
+        case 'roundStart':
+          osc.type = 'sine'; osc.frequency.value = 440;
+          gain.gain.setValueAtTime(0.18, now);
+          osc.frequency.setValueAtTime(554, now + 0.1);
+          osc.frequency.setValueAtTime(659, now + 0.2);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.4);
+          osc.start(now); osc.stop(now + 0.4);
+          break;
+        case 'gameOver':
+          osc.type = 'sine'; osc.frequency.value = 784;
+          gain.gain.setValueAtTime(0.2, now);
+          osc.frequency.setValueAtTime(659, now + 0.15);
+          osc.frequency.setValueAtTime(523, now + 0.3);
+          osc.frequency.setValueAtTime(392, now + 0.45);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+          osc.start(now); osc.stop(now + 0.6);
+          break;
+        case 'win':
+          osc.type = 'sine'; osc.frequency.value = 523;
+          gain.gain.setValueAtTime(0.2, now);
+          osc.frequency.setValueAtTime(659, now + 0.12);
+          osc.frequency.setValueAtTime(784, now + 0.24);
+          osc.frequency.setValueAtTime(1047, now + 0.36);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.55);
+          osc.start(now); osc.stop(now + 0.55);
+          break;
+        case 'notify':
+          osc.type = 'sine'; osc.frequency.value = 600;
+          gain.gain.setValueAtTime(0.12, now);
+          osc.frequency.setValueAtTime(800, now + 0.1);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+          osc.start(now); osc.stop(now + 0.2);
+          break;
+        default:
+          osc.stop(now);
+      }
+    } catch(e) {}
+  }
+
+  function haptic(style) {
+    if (!_hapticsEnabled) return;
+    try {
+      if (window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.Haptics) {
+        const H = window.Capacitor.Plugins.Haptics;
+        if (style === 'heavy') H.impact({ style: 'heavy' });
+        else if (style === 'light') H.impact({ style: 'light' });
+        else H.impact({ style: 'medium' });
+      } else if (navigator.vibrate) {
+        navigator.vibrate(style === 'heavy' ? 50 : style === 'light' ? 10 : 25);
+      }
+    } catch(e) {}
+  }
+
+  return {
+    play,
+    haptic,
+    toggle(enabled) { _enabled = enabled; localStorage.setItem('soundEnabled', enabled); },
+    toggleHaptics(enabled) { _hapticsEnabled = enabled; localStorage.setItem('hapticsEnabled', enabled); },
+    get enabled() { return _enabled; },
+    get hapticsEnabled() { return _hapticsEnabled; },
+    init() {
+      // Restore toggles from localStorage
+      const sToggle = document.getElementById('sound-toggle');
+      const hToggle = document.getElementById('haptics-toggle');
+      if (sToggle) sToggle.checked = _enabled;
+      if (hToggle) hToggle.checked = _hapticsEnabled;
+    }
+  };
+})();
+
+// Initialize sound toggles after DOM load
+document.addEventListener('DOMContentLoaded', () => SoundManager.init());
+
 // --- PREMIUM SWAL DEFAULTS ---
 const SwalPremium = Swal.mixin({
   background: 'linear-gradient(145deg, rgba(20, 18, 50, 0.97), rgba(10, 8, 35, 0.98))',
@@ -145,6 +271,9 @@ const screens = {
   imposter: document.getElementById("imposter-screen"),
   sayiTahmin: document.getElementById("sayiTahmin-screen"),
   bilBakalim: document.getElementById("bilBakalim-screen"),
+  friends: document.getElementById("friends-screen"),
+  stats: document.getElementById("stats-screen"),
+  leaderboard: document.getElementById("leaderboard-screen"),
 };
 function showScreen(name) {
   Object.values(screens).forEach((s) => s.classList.remove("active"));
@@ -274,10 +403,6 @@ function hideHint() {
   if (gs) gs.classList.remove("gender-error");
 }
 // Eski fonksiyon isimleri uyumluluk için
-function showBearBubble(msg) { showHint(msg); }
-function hideBearBubble() { hideHint(); }
-function showWarning(msg) { showHint(msg); }
-function hideWarning() { hideHint(); }
 
 // --- GİRİŞ ---
 
@@ -816,6 +941,7 @@ socket.on("matchSearching", function(data) {
 });
 
 socket.on("matchFound", function(data) {
+  SoundManager.play('notify'); SoundManager.haptic('heavy');
   // Eşleşme bulundu — odaya katıl
   currentRoom = data.roomId;
   sessionStorage.setItem("duoduels_room", data.roomId);
@@ -1091,6 +1217,15 @@ socket.on("connect", async () => {
       if (codeInput) codeInput.value = code;
       setTimeout(() => joinRoom(), 300);
     }
+  }
+  // Set online presence for friend system
+  if (userProfile) {
+    socket.emit("setOnline", {
+      username: userProfile.username || '',
+      gender: userProfile.gender || '',
+      photoURL: userProfile.photoURL || ''
+    });
+    loadBlockedUsers();
   }
 });
 socket.on("disconnect", () => {
@@ -1567,16 +1702,23 @@ socket.on("levelFinished", () =>
     showConfirmButton: false,
   }),
 );
-socket.on("roundChanged", (r) =>
-  Swal.fire({ title: `${r}. ${t('round_n')}`, timer: 1500, showConfirmButton: false }),
-);
-socket.on("gameOver", (msg) => Swal.fire({ title: t('finished'), text: msg }));
+socket.on("roundChanged", (r) => {
+  SoundManager.play('roundStart');
+  SoundManager.haptic('medium');
+  Swal.fire({ title: `${r}. ${t('round_n')}`, timer: 1500, showConfirmButton: false });
+});
+socket.on("gameOver", (msg) => {
+  SoundManager.play('gameOver');
+  SoundManager.haptic('heavy');
+  Swal.fire({ title: t('finished'), text: msg });
+});
 
 socket.on("telepatiGameOver", (data) => {
   clearInterval(timerInterval);
   const iWon = data.winnerIds && data.winnerIds.includes(myPlayerId);
 
   if (iWon) {
+    SoundManager.play('win'); SoundManager.haptic('heavy');
     // Kazanan takım
     confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 } });
     setTimeout(() => confetti({ particleCount: 80, spread: 60, origin: { y: 0.5 } }), 500);
@@ -1593,6 +1735,7 @@ socket.on("telepatiGameOver", (data) => {
       confirmButtonText: t('great_job'),
     });
   } else {
+    SoundManager.play('gameOver'); SoundManager.haptic('medium');
     // Kaybeden takım
     Swal.fire({
       title: t('you_lost'),
@@ -1613,6 +1756,8 @@ socket.on("telepatiGameOver", (data) => {
 socket.on("backToSelect", (data) => {
   clearInterval(timerInterval);
   Swal.close();
+  // Check achievements after game ends
+  setTimeout(() => checkAchievements(), 2000);
   document.getElementById("scoreboard-panel").style.display = "none";
 
   if (data.hostId && myPlayerId === data.hostId) {
@@ -1806,6 +1951,8 @@ socket.on("allCategoriesStart", (data) => {
 
 socket.on("isimSehirResult", (res) => {
   clearInterval(timerInterval);
+  SoundManager.play(res.accepted ? 'correct' : 'wrong');
+  SoundManager.haptic(res.accepted ? 'light' : 'medium');
   addIsimSehirLogItem(res);
 });
 
@@ -2364,6 +2511,7 @@ socket.on("pictionaryRoundEnd", (data) => {
 });
 
 socket.on("pictionaryGameOver", (msg) => {
+  SoundManager.play('gameOver'); SoundManager.haptic('heavy');
   Swal.fire({ title: t('finished'), text: msg });
 });
 
@@ -2572,6 +2720,7 @@ socket.on("tabuTurnEnd", (data) => {
 });
 
 socket.on("tabuGameOver", (msg) => {
+  SoundManager.play('gameOver'); SoundManager.haptic('heavy');
   Swal.fire({ title: t('finished'), text: msg });
 });
 
@@ -2850,6 +2999,7 @@ socket.on("imposterVoteResult", (data) => {
 });
 
 socket.on("imposterGameOver", (data) => {
+  SoundManager.play('gameOver'); SoundManager.haptic('heavy');
   if (typeof data === 'string') {
     Swal.fire({ title: t('finished'), text: data });
     return;
@@ -3320,6 +3470,7 @@ socket.on("sayiTahminWin", (data) => {
 });
 
 socket.on("sayiTahminGameOver", (data) => {
+  SoundManager.play('gameOver'); SoundManager.haptic('heavy');
   // Eski format uyumluluğu (string mesaj)
   if (typeof data === 'string') {
     Swal.fire({ title: t('finished'), text: data });
@@ -3522,6 +3673,7 @@ socket.on("sayiTahminGameOver", (data) => {
   });
 
   socket.on("bilBakalimEnd", function(data) {
+    SoundManager.play('gameOver'); SoundManager.haptic('heavy');
     if (_bbTimerInterval) { clearInterval(_bbTimerInterval); _bbTimerInterval = null; }
 
     var winnerPair = _bbPairs.find(function(p) { return p.id === data.winner; });
@@ -3663,3 +3815,823 @@ function showInterstitialAd() {
   }
 }
 window.showInterstitialAd = showInterstitialAd;
+
+// ============ ARKADAŞ SİSTEMİ ============
+
+let _friendList = [];
+let _pendingRequests = [];
+let _currentFriendsTab = 'list';
+let _pendingGameInvite = null;
+
+// --- Friend Socket Listeners (called after socket is ready) ---
+function _attachFriendListeners() {
+  if (!socket || socket._friendListenersAttached) return;
+  socket._friendListenersAttached = true;
+
+  socket.on("friendListUpdate", (data) => {
+    _friendList = data.friends || [];
+    renderFriendList();
+    // Show invite button in waiting screen if has online friends
+    const invBtn = document.getElementById('btn-invite-friends');
+    if (invBtn && currentRoom) {
+      invBtn.style.display = _friendList.some(f => f.onlineStatus !== 'offline') ? '' : 'none';
+    }
+  });
+
+  socket.on("pendingRequestsUpdate", (data) => {
+    _pendingRequests = data.requests || [];
+    renderPendingRequests();
+    updateFriendBadge();
+  });
+
+  socket.on("friendRequestReceived", (data) => {
+    _pendingRequests.unshift({
+      requestId: data.requestId,
+      fromUid: data.from.uid,
+      fromUsername: data.from.username,
+      fromPhotoURL: data.from.photoURL,
+      fromGender: data.from.gender
+    });
+    renderPendingRequests();
+    updateFriendBadge();
+    showHint(data.from.username + ' ' + t('friends_request_received_hint'));
+  });
+
+  socket.on("friendRequestResult", (data) => {
+    if (data.success) {
+      Swal.fire({ title: t('friends_request_sent'), text: data.targetUsername, icon: 'success', timer: 2000, showConfirmButton: false });
+      document.getElementById('friend-code-input').value = '';
+    } else {
+      const errorMap = {
+        not_found: t('friends_not_found'),
+        self: t('friends_cant_add_self'),
+        already_friends: t('friends_already_friends'),
+        already_sent: t('friends_request_pending'),
+        server_error: t('error')
+      };
+      Swal.fire({ title: t('warning'), text: errorMap[data.error] || t('error'), icon: 'warning' });
+    }
+  });
+
+  socket.on("friendRequestResponded", (data) => {
+    _pendingRequests = _pendingRequests.filter(r => r.requestId !== data.requestId);
+    renderPendingRequests();
+    updateFriendBadge();
+    if (data.accepted) {
+      socket.emit("getFriendList");
+    }
+  });
+
+  socket.on("friendRequestAccepted", (data) => {
+    _friendList.push({
+      uid: data.friendUid,
+      username: data.username,
+      photoURL: data.photoURL,
+      gender: data.gender,
+      onlineStatus: 'online'
+    });
+    renderFriendList();
+    showHint(data.username + ' ' + t('friends_request_accepted'));
+  });
+
+  socket.on("friendStatusChanged", (data) => {
+    const f = _friendList.find(f => f.uid === data.friendUid);
+    if (f) {
+      f.onlineStatus = data.status;
+      renderFriendList();
+    }
+  });
+
+  socket.on("friendRemoveResult", (data) => {
+    if (data.success) {
+      _friendList = _friendList.filter(f => f.uid !== data.friendUid);
+      renderFriendList();
+    }
+  });
+
+  socket.on("friendRemoved", (data) => {
+    _friendList = _friendList.filter(f => f.uid !== data.friendUid);
+    renderFriendList();
+  });
+
+  socket.on("gameInviteReceived", (data) => {
+    _pendingGameInvite = data;
+    showGameInviteToast(data);
+  });
+
+  socket.on("inviteSent", () => {
+    showHint(t('friends_invite_sent'));
+  });
+}
+
+// Auto-attach when socket connects
+const _origConnectSocket = connectSocket;
+connectSocket = function() {
+  _origConnectSocket();
+  if (socket) _attachFriendListeners();
+};
+
+// --- UI Functions ---
+
+function copyFriendCode() {
+  const code = document.getElementById('my-friend-code').textContent;
+  if (code && code !== '--------') {
+    navigator.clipboard.writeText(code).then(() => {
+      showHint(t('conn_copied'));
+    }).catch(() => {
+      // Fallback
+      const inp = document.createElement('input');
+      inp.value = code;
+      document.body.appendChild(inp);
+      inp.select();
+      document.execCommand('copy');
+      inp.remove();
+      showHint(t('conn_copied'));
+    });
+  }
+}
+
+function sendFriendRequestUI() {
+  const input = document.getElementById('friend-code-input');
+  const code = input.value.trim().toUpperCase();
+  if (!code || code.length < 4) {
+    Swal.fire({ title: t('warning'), text: t('friends_code_invalid'), icon: 'warning' });
+    return;
+  }
+  if (!socket || !socket.connected) {
+    Swal.fire({ title: t('warning'), text: t('conn_lost'), icon: 'warning' });
+    return;
+  }
+  socket.emit("sendFriendRequest", { friendCode: code });
+}
+
+function switchFriendsTab(tab) {
+  _currentFriendsTab = tab;
+  document.getElementById('friends-tab-list').classList.toggle('active', tab === 'list');
+  document.getElementById('friends-tab-requests').classList.toggle('active', tab === 'requests');
+  document.getElementById('friends-list-panel').style.display = tab === 'list' ? '' : 'none';
+  document.getElementById('friends-requests-panel').style.display = tab === 'requests' ? '' : 'none';
+}
+
+function renderFriendList() {
+  const container = document.getElementById('friends-list-container');
+  const emptyMsg = document.getElementById('friends-empty-msg');
+  if (!container) return;
+
+  if (_friendList.length === 0) {
+    container.innerHTML = '';
+    container.appendChild(emptyMsg);
+    emptyMsg.style.display = '';
+    return;
+  }
+
+  emptyMsg.style.display = 'none';
+  container.innerHTML = _friendList.map(f => {
+    const statusClass = f.onlineStatus === 'online' ? 'status-online' : f.onlineStatus === 'in-game' ? 'status-ingame' : 'status-offline';
+    const statusText = f.onlineStatus === 'online' ? t('friends_online') : f.onlineStatus === 'in-game' ? t('friends_in_game') : t('friends_offline');
+    const avatar = f.photoURL || (typeof _anonymousAvatarSvg === 'function' ? _anonymousAvatarSvg() : '');
+    const canInvite = currentRoom && f.onlineStatus !== 'offline';
+    return `<div class="friend-item">
+      <div class="friend-item-left">
+        <div class="friend-avatar-wrap">
+          <img class="friend-avatar" src="${escapeHtml(avatar)}" alt="" onerror="this.src='${typeof _anonymousAvatarSvg === 'function' ? _anonymousAvatarSvg() : ''}'"/>
+          <span class="friend-status-dot ${statusClass}"></span>
+        </div>
+        <div class="friend-info">
+          <span class="friend-name">${escapeHtml(f.username)}</span>
+          <span class="friend-status-text ${statusClass}">${statusText}</span>
+        </div>
+      </div>
+      <div class="friend-item-actions">
+        ${canInvite ? `<button class="btn-friend-invite" onclick="inviteFriendToRoom('${f.uid}')">${t('friends_invite')}</button>` : ''}
+        <button class="btn-friend-remove" onclick="reportUser('${f.uid}', '${escapeHtml(f.username)}')" title="Report" style="opacity:0.5">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+        </button>
+        <button class="btn-friend-remove" onclick="removeFriendConfirm('${f.uid}', '${escapeHtml(f.username)}')" title="${t('friends_remove')}">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderPendingRequests() {
+  const container = document.getElementById('friends-requests-container');
+  const emptyMsg = document.getElementById('friends-requests-empty-msg');
+  if (!container) return;
+
+  if (_pendingRequests.length === 0) {
+    container.innerHTML = '';
+    container.appendChild(emptyMsg);
+    emptyMsg.style.display = '';
+    return;
+  }
+
+  emptyMsg.style.display = 'none';
+  container.innerHTML = _pendingRequests.map(r => {
+    const avatar = r.fromPhotoURL || (typeof _anonymousAvatarSvg === 'function' ? _anonymousAvatarSvg() : '');
+    return `<div class="friend-request-item">
+      <div class="friend-item-left">
+        <img class="friend-avatar" src="${escapeHtml(avatar)}" alt="" onerror="this.src='${typeof _anonymousAvatarSvg === 'function' ? _anonymousAvatarSvg() : ''}'"/>
+        <span class="friend-name">${escapeHtml(r.fromUsername)}</span>
+      </div>
+      <div class="friend-request-actions">
+        <button class="btn-accept-request" onclick="respondToFriendRequest('${r.requestId}', true)">✓</button>
+        <button class="btn-reject-request" onclick="respondToFriendRequest('${r.requestId}', false)">✕</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateFriendBadge() {
+  const count = _pendingRequests.length;
+  const badge = document.getElementById('friend-request-badge');
+  const reqCount = document.getElementById('friends-req-count');
+  if (badge) {
+    badge.textContent = count;
+    badge.style.display = count > 0 ? '' : 'none';
+  }
+  if (reqCount) {
+    reqCount.textContent = count;
+    reqCount.style.display = count > 0 ? '' : 'none';
+  }
+}
+
+function respondToFriendRequest(requestId, accept) {
+  if (!socket || !socket.connected) return;
+  socket.emit("respondFriendRequest", { requestId, accept });
+}
+
+function removeFriendConfirm(friendUid, username) {
+  Swal.fire({
+    title: t('friends_remove'),
+    text: t('friends_remove_confirm').replace('{name}', username),
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: t('friends_remove'),
+    cancelButtonText: t('cancel')
+  }).then(result => {
+    if (result.isConfirmed && socket && socket.connected) {
+      socket.emit("removeFriend", { friendUid });
+    }
+  });
+}
+
+function inviteFriendToRoom(friendUid) {
+  if (!socket || !socket.connected || !currentRoom) return;
+  socket.emit("inviteFriendToRoom", { friendUid, roomId: currentRoom });
+}
+
+function showGameInviteToast(data) {
+  const toast = document.getElementById('game-invite-toast');
+  if (!toast) return;
+  const avatar = document.getElementById('invite-toast-avatar');
+  const username = document.getElementById('invite-toast-username');
+  const msg = document.getElementById('invite-toast-msg');
+  if (avatar) avatar.src = data.from.photoURL || (typeof _anonymousAvatarSvg === 'function' ? _anonymousAvatarSvg() : '');
+  if (username) username.textContent = data.from.username;
+  if (msg) msg.textContent = t('friends_invite_received');
+  toast.style.display = '';
+  // Auto-dismiss after 30s
+  if (window._inviteToastTimer) clearTimeout(window._inviteToastTimer);
+  window._inviteToastTimer = setTimeout(() => { toast.style.display = 'none'; _pendingGameInvite = null; }, 30000);
+}
+
+function acceptGameInvite() {
+  const toast = document.getElementById('game-invite-toast');
+  if (toast) toast.style.display = 'none';
+  if (_pendingGameInvite && socket && socket.connected) {
+    const roomId = _pendingGameInvite.roomId;
+    const codeInput = document.getElementById('roomCodeInput');
+    if (codeInput) codeInput.value = roomId;
+    joinRoom();
+    _pendingGameInvite = null;
+  }
+}
+
+function declineGameInvite() {
+  const toast = document.getElementById('game-invite-toast');
+  if (toast) toast.style.display = 'none';
+  _pendingGameInvite = null;
+}
+
+function showInviteFriendsPopup() {
+  if (!socket || !socket.connected) return;
+  // Refresh friend list, then show popup
+  socket.emit("getFriendList");
+  setTimeout(() => {
+    const onlineFriends = _friendList.filter(f => f.onlineStatus !== 'offline');
+    if (onlineFriends.length === 0) {
+      Swal.fire({ title: t('friends_title'), text: t('friends_no_online'), icon: 'info' });
+      return;
+    }
+    const html = onlineFriends.map(f =>
+      `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1)">
+        <img src="${escapeHtml(f.photoURL || '')}" style="width:32px;height:32px;border-radius:50%;object-fit:cover" onerror="this.src='${typeof _anonymousAvatarSvg === 'function' ? _anonymousAvatarSvg() : ''}'"/>
+        <span style="flex:1;color:#fff">${escapeHtml(f.username)}</span>
+        <button class="btn-friend-invite" onclick="inviteFriendToRoom('${f.uid}');Swal.close();">${t('friends_invite')}</button>
+      </div>`
+    ).join('');
+    Swal.fire({
+      title: t('friends_invite_title'),
+      html: html,
+      showConfirmButton: false,
+      showCancelButton: true,
+      cancelButtonText: t('cancel'),
+      background: '#1a1d24',
+      color: '#fff'
+    });
+  }, 500);
+}
+
+// Load friend data when friends screen shown
+const _origShowScreen = typeof showScreen === 'function' ? showScreen : null;
+if (_origShowScreen) {
+  showScreen = function(name) {
+    _origShowScreen(name);
+    if (name === 'friends' && socket && socket.connected) {
+      // Display friend code
+      const codeEl = document.getElementById('my-friend-code');
+      if (codeEl && userProfile && userProfile.friendCode) {
+        codeEl.textContent = userProfile.friendCode.substring(0, 4) + '-' + userProfile.friendCode.substring(4);
+      }
+      socket.emit("getFriendList");
+      socket.emit("getPendingRequests");
+    }
+    // Show invite button in waiting screen
+    if (name === 'waiting') {
+      const invBtn = document.getElementById('btn-invite-friends');
+      if (invBtn && socket && socket.connected && !_isGuestLocal) {
+        invBtn.style.display = '';
+        socket.emit("getFriendList");
+      }
+    }
+    // Load stats when stats screen is shown
+    if (name === 'stats') {
+      loadStats();
+    }
+    // Load leaderboard when leaderboard screen is shown
+    if (name === 'leaderboard') {
+      loadLeaderboard();
+    }
+    // Update reaction button visibility
+    setTimeout(updateReactionButton, 100);
+  };
+}
+
+// ===== STATS SYSTEM =====
+const GAME_TYPE_META = {
+  telepati: { icon: '🧠', name: { tr: 'Telepati', en: 'Telepathy', ar: 'تخاطر' } },
+  isimSehir: { icon: '🏙️', name: { tr: 'İsim Şehir', en: 'Name City', ar: 'اسم مدينة' } },
+  pictionary: { icon: '🎨', name: { tr: 'Pictionary', en: 'Pictionary', ar: 'رسم وتخمين' } },
+  tabu: { icon: '🚫', name: { tr: 'Tabu', en: 'Taboo', ar: 'تابو' } },
+  sayiTahmin: { icon: '🔢', name: { tr: 'Sayı Tahmin', en: 'Number Guess', ar: 'تخمين الرقم' } },
+  imposter: { icon: '🕵️', name: { tr: 'Imposter', en: 'Imposter', ar: 'المحتال' } },
+  bilBakalim: { icon: '❓', name: { tr: 'Bil Bakalım', en: 'Trivia', ar: 'تريفيا' } },
+};
+
+async function loadStats() {
+  if (!window.db || !window._currentUser) {
+    renderEmptyStats();
+    return;
+  }
+  try {
+    const uid = window._currentUser.uid;
+    // Load user stats
+    const userDoc = await db.collection('users').doc(uid).get();
+    const stats = userDoc.exists ? (userDoc.data().stats || {}) : {};
+
+    // Render overview
+    const played = stats.gamesPlayed || 0;
+    const won = stats.gamesWon || 0;
+    const rate = played > 0 ? Math.round((won / played) * 100) : 0;
+    document.getElementById('stat-games-played').textContent = played;
+    document.getElementById('stat-games-won').textContent = won;
+    document.getElementById('stat-win-rate').textContent = rate + '%';
+    document.getElementById('stat-best-streak').textContent = stats.bestWinStreak || 0;
+
+    // Render game type breakdown
+    const byType = stats.gamesByType || {};
+    const lang = window._currentLang || 'tr';
+    const container = document.getElementById('stats-by-game');
+    container.innerHTML = '';
+    Object.entries(GAME_TYPE_META).forEach(([type, meta]) => {
+      const count = byType[type] || 0;
+      if (count > 0) {
+        container.innerHTML += `
+          <div class="stat-game-row">
+            <span class="stat-game-icon">${meta.icon}</span>
+            <span class="stat-game-name">${meta.name[lang] || meta.name.en}</span>
+            <span class="stat-game-count">${count}</span>
+          </div>`;
+      }
+    });
+    if (container.innerHTML === '') {
+      container.innerHTML = '<p class="friends-empty">' + (lang === 'tr' ? 'Henüz oyun oynamadın.' : lang === 'ar' ? 'لم تلعب بعد.' : 'No games played yet.') + '</p>';
+    }
+
+    // Render achievements
+    const achContainer = document.getElementById('stats-achievements');
+    if (achContainer) {
+      const unlockedMap = userDoc.data().achievements || {};
+      achContainer.innerHTML = '';
+      ACHIEVEMENTS.forEach(a => {
+        const unlocked = !!unlockedMap[a.id];
+        const name = t(`ach_${a.id}`) || a.id;
+        achContainer.innerHTML += `
+          <div class="ach-item${unlocked ? ' ach-unlocked' : ''}">
+            <span class="ach-icon">${a.icon}</span>
+            <span class="ach-name">${escapeHtml(name)}</span>
+            ${unlocked ? '<span class="ach-check">✓</span>' : ''}
+          </div>`;
+      });
+    }
+
+    // Load recent games
+    const recentSnap = await db.collection('gameResults')
+      .where('players', 'array-contains-any', [{ uid }])
+      .orderBy('createdAt', 'desc')
+      .limit(10)
+      .get()
+      .catch(() => null);
+
+    // Fallback: query without complex array filter
+    let recentGames = [];
+    if (!recentSnap || recentSnap.empty) {
+      // Try simpler query - get all recent and filter client-side
+      const allRecent = await db.collection('gameResults')
+        .orderBy('createdAt', 'desc')
+        .limit(50)
+        .get()
+        .catch(() => null);
+      if (allRecent && !allRecent.empty) {
+        allRecent.forEach(doc => {
+          const data = doc.data();
+          if (data.players && data.players.some(p => p.uid === uid)) {
+            recentGames.push(data);
+          }
+        });
+        recentGames = recentGames.slice(0, 10);
+      }
+    } else {
+      recentSnap.forEach(doc => recentGames.push(doc.data()));
+    }
+
+    const recentContainer = document.getElementById('stats-recent-games');
+    const noGamesMsg = document.getElementById('stats-no-games');
+    if (recentGames.length === 0) {
+      noGamesMsg.style.display = '';
+      recentContainer.querySelectorAll('.recent-game-item').forEach(el => el.remove());
+    } else {
+      noGamesMsg.style.display = 'none';
+      recentContainer.querySelectorAll('.recent-game-item').forEach(el => el.remove());
+      recentGames.forEach(game => {
+        const meta = GAME_TYPE_META[game.gameType] || { icon: '🎮', name: { tr: game.gameType, en: game.gameType, ar: game.gameType } };
+        const myResult = game.players.find(p => p.uid === uid);
+        const isWin = myResult ? myResult.isWinner : false;
+        const date = game.createdAt ? new Date(game.createdAt.seconds * 1000) : new Date();
+        const dateStr = date.toLocaleDateString(lang === 'tr' ? 'tr-TR' : lang === 'ar' ? 'ar-SA' : 'en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+        const resultText = isWin ? (lang === 'tr' ? 'Kazandın' : lang === 'ar' ? 'فوز' : 'Won') : (lang === 'tr' ? 'Kaybettin' : lang === 'ar' ? 'خسارة' : 'Lost');
+        const resultClass = isWin ? 'win' : 'loss';
+
+        const div = document.createElement('div');
+        div.className = 'recent-game-item';
+        div.innerHTML = `
+          <span class="recent-game-icon">${meta.icon}</span>
+          <div class="recent-game-info">
+            <div class="recent-game-type">${meta.name[lang] || meta.name.en}</div>
+            <div class="recent-game-date">${dateStr}</div>
+          </div>
+          <span class="recent-game-result ${resultClass}">${resultText}</span>`;
+        recentContainer.appendChild(div);
+      });
+    }
+  } catch (err) {
+    console.error('Error loading stats:', err);
+    renderEmptyStats();
+  }
+}
+
+function renderEmptyStats() {
+  document.getElementById('stat-games-played').textContent = '0';
+  document.getElementById('stat-games-won').textContent = '0';
+  document.getElementById('stat-win-rate').textContent = '0%';
+  document.getElementById('stat-best-streak').textContent = '0';
+  document.getElementById('stats-by-game').innerHTML = '';
+}
+
+// ===== REPORT & BLOCK SYSTEM =====
+let _blockedUsers = [];
+
+function loadBlockedUsers() {
+  if (socket && socket.connected) {
+    socket.emit('getBlockedUsers');
+  }
+}
+
+async function reportUser(targetUid, targetUsername) {
+  if (!socket || !targetUid) return;
+  const lang = window._currentLang || 'tr';
+  const { value: reason } = await Swal.fire({
+    title: lang === 'tr' ? 'Kullanıcıyı Şikayet Et' : lang === 'ar' ? 'الإبلاغ عن المستخدم' : 'Report User',
+    text: escapeHtml(targetUsername),
+    input: 'select',
+    inputOptions: lang === 'tr' ? {
+      spam: 'Spam / Reklam',
+      inappropriate: 'Uygunsuz İçerik',
+      cheating: 'Hile',
+      harassment: 'Taciz / Hakaret',
+      other: 'Diğer',
+    } : {
+      spam: 'Spam',
+      inappropriate: 'Inappropriate Content',
+      cheating: 'Cheating',
+      harassment: 'Harassment',
+      other: 'Other',
+    },
+    showCancelButton: true,
+    confirmButtonText: lang === 'tr' ? 'Şikayet Et' : 'Report',
+    cancelButtonText: lang === 'tr' ? 'İptal' : 'Cancel',
+  });
+  if (!reason) return;
+  socket.emit('reportUser', { targetUid, reason });
+}
+
+async function blockUser(targetUid, targetUsername) {
+  if (!socket || !targetUid) return;
+  const lang = window._currentLang || 'tr';
+  const result = await Swal.fire({
+    title: lang === 'tr' ? 'Engelle' : 'Block',
+    text: lang === 'tr' ? `${escapeHtml(targetUsername)} engellensin mi?` : `Block ${escapeHtml(targetUsername)}?`,
+    showCancelButton: true,
+    confirmButtonText: lang === 'tr' ? 'Engelle' : 'Block',
+    cancelButtonText: lang === 'tr' ? 'İptal' : 'Cancel',
+    confirmButtonColor: '#e74c3c',
+  });
+  if (!result.isConfirmed) return;
+  socket.emit('blockUser', { targetUid });
+}
+
+function unblockUser(targetUid) {
+  if (!socket || !targetUid) return;
+  socket.emit('unblockUser', { targetUid });
+}
+
+// Socket listeners for block system
+if (typeof socket !== 'undefined') {
+  socket.on('reportSuccess', () => {
+    const lang = window._currentLang || 'tr';
+    Swal.fire({ title: lang === 'tr' ? 'Şikayet Gönderildi' : 'Report Sent', icon: 'success', timer: 2000, showConfirmButton: false });
+  });
+  socket.on('blockSuccess', ({ targetUid }) => {
+    _blockedUsers.push(targetUid);
+    const lang = window._currentLang || 'tr';
+    Swal.fire({ title: lang === 'tr' ? 'Engellendi' : 'Blocked', icon: 'success', timer: 2000, showConfirmButton: false });
+  });
+  socket.on('unblockSuccess', ({ targetUid }) => {
+    _blockedUsers = _blockedUsers.filter(u => u !== targetUid);
+  });
+  socket.on('blockedUsersList', (list) => {
+    _blockedUsers = list || [];
+  });
+}
+
+// ===== ACHIEVEMENT SYSTEM =====
+const ACHIEVEMENTS = [
+  { id: 'first_game', icon: '🎮', check: s => (s.gamesPlayed || 0) >= 1 },
+  { id: 'first_win', icon: '🏆', check: s => (s.gamesWon || 0) >= 1 },
+  { id: 'games_5', icon: '⭐', check: s => (s.gamesPlayed || 0) >= 5 },
+  { id: 'games_10', icon: '🌟', check: s => (s.gamesPlayed || 0) >= 10 },
+  { id: 'games_25', icon: '💫', check: s => (s.gamesPlayed || 0) >= 25 },
+  { id: 'games_50', icon: '🔥', check: s => (s.gamesPlayed || 0) >= 50 },
+  { id: 'games_100', icon: '💎', check: s => (s.gamesPlayed || 0) >= 100 },
+  { id: 'wins_5', icon: '🥇', check: s => (s.gamesWon || 0) >= 5 },
+  { id: 'wins_10', icon: '👑', check: s => (s.gamesWon || 0) >= 10 },
+  { id: 'wins_25', icon: '🏅', check: s => (s.gamesWon || 0) >= 25 },
+  { id: 'streak_3', icon: '🔥', check: s => (s.bestWinStreak || 0) >= 3 },
+  { id: 'streak_5', icon: '⚡', check: s => (s.bestWinStreak || 0) >= 5 },
+  { id: 'streak_10', icon: '🌈', check: s => (s.bestWinStreak || 0) >= 10 },
+  { id: 'all_games', icon: '🎯', check: s => {
+    const types = s.gamesByType || {};
+    return ['telepati','isimSehir','pictionary','tabu','sayiTahmin','imposter','bilBakalim'].every(t => (types[t] || 0) >= 1);
+  }},
+  { id: 'friend_1', icon: '🤝', check: (s, u) => (u.friendCount || 0) >= 1 },
+];
+
+async function checkAchievements() {
+  if (!window.db || !window._currentUser) return;
+  try {
+    const uid = window._currentUser.uid;
+    const userDoc = await db.collection('users').doc(uid).get();
+    if (!userDoc.exists) return;
+    const userData = userDoc.data();
+    const stats = userData.stats || {};
+    const unlockedMap = userData.achievements || {};
+    const lang = window._currentLang || 'tr';
+
+    const newUnlocks = [];
+    ACHIEVEMENTS.forEach(a => {
+      if (!unlockedMap[a.id] && a.check(stats, userData)) {
+        newUnlocks.push(a);
+      }
+    });
+
+    if (newUnlocks.length === 0) return;
+
+    // Save unlocked achievements
+    const update = {};
+    newUnlocks.forEach(a => { update[`achievements.${a.id}`] = Date.now(); });
+    await db.collection('users').doc(uid).set(update, { merge: true });
+
+    // Show popup for each (staggered)
+    newUnlocks.forEach((a, i) => {
+      setTimeout(() => {
+        const name = t(`ach_${a.id}`) || a.id;
+        SoundManager.play('win');
+        SoundManager.haptic('heavy');
+        Swal.fire({
+          title: t('achievement_unlocked') || 'Achievement Unlocked!',
+          html: `<div style="font-size:3em;margin:10px 0">${a.icon}</div><div style="font-size:1.1em;font-weight:bold">${escapeHtml(name)}</div>`,
+          timer: 3500,
+          showConfirmButton: false,
+          background: 'linear-gradient(135deg, #1a1a2e, #16213e)',
+          color: '#fff',
+        });
+      }, i * 4000);
+    });
+  } catch(e) {
+    console.error('Achievement check error:', e);
+  }
+}
+
+// Check achievements when returning to lobby after a game
+// (hooked into backToSelect event)
+
+// ===== EMOJI REACTIONS =====
+let _reactionPanelOpen = false;
+const GAME_SCREENS = ['telepati', 'isimSehir', 'pictionary', 'tabu', 'imposter', 'sayiTahmin', 'bilBakalim'];
+
+function toggleReactionPanel() {
+  _reactionPanelOpen = !_reactionPanelOpen;
+  const panel = document.getElementById('reaction-panel');
+  panel.style.display = _reactionPanelOpen ? '' : 'none';
+  SoundManager.play('click');
+}
+
+function sendReaction(emoji) {
+  if (!socket || !currentRoom) return;
+  socket.emit('sendReaction', { roomId: currentRoom, emoji });
+  // Show own reaction locally
+  showReactionBubble(emoji, '');
+  _reactionPanelOpen = false;
+  document.getElementById('reaction-panel').style.display = 'none';
+  SoundManager.play('click');
+  SoundManager.haptic('light');
+}
+
+function showReactionBubble(emoji, username) {
+  const overlay = document.getElementById('reaction-overlay');
+  if (!overlay) return;
+
+  const x = 20 + Math.random() * 60; // random horizontal position (%)
+  const bubble = document.createElement('div');
+  bubble.className = 'reaction-bubble';
+  bubble.textContent = emoji;
+  bubble.style.left = x + '%';
+  bubble.style.bottom = '15%';
+  overlay.appendChild(bubble);
+
+  if (username) {
+    const label = document.createElement('div');
+    label.className = 'reaction-bubble-label';
+    label.textContent = username;
+    label.style.left = x + '%';
+    label.style.bottom = '12%';
+    overlay.appendChild(label);
+    setTimeout(() => label.remove(), 2200);
+  }
+
+  setTimeout(() => bubble.remove(), 2200);
+}
+
+// Show/hide reaction button based on current screen
+function updateReactionButton() {
+  const btn = document.getElementById('reaction-btn');
+  if (!btn) return;
+  const currentScreenEl = document.querySelector('.screen:not([style*="display: none"]):not([style*="display:none"])');
+  if (!currentScreenEl) { btn.style.display = 'none'; return; }
+  const screenId = currentScreenEl.id;
+  // Show during game screens
+  const isGameScreen = GAME_SCREENS.some(g => screenId.includes(g)) || screenId === 'game-screen';
+  btn.style.display = (isGameScreen && currentRoom) ? '' : 'none';
+  if (!isGameScreen) {
+    document.getElementById('reaction-panel').style.display = 'none';
+    _reactionPanelOpen = false;
+  }
+}
+
+// Listen for reactions from others
+if (typeof socket !== 'undefined') {
+  socket.on('reactionReceived', (data) => {
+    showReactionBubble(data.emoji, data.username);
+    SoundManager.play('notify');
+  });
+}
+
+// ===== LEADERBOARD SYSTEM =====
+let _currentLbTab = 'global';
+
+function switchLeaderboardTab(tab) {
+  _currentLbTab = tab;
+  document.getElementById('lb-tab-global').classList.toggle('active', tab === 'global');
+  document.getElementById('lb-tab-friends').classList.toggle('active', tab === 'friends');
+  loadLeaderboard();
+}
+
+async function loadLeaderboard() {
+  const listEl = document.getElementById('leaderboard-list');
+  const emptyEl = document.getElementById('lb-empty');
+  listEl.querySelectorAll('.lb-row').forEach(el => el.remove());
+
+  if (!window.db || !window._currentUser) {
+    emptyEl.textContent = _currentLbTab === 'global' ? 'Giriş yap' : 'Giriş yap';
+    emptyEl.style.display = '';
+    return;
+  }
+
+  emptyEl.textContent = '...';
+  emptyEl.style.display = '';
+
+  const sortBy = document.getElementById('lb-sort-select').value;
+  const uid = window._currentUser.uid;
+  const lang = window._currentLang || 'tr';
+
+  try {
+    let users = [];
+
+    if (_currentLbTab === 'friends') {
+      // Get friend UIDs
+      const friendSnap = await db.collection('users').doc(uid).collection('friends').get();
+      const friendUids = [uid];
+      friendSnap.forEach(doc => friendUids.push(doc.id));
+
+      // Fetch each friend's data (Firestore 'in' limit is 30)
+      const chunks = [];
+      for (let i = 0; i < friendUids.length; i += 10) {
+        chunks.push(friendUids.slice(i, i + 10));
+      }
+      for (const chunk of chunks) {
+        const snap = await db.collection('users').where('__name__', 'in', chunk).get();
+        snap.forEach(doc => {
+          const d = doc.data();
+          if (d.stats) {
+            users.push({ uid: doc.id, username: d.username || d.displayName || 'Anon', photoURL: d.photoURL || '', stats: d.stats });
+          }
+        });
+      }
+    } else {
+      // Global: top players by the selected stat
+      const snap = await db.collection('users')
+        .where(`stats.${sortBy}`, '>', 0)
+        .orderBy(`stats.${sortBy}`, 'desc')
+        .limit(50)
+        .get();
+      snap.forEach(doc => {
+        const d = doc.data();
+        users.push({ uid: doc.id, username: d.username || d.displayName || 'Anon', photoURL: d.photoURL || '', stats: d.stats || {} });
+      });
+    }
+
+    // Sort
+    users.sort((a, b) => (b.stats[sortBy] || 0) - (a.stats[sortBy] || 0));
+
+    if (users.length === 0) {
+      emptyEl.textContent = lang === 'tr' ? 'Henüz veri yok.' : lang === 'ar' ? 'لا توجد بيانات بعد.' : 'No data yet.';
+      emptyEl.style.display = '';
+      return;
+    }
+
+    emptyEl.style.display = 'none';
+
+    users.forEach((user, i) => {
+      const rank = i + 1;
+      const value = user.stats[sortBy] || 0;
+      const isMe = user.uid === uid;
+      const rankClass = rank <= 3 ? ` lb-rank-${rank}` : '';
+      const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
+
+      const div = document.createElement('div');
+      div.className = `lb-row${isMe ? ' lb-me' : ''}`;
+      div.innerHTML = `
+        <span class="lb-rank${rankClass}">${medal}</span>
+        ${user.photoURL ? `<img class="lb-avatar" src="${escapeHtml(user.photoURL)}" alt="" onerror="this.style.display='none'"/>` : ''}
+        <span class="lb-name">${escapeHtml(user.username)}${isMe ? ' (sen)' : ''}</span>
+        <span class="lb-value">${value}</span>`;
+      listEl.appendChild(div);
+    });
+  } catch (err) {
+    console.error('Leaderboard error:', err);
+    emptyEl.textContent = lang === 'tr' ? 'Yüklenemedi.' : 'Failed to load.';
+    emptyEl.style.display = '';
+  }
+}

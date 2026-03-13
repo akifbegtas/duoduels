@@ -304,6 +304,79 @@ const TRANSLATIONS = {
 
     // Matchmaking server
     mm_server_searching: "Karşı cinsten oyuncu aranıyor...",
+
+    // Friends
+    friends_title:         "Arkadaşlar",
+    friends_code_label:    "Arkadaş Kodun",
+    friends_code_placeholder: "Arkadaş kodunu gir",
+    friends_send_btn:      "Ekle",
+    friends_tab_list:      "Arkadaşlar",
+    friends_tab_requests:  "İstekler",
+    friends_online:        "Çevrimiçi",
+    friends_offline:       "Çevrimdışı",
+    friends_in_game:       "Oyunda",
+    friends_invite:        "Davet Et",
+    friends_remove:        "Kaldır",
+    friends_remove_confirm:"'{name}' adlı arkadaşı kaldırmak istediğinden emin misin?",
+    friends_request_sent:  "İstek Gönderildi!",
+    friends_request_accepted: "arkadaşlık isteğini kabul etti!",
+    friends_request_received_hint: "sana arkadaşlık isteği gönderdi!",
+    friends_already_friends:"Zaten arkadaşsınız!",
+    friends_request_pending:"İstek zaten gönderilmiş!",
+    friends_not_found:     "Kullanıcı bulunamadı.",
+    friends_cant_add_self: "Kendini ekleyemezsin!",
+    friends_code_invalid:  "Geçerli bir arkadaş kodu gir.",
+    friends_invite_received:"seni oyuna davet ediyor!",
+    friends_invite_sent:   "Davet gönderildi!",
+    friends_invite_title:  "Arkadaş Davet Et",
+    friends_no_online:     "Çevrimiçi arkadaşın yok.",
+    friends_empty:         "Henüz arkadaşın yok.",
+    friends_requests_empty:"Bekleyen istek yok.",
+    friends_lobby_title:   "Arkadaşlar",
+    friends_lobby_sub:     "Arkadaş ekle, davet et",
+    // Stats
+    stats_title:           "İstatistikler",
+    stats_lobby_title:     "İstatistikler",
+    stats_lobby_sub:       "Oyun geçmişin ve başarıların",
+    stats_games_played:    "Oyun",
+    stats_games_won:       "Galibiyet",
+    stats_win_rate:        "Kazanma",
+    stats_best_streak:     "En İyi Seri",
+    stats_by_game:         "Oyun Türlerine Göre",
+    stats_recent:          "Son Oyunlar",
+    stats_no_games:        "Henüz oyun geçmişi yok.",
+    // Leaderboard
+    lb_title:              "Liderlik Tablosu",
+    lb_lobby_title:        "Liderlik Tablosu",
+    lb_lobby_sub:          "En iyi oyuncuları gör",
+    lb_tab_global:         "Global",
+    lb_tab_friends:        "Arkadaşlar",
+    lb_sort_wins:          "En Çok Galibiyet",
+    lb_sort_played:        "En Çok Oyun",
+    lb_sort_streak:        "En İyi Seri",
+    lb_empty:              "Henüz veri yok.",
+    // Sound settings
+    settings_sound:        "Ses Efektleri",
+    settings_sound_label:  "Ses efektleri",
+    settings_haptics_label:"Titreşim",
+    // Achievements
+    stats_ach_title:       "Başarımlar",
+    achievement_unlocked:  "Başarım Açıldı!",
+    ach_first_game:        "İlk Oyun",
+    ach_first_win:         "İlk Galibiyet",
+    ach_games_5:           "5 Oyun",
+    ach_games_10:          "10 Oyun",
+    ach_games_25:          "25 Oyun",
+    ach_games_50:          "50 Oyun",
+    ach_games_100:         "100 Oyun",
+    ach_wins_5:            "5 Galibiyet",
+    ach_wins_10:           "10 Galibiyet",
+    ach_wins_25:           "25 Galibiyet",
+    ach_streak_3:          "3'lü Seri",
+    ach_streak_5:          "5'li Seri",
+    ach_streak_10:         "10'lu Seri",
+    ach_all_games:         "Hepsini Oynadı",
+    ach_friend_1:          "İlk Arkadaş",
   },
   en: {
     // Auth
@@ -607,6 +680,79 @@ const TRANSLATIONS = {
 
     // Matchmaking server
     mm_server_searching: "Searching for an opponent...",
+
+    // Friends
+    friends_title:         "Friends",
+    friends_code_label:    "Your Friend Code",
+    friends_code_placeholder: "Enter friend code",
+    friends_send_btn:      "Add",
+    friends_tab_list:      "Friends",
+    friends_tab_requests:  "Requests",
+    friends_online:        "Online",
+    friends_offline:       "Offline",
+    friends_in_game:       "In Game",
+    friends_invite:        "Invite",
+    friends_remove:        "Remove",
+    friends_remove_confirm:"Are you sure you want to remove '{name}'?",
+    friends_request_sent:  "Request Sent!",
+    friends_request_accepted: "accepted your friend request!",
+    friends_request_received_hint: "sent you a friend request!",
+    friends_already_friends:"You're already friends!",
+    friends_request_pending:"Request already sent!",
+    friends_not_found:     "User not found.",
+    friends_cant_add_self: "You can't add yourself!",
+    friends_code_invalid:  "Enter a valid friend code.",
+    friends_invite_received:"is inviting you to a game!",
+    friends_invite_sent:   "Invite sent!",
+    friends_invite_title:  "Invite Friend",
+    friends_no_online:     "No friends online.",
+    friends_empty:         "No friends yet.",
+    friends_requests_empty:"No pending requests.",
+    friends_lobby_title:   "Friends",
+    friends_lobby_sub:     "Add friends, invite to games",
+    // Stats
+    stats_title:           "Statistics",
+    stats_lobby_title:     "Statistics",
+    stats_lobby_sub:       "Your game history and achievements",
+    stats_games_played:    "Games",
+    stats_games_won:       "Wins",
+    stats_win_rate:        "Win Rate",
+    stats_best_streak:     "Best Streak",
+    stats_by_game:         "By Game Type",
+    stats_recent:          "Recent Games",
+    stats_no_games:        "No game history yet.",
+    // Leaderboard
+    lb_title:              "Leaderboard",
+    lb_lobby_title:        "Leaderboard",
+    lb_lobby_sub:          "See the best players",
+    lb_tab_global:         "Global",
+    lb_tab_friends:        "Friends",
+    lb_sort_wins:          "Most Wins",
+    lb_sort_played:        "Most Games",
+    lb_sort_streak:        "Best Streak",
+    lb_empty:              "No data yet.",
+    // Sound settings
+    settings_sound:        "Sound Effects",
+    settings_sound_label:  "Sound effects",
+    settings_haptics_label:"Vibration",
+    // Achievements
+    stats_ach_title:       "Achievements",
+    achievement_unlocked:  "Achievement Unlocked!",
+    ach_first_game:        "First Game",
+    ach_first_win:         "First Win",
+    ach_games_5:           "5 Games",
+    ach_games_10:          "10 Games",
+    ach_games_25:          "25 Games",
+    ach_games_50:          "50 Games",
+    ach_games_100:         "100 Games",
+    ach_wins_5:            "5 Wins",
+    ach_wins_10:           "10 Wins",
+    ach_wins_25:           "25 Wins",
+    ach_streak_3:          "3-Win Streak",
+    ach_streak_5:          "5-Win Streak",
+    ach_streak_10:         "10-Win Streak",
+    ach_all_games:         "Played All Games",
+    ach_friend_1:          "First Friend",
   },
   ar: {
     // Auth
@@ -910,6 +1056,79 @@ const TRANSLATIONS = {
 
     // Matchmaking server
     mm_server_searching: "البحث عن خصم...",
+
+    // Friends
+    friends_title:         "الأصدقاء",
+    friends_code_label:    "رمز صديقك",
+    friends_code_placeholder: "أدخل رمز الصديق",
+    friends_send_btn:      "إضافة",
+    friends_tab_list:      "الأصدقاء",
+    friends_tab_requests:  "الطلبات",
+    friends_online:        "متصل",
+    friends_offline:       "غير متصل",
+    friends_in_game:       "في اللعبة",
+    friends_invite:        "دعوة",
+    friends_remove:        "إزالة",
+    friends_remove_confirm:"هل أنت متأكد من إزالة '{name}'؟",
+    friends_request_sent:  "تم إرسال الطلب!",
+    friends_request_accepted: "قبل طلب صداقتك!",
+    friends_request_received_hint: "أرسل لك طلب صداقة!",
+    friends_already_friends:"أنتما أصدقاء بالفعل!",
+    friends_request_pending:"تم إرسال الطلب مسبقاً!",
+    friends_not_found:     "المستخدم غير موجود.",
+    friends_cant_add_self: "لا يمكنك إضافة نفسك!",
+    friends_code_invalid:  "أدخل رمز صديق صالح.",
+    friends_invite_received:"يدعوك إلى لعبة!",
+    friends_invite_sent:   "تم إرسال الدعوة!",
+    friends_invite_title:  "دعوة صديق",
+    friends_no_online:     "لا أصدقاء متصلين.",
+    friends_empty:         "لا أصدقاء بعد.",
+    friends_requests_empty:"لا طلبات معلقة.",
+    friends_lobby_title:   "الأصدقاء",
+    friends_lobby_sub:     "أضف أصدقاء، ادعُهم للعب",
+    // Stats
+    stats_title:           "الإحصائيات",
+    stats_lobby_title:     "الإحصائيات",
+    stats_lobby_sub:       "سجل ألعابك وإنجازاتك",
+    stats_games_played:    "ألعاب",
+    stats_games_won:       "انتصارات",
+    stats_win_rate:        "نسبة الفوز",
+    stats_best_streak:     "أفضل سلسلة",
+    stats_by_game:         "حسب نوع اللعبة",
+    stats_recent:          "الألعاب الأخيرة",
+    stats_no_games:        "لا يوجد سجل ألعاب بعد.",
+    // Leaderboard
+    lb_title:              "لوحة المتصدرين",
+    lb_lobby_title:        "لوحة المتصدرين",
+    lb_lobby_sub:          "شاهد أفضل اللاعبين",
+    lb_tab_global:         "عالمي",
+    lb_tab_friends:        "الأصدقاء",
+    lb_sort_wins:          "أكثر انتصارات",
+    lb_sort_played:        "أكثر ألعاب",
+    lb_sort_streak:        "أفضل سلسلة",
+    lb_empty:              "لا توجد بيانات بعد.",
+    // Sound settings
+    settings_sound:        "المؤثرات الصوتية",
+    settings_sound_label:  "المؤثرات الصوتية",
+    settings_haptics_label:"الاهتزاز",
+    // Achievements
+    stats_ach_title:       "الإنجازات",
+    achievement_unlocked:  "تم فتح إنجاز!",
+    ach_first_game:        "أول لعبة",
+    ach_first_win:         "أول فوز",
+    ach_games_5:           "5 ألعاب",
+    ach_games_10:          "10 ألعاب",
+    ach_games_25:          "25 لعبة",
+    ach_games_50:          "50 لعبة",
+    ach_games_100:         "100 لعبة",
+    ach_wins_5:            "5 انتصارات",
+    ach_wins_10:           "10 انتصارات",
+    ach_wins_25:           "25 انتصار",
+    ach_streak_3:          "سلسلة 3",
+    ach_streak_5:          "سلسلة 5",
+    ach_streak_10:         "سلسلة 10",
+    ach_all_games:         "لعب الكل",
+    ach_friend_1:          "أول صديق",
   }
 };
 
@@ -975,6 +1194,51 @@ function applyTranslations() {
   // Bil Bakalım screen (static elements)
   _setAttr('bb-answer-input', 'placeholder', t('bb_ph_answer'));
   _setText('bb-send-btn', t('bb_send'));
+
+  // Friends
+  _setText('friends-title',       t('friends_title'));
+  _setText('friends-code-label',  t('friends_code_label'));
+  _setAttr('friend-code-input', 'placeholder', t('friends_code_placeholder'));
+  _setText('friends-send-btn',    t('friends_send_btn'));
+  _setText('friends-tab-list',    t('friends_tab_list'));
+  _setText('friends-empty-msg',   t('friends_empty'));
+  _setText('friends-requests-empty-msg', t('friends_requests_empty'));
+  _setText('lmc-title-friends',   t('friends_lobby_title'));
+  _setText('lmc-sub-friends',     t('friends_lobby_sub'));
+
+  // Stats screen
+  _setText('stats-title',          t('stats_title'));
+  _setText('stat-label-played',    t('stats_games_played'));
+  _setText('stat-label-won',       t('stats_games_won'));
+  _setText('stat-label-winrate',   t('stats_win_rate'));
+  _setText('stat-label-streak',    t('stats_best_streak'));
+  _setText('stats-by-game-title',  t('stats_by_game'));
+  _setText('stats-recent-title',   t('stats_recent'));
+  _setText('stats-no-games',       t('stats_no_games'));
+  _setText('lmc-title-stats',      t('stats_lobby_title'));
+  _setText('lmc-sub-stats',        t('stats_lobby_sub'));
+
+  // Achievements
+  _setText('stats-ach-title',      t('stats_ach_title'));
+
+  // Sound settings
+  _setText('settings-sound-sec',   t('settings_sound'));
+  _setText('settings-sound-label', t('settings_sound_label'));
+  _setText('settings-haptics-label', t('settings_haptics_label'));
+
+  // Leaderboard screen
+  _setText('leaderboard-title',    t('lb_title'));
+  _setText('lb-tab-global-text',   t('lb_tab_global'));
+  _setText('lb-tab-friends-text',  t('lb_tab_friends'));
+  _setText('lmc-title-leaderboard', t('lb_lobby_title'));
+  _setText('lmc-sub-leaderboard',  t('lb_lobby_sub'));
+  // Leaderboard select options
+  const lbSortWins = document.getElementById('lb-sort-wins');
+  const lbSortPlayed = document.getElementById('lb-sort-played');
+  const lbSortStreak = document.getElementById('lb-sort-streak');
+  if (lbSortWins) lbSortWins.textContent = t('lb_sort_wins');
+  if (lbSortPlayed) lbSortPlayed.textContent = t('lb_sort_played');
+  if (lbSortStreak) lbSortStreak.textContent = t('lb_sort_streak');
 
   // Active language highlight
   ['tr','en','ar'].forEach(l => {
