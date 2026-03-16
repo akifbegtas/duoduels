@@ -28,6 +28,54 @@ function detectAuthPlatform() {
   return "web";
 }
 
+function shouldUseRedirectAuth() {
+  if (detectAuthPlatform() !== "web") return false;
+  const ua = navigator.userAgent || '';
+  const isMobileBrowser = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
+  const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
+    || window.navigator.standalone === true;
+  return isMobileBrowser || isStandalone;
+}
+
+function showScreenSafe(name) {
+  if (typeof showScreen === 'function') {
+    showScreen(name);
+    return true;
+  }
+
+  const aliasMap = {
+    profileSetup: 'profile-setup'
+  };
+  const alias = aliasMap[name] || name;
+  const candidates = [
+    document.getElementById(name + '-screen'),
+    document.getElementById(name),
+    document.getElementById(alias + '-screen'),
+    document.getElementById(alias)
+  ].filter(Boolean);
+
+  if (!candidates.length) return false;
+  document.querySelectorAll('.screen').forEach((s) => s.classList.remove('active'));
+  candidates[0].classList.add('active');
+  return true;
+}
+
+function waitForClientReady(callback, attempts = 40) {
+  const hasTheme = typeof applyGenderTheme === 'function';
+  const hasSocket = typeof connectSocket === 'function';
+  if (hasTheme && hasSocket) {
+    callback();
+    return;
+  }
+
+  if (attempts <= 0) {
+    callback();
+    return;
+  }
+
+  setTimeout(() => waitForClientReady(callback, attempts - 1), 100);
+}
+
 function configureAuthProviderVisibility() {
   const platform = detectAuthPlatform();
   if (platform === "ios") {
@@ -79,15 +127,33 @@ async function signInWithGoogle() {
     return;
   }
 
-  // Web: Firebase popup/redirect
+  // Web: masaüstünde popup, mobil/PWA'da redirect daha güvenilir
   const provider = new firebase.auth.GoogleAuthProvider();
-  try {
-    await auth.signInWithPopup(provider);
-  } catch (err) {
-    if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+  provider.setCustomParameters({ prompt: 'select_account' });
+
+  if (shouldUseRedirectAuth()) {
+    try {
       await auth.signInWithRedirect(provider);
+    } catch (err) {
+      console.error("Google redirect sign-in error:", err.code, err.message);
+      Swal.fire({ title: t('auth_error'), text: err.message || 'Google giriş hatası', icon: "error" });
+    }
+    return;
+  }
+
+  try {
+    const result = await auth.signInWithPopup(provider);
+    console.log("Google popup login başarılı:", result.user?.uid);
+  } catch (err) {
+    console.error("Google sign-in error:", err.code, err.message);
+    if (err.code === 'auth/popup-blocked') {
+      // Popup engellendi, redirect'e düş
+      await auth.signInWithRedirect(provider);
+    } else if (err.code === 'auth/popup-closed-by-user') {
+      // Kullanıcı popup'ı kapattı - sessiz kal
+    } else if (err.code === 'auth/unauthorized-domain') {
+      Swal.fire({ title: t('auth_error'), text: 'Bu domain Firebase\'de yetkilendirilmemiş. Firebase Console > Authentication > Settings > Authorized domains\'e "duoduels.com" ekleyin.', icon: "error" });
     } else {
-      console.error("Google sign-in error:", err);
       Swal.fire({ title: t('auth_error'), text: err.message, icon: "error" });
     }
   }
@@ -97,10 +163,14 @@ async function signInWithFacebook() {
   if (!_enabledProviders.has("facebook")) return;
   const provider = new firebase.auth.FacebookAuthProvider();
   try {
-    await auth.signInWithPopup(provider);
+    const result = await auth.signInWithPopup(provider);
+    console.log("Facebook popup login başarılı:", result.user?.uid);
   } catch (err) {
-    if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+    console.error("Facebook sign-in error:", err.code, err.message);
+    if (err.code === 'auth/popup-blocked') {
       await auth.signInWithRedirect(provider);
+    } else if (err.code === 'auth/popup-closed-by-user') {
+      // Kullanıcı popup'ı kapattı - sessiz kal
     } else if (err.code === 'auth/account-exists-with-different-credential') {
       Swal.fire({
         title: t('auth_account_exists'),
@@ -221,9 +291,31 @@ if (_isLocalDev) {
     const splash = document.getElementById('app-splash');
     if (splash) {
       dismissSplash(splash);
-      showScreen('auth');
+      showScreenSafe('auth');
     }
   }, 2000);
+}
+
+// --- REDIRECT RESULT HANDLER ---
+// signInWithRedirect sonrasında sayfaya dönünce sonucu yakala
+if (auth && auth.getRedirectResult) {
+  auth.getRedirectResult().then((result) => {
+    // result.user varsa onAuthStateChanged zaten tetiklenecek
+    if (result && result.user) {
+      console.log("Redirect login başarılı:", result.user.uid);
+    }
+  }).catch((err) => {
+    console.error("Redirect login hatası:", err);
+    if (err.code === 'auth/account-exists-with-different-credential') {
+      Swal.fire({
+        title: t('auth_account_exists'),
+        text: t('auth_account_exists_text'),
+        icon: "warning"
+      });
+    } else if (err.code !== 'auth/popup-closed-by-user') {
+      Swal.fire({ title: t('auth_error'), text: err.message, icon: "error" });
+    }
+  });
 }
 
 // --- AUTH STATE OBSERVER ---
@@ -252,7 +344,7 @@ auth && auth.onAuthStateChanged && auth.onAuthStateChanged(async (user) => {
 
       // Anonim kullanıcının profili olmayacak, direkt profil setup'a geç
       dismissSplash(splash);
-      showScreen('profileSetup');
+      showScreenSafe('profileSetup');
       return;
     }
 
@@ -260,29 +352,56 @@ auth && auth.onAuthStateChanged && auth.onAuthStateChanged(async (user) => {
     authIdToken = await user.getIdToken();
     startTokenRefresh();
 
-    // Firestore'dan profil çek
-    try {
-      const doc = await db.collection('users').doc(user.uid).get();
-      if (doc.exists) {
-        userProfile = doc.data();
-        // lastLogin güncelle + friendCode yoksa üret (eski kullanıcılar için)
-        const updateData = { lastLogin: firebase.firestore.FieldValue.serverTimestamp() };
-        if (!userProfile.friendCode) {
-          const code = await _getUniqueFriendCode();
-          updateData.friendCode = code;
-          userProfile.friendCode = code;
-        }
-        db.collection('users').doc(user.uid).update(updateData);
-        enterLobby();
-      } else {
-        // İlk kez giriş - profil oluştur ekranı
-        dismissSplash(splash);
-        showScreen('profileSetup');
+    // Firestore'dan profil çek (retry ile)
+    let profileDoc = null;
+    let profileError = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        profileDoc = await db.collection('users').doc(user.uid).get();
+        profileError = null;
+        break;
+      } catch (err) {
+        profileError = err;
+        console.warn(`Profil çekme denemesi ${attempt + 1}/3 başarısız:`, err.message);
+        if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
       }
-    } catch (err) {
-      console.error("Profil çekme hatası:", err);
+    }
+
+    if (profileError) {
+      console.error("Profil çekme hatası (3 deneme sonrası):", profileError);
       dismissSplash(splash);
-      showScreen('profileSetup');
+      Swal.fire({
+        title: t('error'),
+        text: 'Profil yüklenemedi: ' + profileError.message,
+        icon: 'error',
+        confirmButtonText: 'Tekrar Dene',
+        showCancelButton: true,
+        cancelButtonText: 'Profil Oluştur'
+      }).then((result) => {
+        if (result.isConfirmed) {
+          window.location.reload();
+        } else {
+          showScreenSafe('profileSetup');
+        }
+      });
+      return;
+    }
+
+    if (profileDoc && profileDoc.exists) {
+      userProfile = profileDoc.data();
+      // lastLogin güncelle + friendCode yoksa üret (eski kullanıcılar için)
+      const updateData = { lastLogin: firebase.firestore.FieldValue.serverTimestamp() };
+      if (!userProfile.friendCode) {
+        const code = await _getUniqueFriendCode();
+        updateData.friendCode = code;
+        userProfile.friendCode = code;
+      }
+      db.collection('users').doc(user.uid).update(updateData);
+      enterLobby();
+    } else {
+      // İlk kez giriş - profil oluştur ekranı
+      dismissSplash(splash);
+      showScreenSafe('profileSetup');
     }
   } else {
     // Kullanıcı yok - auth ekranı
@@ -294,7 +413,7 @@ auth && auth.onAuthStateChanged && auth.onAuthStateChanged(async (user) => {
     document.body.classList.remove('theme-male', 'theme-female');
     if (typeof updateSvgColors === 'function') updateSvgColors(null);
     dismissSplash(splash);
-    showScreen('auth');
+    showScreenSafe('auth');
   }
 });
 
@@ -361,41 +480,47 @@ async function saveProfile() {
     return;
   }
 
-  const friendCode = await _getUniqueFriendCode();
-
-  const profileData = {
-    username: username,
-    gender: genderEl.value,
-    email: currentUser.email || '',
-    photoURL: currentUser.photoURL || '',
-    friendCode: friendCode,
-  };
-
-  // Local guest veya dev — Firestore yerine localStorage kullan
-  if ((_isGuestLocal || (_isLocalDev && !authIdToken)) && !authIdToken) {
-    userProfile = { ...profileData };
-    const storageKey = _isGuestLocal ? 'dd_guest_profile' : 'dd_dev_profile';
-    localStorage.setItem(storageKey, JSON.stringify(profileData));
-    enterLobby();
-    return;
-  }
-
-  const profileDataWithTimestamps = {
-    ...profileData,
-    createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-    lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
-    friendCount: 0,
-    onlineStatus: 'online',
-    lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-  };
+  // Devam Et butonunu disable et
+  const continueBtn = document.getElementById('btn-continue-profile');
+  if (continueBtn) { continueBtn.disabled = true; continueBtn.textContent = 'Kaydediliyor...'; }
 
   try {
+    const friendCode = await _getUniqueFriendCode();
+
+    const profileData = {
+      username: username,
+      gender: genderEl.value,
+      email: (currentUser && currentUser.email) || '',
+      photoURL: (currentUser && currentUser.photoURL) || '',
+      friendCode: friendCode,
+    };
+
+    // Local guest veya dev — Firestore yerine localStorage kullan
+    if ((_isGuestLocal || (_isLocalDev && !authIdToken)) && !authIdToken) {
+      userProfile = { ...profileData };
+      const storageKey = _isGuestLocal ? 'dd_guest_profile' : 'dd_dev_profile';
+      localStorage.setItem(storageKey, JSON.stringify(profileData));
+      enterLobby();
+      return;
+    }
+
+    const profileDataWithTimestamps = {
+      ...profileData,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
+      lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
+      friendCount: 0,
+      onlineStatus: 'online',
+      lastSeen: firebase.firestore.FieldValue.serverTimestamp()
+    };
+
     await db.collection('users').doc(currentUser.uid).set(profileDataWithTimestamps);
     userProfile = { ...profileDataWithTimestamps };
     enterLobby();
   } catch (err) {
     console.error("Profil kaydetme hatası:", err);
-    Swal.fire({ title: t('error'), text: t('error_profile_save') + err.message, icon: "error" });
+    Swal.fire({ title: t('error'), text: 'Profil kaydedilemedi: ' + err.message, icon: "error" });
+  } finally {
+    if (continueBtn) { continueBtn.disabled = false; continueBtn.textContent = t('btn_continue') || 'Devam Et'; }
   }
 }
 
@@ -418,7 +543,7 @@ function skipToLobbyAsGuest() {
       return;
     } catch(e) {}
   }
-  if (typeof showScreen === 'function') showScreen('profileSetup');
+  if (typeof showScreen === 'function') showScreenSafe('profileSetup');
   else _devShowScreen('profile-setup');
 }
 
@@ -449,7 +574,7 @@ function requireAuthForMultiplayer(callback) {
     if (result.isConfirmed) {
       // Auth ekranına yönlendir, giriş sonrası lobby'ye dönecek
       _pendingMultiplayerCallback = callback;
-      showScreen('auth');
+      showScreenSafe('auth');
     }
   });
 }
@@ -460,47 +585,57 @@ let _pendingMultiplayerCallback = null;
 function enterLobby() {
   if (!userProfile || !currentUser) return;
 
-  // Tema uygula
-  applyGenderTheme(userProfile.gender);
+  waitForClientReady(() => {
+    try {
+      // Tema uygula
+      if (typeof applyGenderTheme === 'function') {
+        applyGenderTheme(userProfile.gender);
+      }
 
-  // Splash dismiss
-  const splash = document.getElementById('app-splash');
-  dismissSplash(splash);
+      // Splash dismiss
+      const splash = document.getElementById('app-splash');
+      dismissSplash(splash);
 
-  // Lobby ekranına geç (showScreen global değilse _devShowScreen kullan)
-  if (typeof showScreen === 'function') {
-    showScreen('lobby');
-  } else {
-    _devShowScreen('lobby');
-  }
+      // Lobby ekranına geç (showScreen global değilse _devShowScreen kullan)
+      if (typeof showScreen === 'function') {
+        showScreenSafe('lobby');
+      } else {
+        _devShowScreen('lobby');
+      }
 
-  // Lobby'deki kullanıcı adı greeting
-  const greetEl = document.getElementById('lobby-username-greeting');
-  if (greetEl) greetEl.textContent = userProfile.username;
+      // Lobby'deki kullanıcı adı greeting
+      const greetEl = document.getElementById('lobby-username-greeting');
+      if (greetEl) greetEl.textContent = userProfile.username;
 
-  // Avatar — Bug 17 fix: validate URL starts with https:// before assigning
-  const avatarEl = document.getElementById('lobby-avatar');
-  if (avatarEl) {
-    const photo = userProfile.photoURL || currentUser.photoURL || '';
-    if (photo && (photo.startsWith('https://') || photo.startsWith('data:image/'))) {
-      avatarEl.src = photo;
-      avatarEl.onerror = () => { avatarEl.src = _anonymousAvatarSvg(); };
-    } else {
-      avatarEl.src = _anonymousAvatarSvg();
+      // Avatar — Bug 17 fix: validate URL starts with https:// before assigning
+      const avatarEl = document.getElementById('lobby-avatar');
+      if (avatarEl) {
+        const photo = userProfile.photoURL || currentUser.photoURL || '';
+        if (photo && (photo.startsWith('https://') || photo.startsWith('data:image/'))) {
+          avatarEl.src = photo;
+          avatarEl.onerror = () => { avatarEl.src = _anonymousAvatarSvg(); };
+        } else {
+          avatarEl.src = _anonymousAvatarSvg();
+        }
+      }
+
+      // Socket bağlantısını başlat (guest local için Pass & Play seçene kadar bekleme)
+      if (!_isGuestLocal && typeof connectSocket === 'function') {
+        connectSocket();
+      }
+
+      // Auth sonrası bekleyen multiplayer callback varsa çalıştır
+      if (_pendingMultiplayerCallback && isFullyAuthenticated()) {
+        const cb = _pendingMultiplayerCallback;
+        _pendingMultiplayerCallback = null;
+        cb();
+      }
+    } catch (err) {
+      console.error('enterLobby error:', err);
+      showScreenSafe('auth');
+      Swal.fire({ title: t('auth_error'), text: err.message || 'Giriş sonrası ekran yüklenemedi', icon: 'error' });
     }
-  }
-
-  // Socket bağlantısını başlat (guest local için Pass & Play seçene kadar bekleme)
-  if (!_isGuestLocal) {
-    connectSocket();
-  }
-
-  // Auth sonrası bekleyen multiplayer callback varsa çalıştır
-  if (_pendingMultiplayerCallback && isFullyAuthenticated()) {
-    const cb = _pendingMultiplayerCallback;
-    _pendingMultiplayerCallback = null;
-    cb();
-  }
+  });
 }
 
 // --- SIGN OUT ---
@@ -539,7 +674,7 @@ async function signOut() {
     stopTokenRefresh();
 
     if (wasGuestLocal || !auth) {
-      showScreen('auth');
+      showScreenSafe('auth');
       return;
     }
 
@@ -556,14 +691,14 @@ async function signOut() {
     }
 
     // Garanti: auth ekranına geç
-    showScreen('auth');
+    showScreenSafe('auth');
   } catch (err) {
     console.error("Çıkış hatası:", err);
     // Her halükarda auth ekranına dön
     currentUser = null;
     userProfile = null;
     authIdToken = null;
-    showScreen('auth');
+    showScreenSafe('auth');
   }
 }
 
@@ -599,7 +734,7 @@ function getMyPlayerId() {
 
 // --- SETTINGS ---
 function openSettings() {
-  if (typeof showScreen === 'function') showScreen('settings');
+  if (typeof showScreen === 'function') showScreenSafe('settings');
   else _devShowScreen('settings');
 
   // Sync avatar in settings
