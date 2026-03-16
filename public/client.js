@@ -187,6 +187,7 @@ function connectSocket() {
   if (socket) {
     // Mevcut socket varsa auth güncelle ve yeniden bağlan
     socket.auth = authPayload;
+    _attachDeferredSocketListeners();
     socket.connect();
     return;
   }
@@ -197,6 +198,7 @@ function connectSocket() {
   });
 
   setupSocketListeners();
+  _attachDeferredSocketListeners();
 }
 
 // --- ROUND TRANSITION TOAST ---
@@ -3823,6 +3825,12 @@ let _pendingRequests = [];
 let _currentFriendsTab = 'list';
 let _pendingGameInvite = null;
 
+function _attachDeferredSocketListeners() {
+  _attachFriendListeners();
+  _attachModerationSocketListeners();
+  _attachReactionSocketListeners();
+}
+
 // --- Friend Socket Listeners (called after socket is ready) ---
 function _attachFriendListeners() {
   if (!socket || socket._friendListenersAttached) return;
@@ -3924,13 +3932,6 @@ function _attachFriendListeners() {
   });
 }
 
-// Auto-attach when socket connects
-const _origConnectSocket = connectSocket;
-connectSocket = function() {
-  _origConnectSocket();
-  if (socket) _attachFriendListeners();
-};
-
 // --- UI Functions ---
 
 function copyFriendCode() {
@@ -3953,11 +3954,15 @@ function copyFriendCode() {
 
 function sendFriendRequestUI() {
   const input = document.getElementById('friend-code-input');
-  const code = input.value.trim().toUpperCase();
-  if (!code || code.length < 4) {
+  if (!input) return;
+
+  const code = (input.value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (code.length !== 8) {
     Swal.fire({ title: t('warning'), text: t('friends_code_invalid'), icon: 'warning' });
     return;
   }
+
+  input.value = code.slice(0, 4) + '-' + code.slice(4);
   if (!socket || !socket.connected) {
     Swal.fire({ title: t('warning'), text: t('conn_lost'), icon: 'warning' });
     return;
@@ -4097,16 +4102,26 @@ function showGameInviteToast(data) {
   window._inviteToastTimer = setTimeout(() => { toast.style.display = 'none'; _pendingGameInvite = null; }, 30000);
 }
 
-function acceptGameInvite() {
+async function acceptGameInvite() {
   const toast = document.getElementById('game-invite-toast');
   if (toast) toast.style.display = 'none';
-  if (_pendingGameInvite && socket && socket.connected) {
-    const roomId = _pendingGameInvite.roomId;
-    const codeInput = document.getElementById('roomCodeInput');
-    if (codeInput) codeInput.value = roomId;
-    joinRoom();
-    _pendingGameInvite = null;
+
+  const invite = _pendingGameInvite;
+  _pendingGameInvite = null;
+  if (!invite || !socket || !socket.connected) return;
+
+  const roomId = invite.roomId;
+  if (currentRoom && currentRoom !== roomId && typeof leaveCurrentRoom === 'function') {
+    const didLeave = await leaveCurrentRoom();
+    if (didLeave) {
+      currentRoom = null;
+      sessionStorage.removeItem("duoduels_room");
+    }
   }
+
+  const codeInput = document.getElementById('roomCodeInput');
+  if (codeInput) codeInput.value = roomId;
+  joinRoom();
 }
 
 function declineGameInvite() {
@@ -4377,14 +4392,16 @@ function unblockUser(targetUid) {
   socket.emit('unblockUser', { targetUid });
 }
 
-// Socket listeners for block system
-if (typeof socket !== 'undefined') {
+function _attachModerationSocketListeners() {
+  if (!socket || socket._moderationListenersAttached) return;
+  socket._moderationListenersAttached = true;
+
   socket.on('reportSuccess', () => {
     const lang = window._currentLang || 'tr';
     Swal.fire({ title: lang === 'tr' ? 'Şikayet Gönderildi' : 'Report Sent', icon: 'success', timer: 2000, showConfirmButton: false });
   });
   socket.on('blockSuccess', ({ targetUid }) => {
-    _blockedUsers.push(targetUid);
+    if (!_blockedUsers.includes(targetUid)) _blockedUsers.push(targetUid);
     const lang = window._currentLang || 'tr';
     Swal.fire({ title: lang === 'tr' ? 'Engellendi' : 'Blocked', icon: 'success', timer: 2000, showConfirmButton: false });
   });
@@ -4517,21 +4534,31 @@ function showReactionBubble(emoji, username) {
 // Show/hide reaction button based on current screen
 function updateReactionButton() {
   const btn = document.getElementById('reaction-btn');
+  const panel = document.getElementById('reaction-panel');
   if (!btn) return;
-  const currentScreenEl = document.querySelector('.screen:not([style*="display: none"]):not([style*="display:none"])');
-  if (!currentScreenEl) { btn.style.display = 'none'; return; }
+
+  const currentScreenEl = document.querySelector('.screen.active');
+  if (!currentScreenEl) {
+    btn.style.display = 'none';
+    if (panel) panel.style.display = 'none';
+    _reactionPanelOpen = false;
+    return;
+  }
+
   const screenId = currentScreenEl.id;
   // Show during game screens
   const isGameScreen = GAME_SCREENS.some(g => screenId.includes(g)) || screenId === 'game-screen';
   btn.style.display = (isGameScreen && currentRoom) ? '' : 'none';
-  if (!isGameScreen) {
-    document.getElementById('reaction-panel').style.display = 'none';
+  if (!isGameScreen && panel) {
+    panel.style.display = 'none';
     _reactionPanelOpen = false;
   }
 }
 
-// Listen for reactions from others
-if (typeof socket !== 'undefined') {
+function _attachReactionSocketListeners() {
+  if (!socket || socket._reactionListenersAttached) return;
+  socket._reactionListenersAttached = true;
+
   socket.on('reactionReceived', (data) => {
     showReactionBubble(data.emoji, data.username);
     SoundManager.play('notify');

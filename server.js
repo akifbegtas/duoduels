@@ -251,6 +251,24 @@ function sanitizeString(str, maxLength = 50) {
   return str.trim().substring(0, maxLength).replace(/<[^>]*>/g, '');
 }
 
+function normalizeFriendCode(code) {
+  return sanitizeString(code, 12).toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 8);
+}
+
+function randomDigits(length = 4) {
+  const size = Math.max(1, Number(length) || 4);
+  let digits = '';
+
+  do {
+    digits = '';
+    for (let i = 0; i < size; i++) {
+      digits += Math.floor(Math.random() * 10).toString();
+    }
+  } while (/^(\d)\1*$/.test(digits));
+
+  return digits;
+}
+
 function isValidRoomId(id) {
   return typeof id === 'string' && /^[A-Z0-9]{5,6}$/.test(id);
 }
@@ -1241,7 +1259,14 @@ io.on("connection", (socket) => {
       socket.emit("gameError", serverT('room_not_found', socket.lang));
       return;
     }
+
     const pid = socket.userId;
+    const existingRoomId = findRoomIdByPlayer(pid);
+    if (existingRoomId && existingRoomId !== cleanRoomId) {
+      socket.leave(existingRoomId);
+      removePlayerFromRoom(existingRoomId, pid);
+    }
+
     // Zaten odada mı?
     if (findPlayerInRoom(room, pid)) {
       socket.join(cleanRoomId);
@@ -2372,7 +2397,11 @@ io.on("connection", (socket) => {
         return;
       }
 
-      const code = sanitizeString(friendCode, 8).toUpperCase();
+      const code = normalizeFriendCode(friendCode);
+      if (code.length !== 8) {
+        socket.emit("friendRequestResult", { success: false, error: 'invalid' });
+        return;
+      }
 
       // Find user by friendCode
       const userSnap = await adminDb.collection('users').where('friendCode', '==', code).limit(1).get();
@@ -2712,6 +2741,14 @@ function findPlayerInRoom(room, pid) {
     if (t.p2 && t.p2.id === pid) return t.p2;
   }
   return room.spectators.find(p => p.id === pid) || null;
+}
+
+function findRoomIdByPlayer(pid) {
+  if (!pid) return null;
+  for (const roomId of Object.keys(rooms)) {
+    if (findPlayerInRoom(rooms[roomId], pid)) return roomId;
+  }
+  return null;
 }
 
 function clearAllRoomTimers(room) {
