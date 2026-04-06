@@ -166,6 +166,8 @@ const SERVER_URL = isLocalDev
 let socket = null;
 let _socketListenersAttached = false;
 
+window.socket = null;
+
 function connectSocket() {
   if (socket && socket.connected) return;
 
@@ -174,19 +176,25 @@ function connectSocket() {
   const devUid = useLocalFallback && typeof _getOrCreateDevUid === 'function'
     ? _getOrCreateDevUid()
     : null;
+  const fallbackUserId = authIdToken
+    ? (typeof currentUser !== 'undefined' && currentUser && currentUser.uid ? currentUser.uid : null)
+    : devUid;
 
-  if (!authIdToken && !devUid) {
+  if (!authIdToken && !fallbackUserId) {
     console.warn("connectSocket: authIdToken yok, bağlanılamıyor");
     return;
   }
 
-  const authPayload = authIdToken
-    ? { token: authIdToken, lang: currentLang || 'tr' }
-    : { fallbackUserId: devUid, lang: currentLang || 'tr' };
+  const authPayload = {
+    lang: currentLang || 'tr',
+    ...(authIdToken ? { token: authIdToken } : {}),
+    ...(fallbackUserId ? { fallbackUserId } : {})
+  };
 
   if (socket) {
     // Mevcut socket varsa auth güncelle ve yeniden bağlan
     socket.auth = authPayload;
+    window.socket = socket;
     _attachDeferredSocketListeners();
     socket.connect();
     return;
@@ -196,6 +204,7 @@ function connectSocket() {
     auth: authPayload,
     autoConnect: true
   });
+  window.socket = socket;
 
   setupSocketListeners();
   _attachDeferredSocketListeners();
@@ -4214,7 +4223,12 @@ async function loadStats() {
     const uid = window._currentUser.uid;
     // Load user stats
     const userDoc = await db.collection('users').doc(uid).get();
-    const stats = userDoc.exists ? (userDoc.data().stats || {}) : {};
+    if (!userDoc.exists) {
+      renderEmptyStats();
+      return;
+    }
+
+    const stats = userDoc.data().stats || {};
 
     // Render overview
     const played = stats.gamesPlayed || 0;
@@ -4333,6 +4347,18 @@ function renderEmptyStats() {
   document.getElementById('stat-win-rate').textContent = '0%';
   document.getElementById('stat-best-streak').textContent = '0';
   document.getElementById('stats-by-game').innerHTML = '';
+  const recentContainer = document.getElementById('stats-recent-games');
+  const noGamesMsg = document.getElementById('stats-no-games');
+  const achievements = document.getElementById('stats-achievements');
+  if (recentContainer) {
+    recentContainer.querySelectorAll('.recent-game-item').forEach(el => el.remove());
+  }
+  if (noGamesMsg) {
+    noGamesMsg.style.display = '';
+  }
+  if (achievements) {
+    achievements.innerHTML = '';
+  }
 }
 
 // ===== REPORT & BLOCK SYSTEM =====
@@ -4579,9 +4605,10 @@ async function loadLeaderboard() {
   const listEl = document.getElementById('leaderboard-list');
   const emptyEl = document.getElementById('lb-empty');
   listEl.querySelectorAll('.lb-row').forEach(el => el.remove());
+  const lang = window._currentLang || 'tr';
 
   if (!window.db || !window._currentUser) {
-    emptyEl.textContent = _currentLbTab === 'global' ? 'Giriş yap' : 'Giriş yap';
+    emptyEl.textContent = lang === 'tr' ? 'Giriş yap' : lang === 'ar' ? 'سجّل الدخول' : 'Sign in';
     emptyEl.style.display = '';
     return;
   }
@@ -4591,7 +4618,6 @@ async function loadLeaderboard() {
 
   const sortBy = document.getElementById('lb-sort-select').value;
   const uid = window._currentUser.uid;
-  const lang = window._currentLang || 'tr';
 
   try {
     let users = [];

@@ -15,6 +15,9 @@ let auth = null;
 let db = null;
 let _firebaseReady = false;
 
+window.auth = null;
+window.db = null;
+
 function isPlaceholderFirebaseConfig(cfg) {
   if (!cfg || typeof cfg !== "object") return true;
   const values = [
@@ -35,11 +38,15 @@ try {
   firebase.initializeApp(firebaseConfig);
   auth = firebase.auth();
   db = firebase.firestore();
+  window.auth = auth;
+  window.db = db;
   // Persistence ayarı - oturum tab kapatılınca bile korunsun
   auth.setPersistence(firebase.auth.Auth.Persistence.LOCAL);
   _firebaseReady = true;
 } catch (e) {
   console.error("Firebase init hatası:", e.message);
+  window.auth = null;
+  window.db = null;
   // Firebase init başarısız - splash kaldır ve auth ekranını göster
   document.addEventListener('DOMContentLoaded', () => {
     const splash = document.getElementById('app-splash');

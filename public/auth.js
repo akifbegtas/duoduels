@@ -7,6 +7,15 @@ let authIdToken = null;
 let _tokenRefreshTimer = null;
 let _enabledProviders = new Set(["google", "facebook", "guest"]);
 let _isGuestLocal = false; // Giriş yapmadan oynayan kullanıcı
+let _authBootstrapPromise = null;
+let _authBootstrapUid = null;
+let _hydratedAuthUid = null;
+
+window._currentUser = null;
+
+function syncCurrentUserGlobal() {
+  window._currentUser = currentUser;
+}
 
 // Local dev bypass — Firebase olmadan çalışır
 const _isLocalDev = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
@@ -34,7 +43,10 @@ function shouldUseRedirectAuth() {
   const isMobileBrowser = /Android|iPhone|iPad|iPod|Mobile/i.test(ua);
   const isStandalone = (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
     || window.navigator.standalone === true;
-  return isMobileBrowser || isStandalone;
+  const isHostedWeb = window.location.hostname === 'duoduels.com'
+    || window.location.hostname === 'www.duoduels.com'
+    || window.location.hostname.endsWith('.run.app');
+  return isMobileBrowser || isStandalone || isHostedWeb;
 }
 
 function showScreenSafe(name) {
@@ -74,6 +86,294 @@ function waitForClientReady(callback, attempts = 40) {
   }
 
   setTimeout(() => waitForClientReady(callback, attempts - 1), 100);
+}
+
+async function getIdTokenWithRetry(user, attempts = 3) {
+  let lastError = null;
+
+  for (let attempt = 0; attempt < attempts; attempt++) {
+    try {
+      return await user.getIdToken(attempt > 0);
+    } catch (err) {
+      lastError = err;
+      console.warn(`Token alma denemesi ${attempt + 1}/${attempts} başarısız:`, err.message);
+      if (attempt < attempts - 1) {
+        await new Promise((resolve) => setTimeout(resolve, 500));
+      }
+    }
+  }
+
+  throw lastError || new Error('Firebase token alınamadı');
+}
+
+async function completeFirebaseSignIn(user, source = 'unknown') {
+  if (!user || _devModeActive) return false;
+
+  if (_authBootstrapPromise && _authBootstrapUid === user.uid) {
+    return _authBootstrapPromise;
+  }
+
+  const alreadyHydrated = _hydratedAuthUid === user.uid
+    && currentUser
+    && currentUser.uid === user.uid
+    && userProfile;
+  if (alreadyHydrated) {
+    enterLobby();
+    return true;
+  }
+
+  _authBootstrapUid = user.uid;
+  _authBootstrapPromise = (async () => {
+    const splash = document.getElementById('app-splash');
+
+    try {
+      currentUser = user;
+      syncCurrentUserGlobal();
+
+      if (!user.isAnonymous) {
+        _isGuestLocal = false;
+      }
+
+      if (user.isAnonymous) {
+        authIdToken = await getIdTokenWithRetry(user);
+        startTokenRefresh();
+        dismissSplash(splash);
+        showScreenSafe('profileSetup');
+        _hydratedAuthUid = user.uid;
+        return true;
+      }
+
+      authIdToken = await getIdTokenWithRetry(user);
+      startTokenRefresh();
+
+      const profile = await runWithLegacyProfileFallback(
+        () => fetchOwnProfileFromServer(),
+        () => fetchOwnProfileFromFirestore(),
+        'Profile load'
+      );
+
+      if (profile) {
+        userProfile = profile;
+        _hydratedAuthUid = user.uid;
+        enterLobby();
+      } else {
+        dismissSplash(splash);
+        showScreenSafe('profileSetup');
+        _hydratedAuthUid = user.uid;
+      }
+
+      return true;
+    } catch (err) {
+      console.error(`Auth bootstrap error (${source}):`, err);
+      dismissSplash(splash);
+      showScreenSafe('auth');
+      Swal.fire({
+        title: t('auth_error'),
+        text: err.message || 'Giriş tamamlanamadı',
+        icon: 'error'
+      });
+      return false;
+    } finally {
+      _authBootstrapPromise = null;
+      _authBootstrapUid = null;
+    }
+  })();
+
+  return _authBootstrapPromise;
+}
+
+async function getApiAuthToken(forceRefresh = false) {
+  if (_isGuestLocal || _devModeActive || !currentUser) return null;
+  if (forceRefresh || !authIdToken) {
+    authIdToken = await getIdTokenWithRetry(currentUser, forceRefresh ? 2 : 3);
+  }
+  return authIdToken;
+}
+
+async function apiRequest(path, options = {}) {
+  const token = await getApiAuthToken(options.forceRefresh === true);
+  const headers = new Headers(options.headers || {});
+
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  if (options.body && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const response = await fetch(path, {
+    method: options.method || 'GET',
+    headers,
+    body: options.body,
+  });
+
+  const raw = await response.text();
+  let payload = null;
+  if (raw) {
+    try {
+      payload = JSON.parse(raw);
+    } catch (err) {
+      payload = { raw };
+    }
+  }
+
+  if (!response.ok) {
+    const error = new Error((payload && (payload.error || payload.message)) || response.statusText || 'Request failed');
+    error.status = response.status;
+    error.payload = payload;
+    throw error;
+  }
+
+  return payload;
+}
+
+async function fetchOwnProfileFromServer() {
+  const data = await apiRequest('/api/me/profile');
+  return data && data.profile ? data.profile : null;
+}
+
+async function saveOwnProfileToServer(profileData) {
+  const data = await apiRequest('/api/me/profile', {
+    method: 'POST',
+    body: JSON.stringify(profileData),
+  });
+  return data && data.profile ? data.profile : null;
+}
+
+async function saveOwnAvatarToServer(photoURL) {
+  const data = await apiRequest('/api/me/profile/avatar', {
+    method: 'PATCH',
+    body: JSON.stringify({ photoURL }),
+  });
+  return data && data.photoURL ? data.photoURL : photoURL;
+}
+
+function shouldUseLegacyProfileFallback(err) {
+  if (!db || !currentUser || _isGuestLocal || _devModeActive) return false;
+  if (!err) return false;
+
+  if ([401, 403, 404, 429, 500, 502, 503, 504].includes(err.status)) {
+    return true;
+  }
+
+  const message = String(err.message || '').toLowerCase();
+  return message.includes('failed to fetch')
+    || message.includes('networkerror')
+    || message.includes('authentication service unavailable')
+    || message.includes('invalid auth token')
+    || message.includes('missing auth token');
+}
+
+async function runWithLegacyProfileFallback(primaryTask, fallbackTask, contextLabel) {
+  try {
+    return await primaryTask();
+  } catch (err) {
+    if (!shouldUseLegacyProfileFallback(err)) {
+      throw err;
+    }
+
+    console.warn(`${contextLabel}: profile API kullanılamadı, Firestore fallback devreye alınıyor.`, err.message);
+    return fallbackTask();
+  }
+}
+
+async function fetchOwnProfileFromFirestore() {
+  if (!db || !currentUser) return null;
+
+  const userRef = db.collection('users').doc(currentUser.uid);
+  const profileDoc = await userRef.get();
+
+  if (!profileDoc.exists) {
+    return null;
+  }
+
+  const profileData = profileDoc.data() || {};
+  const updateData = {
+    lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
+    lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
+    onlineStatus: 'online',
+  };
+
+  if (!profileData.friendCode) {
+    const friendCode = await _getUniqueFriendCode();
+    updateData.friendCode = friendCode;
+    profileData.friendCode = friendCode;
+  }
+
+  if (!profileData.email && currentUser.email) {
+    updateData.email = currentUser.email;
+    profileData.email = currentUser.email;
+  }
+
+  if (!profileData.photoURL && currentUser.photoURL) {
+    updateData.photoURL = currentUser.photoURL;
+    profileData.photoURL = currentUser.photoURL;
+  }
+
+  await userRef.set(updateData, { merge: true });
+
+  return {
+    ...profileData,
+    email: profileData.email || currentUser.email || '',
+    photoURL: profileData.photoURL || currentUser.photoURL || '',
+    onlineStatus: 'online',
+  };
+}
+
+async function saveOwnProfileToFirestore(profileData) {
+  if (!db || !currentUser) {
+    throw new Error('Firestore unavailable');
+  }
+
+  const userRef = db.collection('users').doc(currentUser.uid);
+  const existingDoc = await userRef.get();
+  const existingData = existingDoc.exists ? (existingDoc.data() || {}) : {};
+  const friendCode = existingData.friendCode || await _getUniqueFriendCode();
+
+  const payload = {
+    username: profileData.username,
+    gender: profileData.gender,
+    email: profileData.email || currentUser.email || existingData.email || '',
+    photoURL: profileData.photoURL || currentUser.photoURL || existingData.photoURL || '',
+    friendCode,
+    friendCount: Number.isFinite(existingData.friendCount) ? existingData.friendCount : 0,
+    onlineStatus: 'online',
+    lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
+    lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
+  };
+
+  if (!existingDoc.exists) {
+    payload.createdAt = firebase.firestore.FieldValue.serverTimestamp();
+    payload.stats = existingData.stats || {};
+    payload.achievements = existingData.achievements || {};
+    payload.blockedUsers = Array.isArray(existingData.blockedUsers) ? existingData.blockedUsers : [];
+  }
+
+  await userRef.set(payload, { merge: true });
+
+  return {
+    ...existingData,
+    ...payload,
+    friendCode,
+    stats: existingData.stats || payload.stats || {},
+    achievements: existingData.achievements || payload.achievements || {},
+    blockedUsers: Array.isArray(existingData.blockedUsers) ? existingData.blockedUsers : (payload.blockedUsers || []),
+  };
+}
+
+async function saveOwnAvatarToFirestore(photoURL) {
+  if (!db || !currentUser) {
+    throw new Error('Firestore unavailable');
+  }
+
+  await db.collection('users').doc(currentUser.uid).set({
+    photoURL,
+    onlineStatus: 'online',
+    lastSeen: firebase.firestore.FieldValue.serverTimestamp(),
+  }, { merge: true });
+
+  return photoURL;
 }
 
 function configureAuthProviderVisibility() {
@@ -144,13 +444,14 @@ async function signInWithGoogle() {
   try {
     const result = await auth.signInWithPopup(provider);
     console.log("Google popup login başarılı:", result.user?.uid);
+    if (result && result.user) {
+      await completeFirebaseSignIn(result.user, 'google-popup');
+    }
   } catch (err) {
     console.error("Google sign-in error:", err.code, err.message);
-    if (err.code === 'auth/popup-blocked') {
-      // Popup engellendi, redirect'e düş
+    if (err.code === 'auth/popup-blocked' || err.code === 'auth/popup-closed-by-user') {
+      // Popup dönüşü güvenilir değilse redirect'e düş
       await auth.signInWithRedirect(provider);
-    } else if (err.code === 'auth/popup-closed-by-user') {
-      // Kullanıcı popup'ı kapattı - sessiz kal
     } else if (err.code === 'auth/unauthorized-domain') {
       Swal.fire({ title: t('auth_error'), text: 'Bu domain Firebase\'de yetkilendirilmemiş. Firebase Console > Authentication > Settings > Authorized domains\'e "duoduels.com" ekleyin.', icon: "error" });
     } else {
@@ -262,6 +563,7 @@ function _devSignIn() {
   _devModeActive = true;
   const uid = _getOrCreateDevUid();
   currentUser = { uid, email: null, photoURL: null, displayName: 'DevUser' };
+  syncCurrentUserGlobal();
   authIdToken = null; // Sunucu fallbackUserId kullanacak
 
   const splash = document.getElementById('app-splash');
@@ -300,9 +602,9 @@ if (_isLocalDev) {
 // signInWithRedirect sonrasında sayfaya dönünce sonucu yakala
 if (auth && auth.getRedirectResult) {
   auth.getRedirectResult().then((result) => {
-    // result.user varsa onAuthStateChanged zaten tetiklenecek
     if (result && result.user) {
       console.log("Redirect login başarılı:", result.user.uid);
+      return completeFirebaseSignIn(result.user, 'google-redirect');
     }
   }).catch((err) => {
     console.error("Redirect login hatası:", err);
@@ -323,91 +625,17 @@ auth && auth.onAuthStateChanged && auth.onAuthStateChanged(async (user) => {
   // Dev modda Firebase observer'ı yok say
   if (_devModeActive) return;
 
-  // Kullanıcı Firebase ile giriş yaptıysa guest local modunu kapat
-  if (user && !user.isAnonymous) {
-    _isGuestLocal = false;
-  }
-
   const splash = document.getElementById('app-splash');
 
   if (user) {
-    currentUser = user;
-
-    // Anonymous (misafir) kullanıcılar için hızlı yol:
-    // Token ve Firestore sorgusunu paralel yap, profil yoksa direkt setup'a geç
-    if (user.isAnonymous) {
-      // Token'ı arka planda al, ekranı bekletme
-      user.getIdToken().then(token => {
-        authIdToken = token;
-        startTokenRefresh();
-      }).catch(err => console.error("Token hatası:", err));
-
-      // Anonim kullanıcının profili olmayacak, direkt profil setup'a geç
-      dismissSplash(splash);
-      showScreenSafe('profileSetup');
-      return;
-    }
-
-    // Normal kullanıcılar (Google/Facebook/Apple)
-    authIdToken = await user.getIdToken();
-    startTokenRefresh();
-
-    // Firestore'dan profil çek (retry ile)
-    let profileDoc = null;
-    let profileError = null;
-    for (let attempt = 0; attempt < 3; attempt++) {
-      try {
-        profileDoc = await db.collection('users').doc(user.uid).get();
-        profileError = null;
-        break;
-      } catch (err) {
-        profileError = err;
-        console.warn(`Profil çekme denemesi ${attempt + 1}/3 başarısız:`, err.message);
-        if (attempt < 2) await new Promise(r => setTimeout(r, 1000));
-      }
-    }
-
-    if (profileError) {
-      console.error("Profil çekme hatası (3 deneme sonrası):", profileError);
-      dismissSplash(splash);
-      Swal.fire({
-        title: t('error'),
-        text: 'Profil yüklenemedi: ' + profileError.message,
-        icon: 'error',
-        confirmButtonText: 'Tekrar Dene',
-        showCancelButton: true,
-        cancelButtonText: 'Profil Oluştur'
-      }).then((result) => {
-        if (result.isConfirmed) {
-          window.location.reload();
-        } else {
-          showScreenSafe('profileSetup');
-        }
-      });
-      return;
-    }
-
-    if (profileDoc && profileDoc.exists) {
-      userProfile = profileDoc.data();
-      // lastLogin güncelle + friendCode yoksa üret (eski kullanıcılar için)
-      const updateData = { lastLogin: firebase.firestore.FieldValue.serverTimestamp() };
-      if (!userProfile.friendCode) {
-        const code = await _getUniqueFriendCode();
-        updateData.friendCode = code;
-        userProfile.friendCode = code;
-      }
-      db.collection('users').doc(user.uid).update(updateData);
-      enterLobby();
-    } else {
-      // İlk kez giriş - profil oluştur ekranı
-      dismissSplash(splash);
-      showScreenSafe('profileSetup');
-    }
+    await completeFirebaseSignIn(user, 'auth-state');
   } else {
     // Kullanıcı yok - auth ekranı
     currentUser = null;
+    syncCurrentUserGlobal();
     userProfile = null;
     authIdToken = null;
+    _hydratedAuthUid = null;
     stopTokenRefresh();
     // Temayı sıfırla (önceki oturumdan kalan mavi/pembe arka plan)
     document.body.classList.remove('theme-male', 'theme-female');
@@ -416,6 +644,14 @@ auth && auth.onAuthStateChanged && auth.onAuthStateChanged(async (user) => {
     showScreenSafe('auth');
   }
 });
+
+if (auth) {
+  setTimeout(() => {
+    if (auth.currentUser && (!currentUser || currentUser.uid !== auth.currentUser.uid || !userProfile)) {
+      completeFirebaseSignIn(auth.currentUser, 'current-user-fallback');
+    }
+  }, 1500);
+}
 
 // --- ANONYMOUS AVATAR ---
 function _anonymousAvatarSvg() {
@@ -485,36 +721,28 @@ async function saveProfile() {
   if (continueBtn) { continueBtn.disabled = true; continueBtn.textContent = 'Kaydediliyor...'; }
 
   try {
-    const friendCode = await _getUniqueFriendCode();
-
     const profileData = {
       username: username,
       gender: genderEl.value,
       email: (currentUser && currentUser.email) || '',
       photoURL: (currentUser && currentUser.photoURL) || '',
-      friendCode: friendCode,
     };
 
-    // Local guest veya dev — Firestore yerine localStorage kullan
+    // Local guest veya dev — localStorage kullan
     if ((_isGuestLocal || (_isLocalDev && !authIdToken)) && !authIdToken) {
-      userProfile = { ...profileData };
+      const friendCode = await _getUniqueFriendCode();
+      userProfile = { ...profileData, friendCode };
       const storageKey = _isGuestLocal ? 'dd_guest_profile' : 'dd_dev_profile';
-      localStorage.setItem(storageKey, JSON.stringify(profileData));
+      localStorage.setItem(storageKey, JSON.stringify(userProfile));
       enterLobby();
       return;
     }
 
-    const profileDataWithTimestamps = {
-      ...profileData,
-      createdAt: firebase.firestore.FieldValue.serverTimestamp(),
-      lastLogin: firebase.firestore.FieldValue.serverTimestamp(),
-      friendCount: 0,
-      onlineStatus: 'online',
-      lastSeen: firebase.firestore.FieldValue.serverTimestamp()
-    };
-
-    await db.collection('users').doc(currentUser.uid).set(profileDataWithTimestamps);
-    userProfile = { ...profileDataWithTimestamps };
+    userProfile = await runWithLegacyProfileFallback(
+      () => saveOwnProfileToServer(profileData),
+      () => saveOwnProfileToFirestore(profileData),
+      'Profile save'
+    );
     enterLobby();
   } catch (err) {
     console.error("Profil kaydetme hatası:", err);
@@ -529,6 +757,7 @@ function skipToLobbyAsGuest() {
   _isGuestLocal = true;
   const uid = _getOrCreateDevUid();
   currentUser = { uid, email: null, photoURL: null, displayName: null };
+  syncCurrentUserGlobal();
   authIdToken = null;
 
   const splash = document.getElementById('app-splash');
@@ -669,8 +898,10 @@ async function signOut() {
 
     // State'i temizle
     currentUser = null;
+    syncCurrentUserGlobal();
     userProfile = null;
     authIdToken = null;
+    _hydratedAuthUid = null;
     stopTokenRefresh();
 
     if (wasGuestLocal || !auth) {
@@ -696,8 +927,10 @@ async function signOut() {
     console.error("Çıkış hatası:", err);
     // Her halükarda auth ekranına dön
     currentUser = null;
+    syncCurrentUserGlobal();
     userProfile = null;
     authIdToken = null;
+    _hydratedAuthUid = null;
     showScreenSafe('auth');
   }
 }
@@ -712,6 +945,9 @@ function startTokenRefresh() {
         // Socket varsa token'ı güncelle
         if (typeof socket !== 'undefined' && socket && socket.connected) {
           socket.auth.token = authIdToken;
+          if (currentUser && currentUser.uid) {
+            socket.auth.fallbackUserId = currentUser.uid;
+          }
         }
       } catch (err) {
         console.error("Token yenileme hatası:", err);
@@ -759,14 +995,19 @@ async function handleAvatarChange(input) {
     const lobbyAv = document.getElementById('lobby-avatar');
     if (lobbyAv) lobbyAv.src = dataUrl;
 
-    // Persist to Firestore (or localStorage for dev)
+    // Persist to backend (or localStorage for dev)
     if (userProfile) userProfile.photoURL = dataUrl;
     if (_isLocalDev && !authIdToken) {
       const saved = JSON.parse(localStorage.getItem('dd_dev_profile') || '{}');
       saved.photoURL = dataUrl;
       localStorage.setItem('dd_dev_profile', JSON.stringify(saved));
     } else if (currentUser) {
-      await db.collection('users').doc(currentUser.uid).update({ photoURL: dataUrl });
+      const savedPhotoUrl = await runWithLegacyProfileFallback(
+        () => saveOwnAvatarToServer(dataUrl),
+        () => saveOwnAvatarToFirestore(dataUrl),
+        'Avatar save'
+      );
+      if (userProfile) userProfile.photoURL = savedPhotoUrl;
     }
 
     if (statusEl) statusEl.textContent = typeof t === 'function' ? t('saved') : 'Kaydedildi ✓';

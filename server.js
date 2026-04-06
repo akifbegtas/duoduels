@@ -64,16 +64,20 @@ if (process.env.FIREBASE_SERVICE_ACCOUNT) {
   const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
   admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
   firebaseAuthEnabled = true;
-} else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
-  admin.initializeApp({ credential: admin.credential.applicationDefault() });
-  firebaseAuthEnabled = true;
 } else {
-  console.warn("Firebase Admin credential bulunamadı. Server-side token doğrulama devre dışı.");
-  try { admin.initializeApp(); } catch (e) { /* already initialized */ }
+  try {
+    admin.initializeApp({ credential: admin.credential.applicationDefault() });
+    firebaseAuthEnabled = true;
+  } catch (err) {
+    console.warn("Firebase Admin credential bulunamadı. Server-side token doğrulama devre dışı.", err.message);
+    try { admin.initializeApp(); } catch (e) { /* already initialized */ }
+  }
 }
 
 const app = express();
 const server = http.createServer(app);
+
+app.use(express.json({ limit: '2mb' }));
 
 // --- CORS Allowlist ---
 const ALLOWED_ORIGINS = [
@@ -253,6 +257,35 @@ function sanitizeString(str, maxLength = 50) {
 
 function normalizeFriendCode(code) {
   return sanitizeString(code, 12).toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 8);
+}
+
+function generateFriendCode(length = 8) {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = '';
+  for (let i = 0; i < length; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
+function sanitizePhotoUrl(photoURL, maxLength = 450000) {
+  if (typeof photoURL !== 'string') return '';
+  const value = photoURL.trim();
+  if (!value) return '';
+  if (value.startsWith('https://') || value.startsWith('data:image/')) {
+    return value.substring(0, maxLength);
+  }
+  return '';
+}
+
+async function randomUniqueFriendCode(maxAttempts = 8) {
+  if (!adminDb) return generateFriendCode();
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const code = generateFriendCode();
+    const snap = await adminDb.collection('users').where('friendCode', '==', code).limit(1).get();
+    if (snap.empty) return code;
+  }
+  return generateFriendCode();
 }
 
 function randomDigits(length = 4) {
@@ -555,6 +588,168 @@ function getSocketId(playerId) {
 
 // --- Firestore Admin DB Reference ---
 const adminDb = firebaseAuthEnabled ? admin.firestore() : null;
+
+async function requireHttpAuth(req, res, next) {
+  if (!firebaseAuthEnabled || !adminDb) {
+    return res.status(503).json({ error: 'Authentication service unavailable' });
+  }
+
+  const authHeader = req.headers.authorization || '';
+  if (!authHeader.startsWith('Bearer ')) {
+    return res.status(401).json({ error: 'Missing auth token' });
+  }
+
+  const token = authHeader.slice(7).trim();
+  if (!token) {
+    return res.status(401).json({ error: 'Missing auth token' });
+  }
+
+  try {
+    const decoded = await admin.auth().verifyIdToken(token);
+    req.userId = decoded.uid;
+    req.authUser = decoded;
+    next();
+  } catch (err) {
+    console.error('HTTP auth error:', err.message);
+    return res.status(401).json({ error: 'Invalid auth token' });
+  }
+}
+
+function serializeUserProfile(data) {
+  if (!data) return null;
+  return {
+    username: data.username || '',
+    gender: data.gender || '',
+    email: data.email || '',
+    photoURL: data.photoURL || '',
+    friendCode: data.friendCode || '',
+    friendCount: Number.isFinite(data.friendCount) ? data.friendCount : 0,
+    stats: data.stats || {},
+    achievements: data.achievements || {},
+    blockedUsers: Array.isArray(data.blockedUsers) ? data.blockedUsers : [],
+    onlineStatus: data.onlineStatus || 'online',
+  };
+}
+
+app.get('/api/me/profile', requireHttpAuth, async (req, res) => {
+  try {
+    const ref = adminDb.collection('users').doc(req.userId);
+    const snap = await ref.get();
+
+    if (!snap.exists) {
+      return res.status(404).json({ error: 'Profile not found' });
+    }
+
+    const data = snap.data() || {};
+    const responseProfile = { ...data };
+    const updateData = {
+      lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+      lastSeen: admin.firestore.FieldValue.serverTimestamp(),
+      onlineStatus: 'online',
+    };
+
+    if (!responseProfile.friendCode) {
+      const code = await randomUniqueFriendCode();
+      updateData.friendCode = code;
+      responseProfile.friendCode = code;
+    }
+
+    if (!responseProfile.email && req.authUser && typeof req.authUser.email === 'string') {
+      updateData.email = req.authUser.email;
+      responseProfile.email = req.authUser.email;
+    }
+
+    if (!responseProfile.photoURL && req.authUser && typeof req.authUser.picture === 'string') {
+      const safePhoto = sanitizePhotoUrl(req.authUser.picture);
+      if (safePhoto) {
+        updateData.photoURL = safePhoto;
+        responseProfile.photoURL = safePhoto;
+      }
+    }
+
+    await ref.set(updateData, { merge: true });
+    responseProfile.onlineStatus = 'online';
+
+    return res.json({ profile: serializeUserProfile(responseProfile) });
+  } catch (err) {
+    console.error('GET /api/me/profile error:', err);
+    return res.status(500).json({ error: err.message || 'Profile load failed' });
+  }
+});
+
+app.post('/api/me/profile', requireHttpAuth, async (req, res) => {
+  try {
+    const username = sanitizeString(req.body && req.body.username, 12);
+    const gender = sanitizeString(req.body && req.body.gender, 10);
+
+    if (!username) {
+      return res.status(400).json({ error: 'Username required' });
+    }
+    if (!VALID_GENDERS.includes(gender)) {
+      return res.status(400).json({ error: 'Invalid gender' });
+    }
+
+    const ref = adminDb.collection('users').doc(req.userId);
+    const existingSnap = await ref.get();
+    const existingData = existingSnap.exists ? (existingSnap.data() || {}) : {};
+
+    const photoURL = sanitizePhotoUrl((req.body && req.body.photoURL) || existingData.photoURL || (req.authUser && req.authUser.picture) || '');
+    const email = sanitizeString((req.authUser && req.authUser.email) || existingData.email || '', 160);
+    const friendCode = normalizeFriendCode(existingData.friendCode) || await randomUniqueFriendCode();
+
+    const profileData = {
+      username,
+      gender,
+      email,
+      photoURL,
+      friendCode,
+      friendCount: Number.isFinite(existingData.friendCount) ? existingData.friendCount : 0,
+      onlineStatus: 'online',
+      lastSeen: admin.firestore.FieldValue.serverTimestamp(),
+      lastLogin: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
+    if (!existingSnap.exists) {
+      profileData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+      profileData.stats = {};
+      profileData.achievements = {};
+      profileData.blockedUsers = [];
+    }
+
+    await ref.set(profileData, { merge: true });
+
+    return res.json({
+      profile: serializeUserProfile({
+        ...existingData,
+        ...profileData,
+        friendCode,
+      })
+    });
+  } catch (err) {
+    console.error('POST /api/me/profile error:', err);
+    return res.status(500).json({ error: err.message || 'Profile save failed' });
+  }
+});
+
+app.patch('/api/me/profile/avatar', requireHttpAuth, async (req, res) => {
+  try {
+    const photoURL = sanitizePhotoUrl(req.body && req.body.photoURL);
+    if (!photoURL) {
+      return res.status(400).json({ error: 'Invalid photo URL' });
+    }
+
+    await adminDb.collection('users').doc(req.userId).set({
+      photoURL,
+      onlineStatus: 'online',
+      lastSeen: admin.firestore.FieldValue.serverTimestamp(),
+    }, { merge: true });
+
+    return res.json({ photoURL });
+  } catch (err) {
+    console.error('PATCH /api/me/profile/avatar error:', err);
+    return res.status(500).json({ error: err.message || 'Avatar save failed' });
+  }
+});
 
 // --- Game Stats Persistence ---
 async function saveGameResult(roomId) {
@@ -1050,6 +1245,11 @@ io.on("connection", (socket) => {
   console.log(`Yeni bağlantı: socketId=${socket.id} userId=${socket.userId} origin=${origin} transport=${socket.conn.transport.name}`);
   const playerId = socket.userId;
   playerSockets[playerId] = socket.id;
+
+  socket.on("setLanguage", (data = {}) => {
+    const lang = sanitizeString(data.lang, 5).toLowerCase();
+    socket.lang = ['tr', 'en', 'ar'].includes(lang) ? lang : 'tr';
+  });
 
   // --- MATCHMAKING ---
   socket.on("findMatch", (data) => {

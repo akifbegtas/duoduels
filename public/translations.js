@@ -1133,6 +1133,7 @@ const TRANSLATIONS = {
 };
 
 let currentLang = localStorage.getItem('dd_lang') || 'tr';
+window._currentLang = currentLang;
 
 function t(key) {
   return (TRANSLATIONS[currentLang] && TRANSLATIONS[currentLang][key])
@@ -1250,7 +1251,15 @@ function applyTranslations() {
 function setLanguage(lang) {
   if (!TRANSLATIONS[lang]) return;
   currentLang = lang;
+  window._currentLang = lang;
   localStorage.setItem('dd_lang', lang);
+  if (window.socket) {
+    if (!window.socket.auth) window.socket.auth = {};
+    window.socket.auth.lang = lang;
+    if (window.socket.connected) {
+      window.socket.emit('setLanguage', { lang });
+    }
+  }
   applyTranslations();
 }
 
