@@ -1113,6 +1113,12 @@ function hideConnectionStatus() {
   if (el) el.style.display = "none";
 }
 
+function shouldShowConnectionStatus() {
+  if (currentRoom) return true;
+  if (typeof currentUser === 'undefined' || !currentUser) return false;
+  return !currentUser.isAnonymous;
+}
+
 // --- KLAVYE YÖNETİMİ (iOS / Android) ---
 (function initKeyboardHandling() {
   let keyboardVisible = false;
@@ -1240,8 +1246,10 @@ socket.on("connect", async () => {
   }
 });
 socket.on("disconnect", () => {
-  if (currentRoom) {
+  if (shouldShowConnectionStatus()) {
     showConnectionStatus("disconnected");
+  } else {
+    hideConnectionStatus();
   }
 });
 socket.on("connect_error", async (err) => {
@@ -1258,13 +1266,13 @@ socket.on("connect_error", async (err) => {
     }
   } else if (err.message !== 'Authentication required') {
     // Show user-visible error for non-auth errors (Bug 8 fix)
-    showConnectionStatus('disconnected');
+    if (shouldShowConnectionStatus()) showConnectionStatus('disconnected');
   }
 });
 socket.on("error", (err) => {
   // Bug 8 fix: handle generic socket errors with user-visible message
   console.error("Socket error:", err);
-  showConnectionStatus('disconnected');
+  if (shouldShowConnectionStatus()) showConnectionStatus('disconnected');
 });
 socket.on("rejoinSuccess", (data) => {
   hideConnectionStatus();

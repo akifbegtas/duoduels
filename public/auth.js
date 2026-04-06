@@ -848,8 +848,13 @@ function enterLobby() {
         }
       }
 
-      // Socket bağlantısını başlat (guest local için Pass & Play seçene kadar bekleme)
-      if (!_isGuestLocal && typeof connectSocket === 'function') {
+      // Anonymous guest'leri lobby'de boş yere sokete bağlama; ihtiyaç olduğunda bağlanırlar.
+      const hasSavedRoom = !!sessionStorage.getItem('duoduels_room');
+      const hasJoinParam = !!new URLSearchParams(window.location.search).get('join');
+      const shouldAutoConnect = !_isGuestLocal
+        && (!currentUser || !currentUser.isAnonymous || hasSavedRoom || hasJoinParam);
+
+      if (shouldAutoConnect && typeof connectSocket === 'function') {
         connectSocket();
       }
 
