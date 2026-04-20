@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "kanka": {
+      "command": "uvx",
+      "args": ["mcp-kanka"],
+      "env": {
+        "KANKA_TOKEN": "",
+        "KANKA_CAMPAIGN_ID": ""
+      }
+    }
+  }
+}
