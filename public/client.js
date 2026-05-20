@@ -264,6 +264,12 @@ let currentTargetLetter = null;
 let selectedMode = "cift";
 let _listenersAttached = {};
 
+function resetRoomSessionForNewRoom() {
+  currentRoom = null;
+  sessionStorage.removeItem("duoduels_room");
+  hideConnectionStatus();
+}
+
 // --- EKRANLAR (global — auth.js de kullanır) ---
 const screens = {
   auth: document.getElementById("auth-screen"),
@@ -442,13 +448,15 @@ function goToPassPlay() {
 function goToPrivateRoom() {
   if (!userProfile) return;
   resetPassPlayState();
-  pendingRoomData = { username: userProfile.username, gender: userProfile.gender };
+  resetRoomSessionForNewRoom();
+  pendingRoomData = { username: userProfile.username, gender: userProfile.gender, _isNewRoom: true };
   showScreen("gameSelect");
   selectMode("duo");
 }
 
 function selectPassPlayGame(gameType) {
   if (!userProfile) return;
+  resetRoomSessionForNewRoom();
   const p1Name = (document.getElementById('pp-p1-name').value || '').trim() || userProfile.username;
   const p2Name = (document.getElementById('pp-p2-name').value || '').trim() || t('pp_player2');
   if (p1Name.length > 12 || p2Name.length > 12) {
@@ -553,7 +561,8 @@ function closeQrScanner() {
 function createRoom() {
   if (!userProfile) return;
   resetPassPlayState();
-  pendingRoomData = { username: userProfile.username, gender: userProfile.gender };
+  resetRoomSessionForNewRoom();
+  pendingRoomData = { username: userProfile.username, gender: userProfile.gender, _isNewRoom: true };
   showScreen("gameSelect");
   selectMode("cift");
 }
@@ -712,21 +721,25 @@ function confirmGameSettings() {
   pendingRoomData.roundTime = document.getElementById("roundTimeInput").value;
   pendingRoomData.digitCount = document.getElementById("digitCountInput").value;
   pendingRoomData.targetScore = document.getElementById("targetScoreInput").value;
+  const isNewRoom = pendingRoomData._isNewRoom === true;
 
   function doEmit() {
-    if (currentRoom) {
+    const roomPayload = { ...pendingRoomData };
+    delete roomPayload._isNewRoom;
+
+    if (currentRoom && !isNewRoom) {
       socket.emit("updateRoom", {
         roomId: currentRoom,
-        gameType: pendingRoomData.gameType,
-        gameMode: pendingRoomData.gameMode,
-        roundCount: pendingRoomData.roundCount,
-        roundTime: pendingRoomData.roundTime,
-        digitCount: pendingRoomData.digitCount,
-        targetScore: pendingRoomData.targetScore,
+        gameType: roomPayload.gameType,
+        gameMode: roomPayload.gameMode,
+        roundCount: roomPayload.roundCount,
+        roundTime: roomPayload.roundTime,
+        digitCount: roomPayload.digitCount,
+        targetScore: roomPayload.targetScore,
       });
       pendingRoomData = null;
     } else {
-      socket.emit("createRoom", pendingRoomData);
+      socket.emit("createRoom", roomPayload);
       pendingRoomData = null;
     }
   }
@@ -762,6 +775,7 @@ function joinRoom() {
 
 function goToMatchmaking() {
   if (!userProfile) return;
+  resetRoomSessionForNewRoom();
   resetPassPlayState();
   if (typeof requireAuthForMultiplayer === 'function') {
     requireAuthForMultiplayer(function() {

@@ -848,9 +848,12 @@ function enterLobby() {
         }
       }
 
-      // Anonymous guest'leri lobby'de boş yere sokete bağlama; ihtiyaç olduğunda bağlanırlar.
-      const hasSavedRoom = !!sessionStorage.getItem('duoduels_room');
+      // Anonymous guest'leri lobby'de eski oda kalıntısı yüzünden sokete bağlama.
       const hasJoinParam = !!new URLSearchParams(window.location.search).get('join');
+      if (currentUser && currentUser.isAnonymous && !hasJoinParam) {
+        sessionStorage.removeItem('duoduels_room');
+      }
+      const hasSavedRoom = !!sessionStorage.getItem('duoduels_room');
       const shouldAutoConnect = !_isGuestLocal
         && (!currentUser || !currentUser.isAnonymous || hasSavedRoom || hasJoinParam);
 
