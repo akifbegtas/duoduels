@@ -423,6 +423,17 @@ function resetPassPlayState() {
 
 function goToPassPlay() {
   if (!userProfile) return;
+  // P1 ismini kendi profilinden pre-fill et
+  const pp1 = document.getElementById('pp-p1-name');
+  if (pp1 && !pp1.value) pp1.value = userProfile.username || '';
+  // P1 cinsiyetini profilden seç
+  if (userProfile.gender === 'female') {
+    const f = document.querySelector('input[name="pp-p1-gender"][value="female"]');
+    if (f) f.checked = true;
+  } else {
+    const m = document.querySelector('input[name="pp-p1-gender"][value="male"]');
+    if (m) m.checked = true;
+  }
   showScreen('passplaySetup');
 }
 
@@ -436,10 +447,15 @@ function goToPrivateRoom() {
 
 function selectPassPlayGame(gameType) {
   if (!userProfile) return;
-  const p1Name = (document.getElementById('pp-p1-name').value || '').trim() || userProfile.username;
-  const p2Name = (document.getElementById('pp-p2-name').value || '').trim() || t('pp_player2');
+  let p1Name = (document.getElementById('pp-p1-name').value || '').trim() || userProfile.username || 'Oyuncu 1';
+  let p2Name = (document.getElementById('pp-p2-name').value || '').trim() || t('pp_player2') || 'Oyuncu 2';
   if (p1Name.length > 12 || p2Name.length > 12) {
     Swal.fire({ title: t('warning'), text: t('warn_name_long'), icon: 'warning' });
+    return;
+  }
+  // İsimler aynıysa kullanıcıyı uyar
+  if (p1Name.trim().toLowerCase() === p2Name.trim().toLowerCase()) {
+    Swal.fire({ title: t('warning'), text: 'İki oyuncuya farklı isim gir!', icon: 'warning' });
     return;
   }
   const p1Gender = document.querySelector('input[name="pp-p1-gender"]:checked')?.value || userProfile.gender;
