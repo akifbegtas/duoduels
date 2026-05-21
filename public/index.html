@@ -22,7 +22,7 @@
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 
-  <link rel="stylesheet" href="style.css?v=41" />
+  <link rel="stylesheet" href="style.css?v=42" />
   <script src="translations.js?v=2"></script>
   <script>
     // Platform detection: capacitor:// = iOS native, content:// or file:// = Android native
@@ -1473,6 +1473,22 @@
       }
     });
   })();
+  </script>
+  <!-- Defensive: ensure only one .screen.active exists; default to profile-setup -->
+  <script>
+    (function(){
+      try {
+        var screens = document.querySelectorAll('.screen');
+        var actives = document.querySelectorAll('.screen.active');
+        if (actives.length === 0) {
+          var fallback = document.getElementById('profile-setup-screen');
+          if (fallback) fallback.classList.add('active');
+        } else if (actives.length > 1) {
+          // Keep only the first active
+          for (var i = 1; i < actives.length; i++) actives[i].classList.remove('active');
+        }
+      } catch(e) {}
+    })();
   </script>
 </body>
 
