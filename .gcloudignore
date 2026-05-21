@@ -1,0 +1,14 @@
+.gcloudignore
+.git
+.gitignore
+.claude
+.DS_Store
+node_modules
+ios
+android
+npm-debug.log
+yarn-error.log
+.env
+.env.local
+.env.*
+!.env.example
