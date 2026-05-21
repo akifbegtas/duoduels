@@ -96,6 +96,8 @@ function _anonymousAvatarSvg() {
 }
 
 // --- PROFILE SAVE ---
+let _pendingProfileCallback = null;
+
 async function saveProfile() {
   const usernameInput = document.getElementById('setup-username');
   const genderEl = document.querySelector('input[name="setup-gender"]:checked');
@@ -123,16 +125,32 @@ async function saveProfile() {
     photoURL: (userProfile && userProfile.photoURL) || '',
   };
   _persistProfile(userProfile);
-  enterLobby();
+
+  if (typeof applyGenderTheme === 'function') applyGenderTheme(userProfile.gender);
+
+  if (_pendingProfileCallback) {
+    const cb = _pendingProfileCallback;
+    _pendingProfileCallback = null;
+    try { cb(); } catch (e) { console.error(e); enterLobby(); }
+  } else {
+    enterLobby();
+  }
+}
+
+function requireProfile(callback) {
+  if (userProfile) {
+    callback();
+    return;
+  }
+  _pendingProfileCallback = callback;
+  showScreenSafe('profileSetup');
 }
 
 // --- ENTER LOBBY ---
 function enterLobby() {
-  if (!userProfile || !currentUser) return;
-
   waitForClientReady(() => {
     try {
-      if (typeof applyGenderTheme === 'function') {
+      if (userProfile && typeof applyGenderTheme === 'function') {
         applyGenderTheme(userProfile.gender);
       }
 
@@ -141,18 +159,31 @@ function enterLobby() {
 
       showScreenSafe('lobby');
 
+      // Greeting & avatar — profil yoksa gizle
       const greetEl = document.getElementById('lobby-username-greeting');
-      if (greetEl) greetEl.textContent = userProfile.username;
-
+      const welcomeEl = document.getElementById('lobby-welcome-text');
       const avatarEl = document.getElementById('lobby-avatar');
-      if (avatarEl) {
-        const photo = userProfile.photoURL || '';
-        if (photo && (photo.startsWith('https://') || photo.startsWith('data:image/'))) {
-          avatarEl.src = photo;
-          avatarEl.onerror = () => { avatarEl.onerror = null; avatarEl.src = _anonymousAvatarSvg(); };
-        } else {
-          avatarEl.src = _anonymousAvatarSvg();
+      const signOutBtn = document.querySelector('.btn-signout');
+
+      if (userProfile) {
+        if (greetEl) greetEl.textContent = userProfile.username;
+        if (welcomeEl) welcomeEl.style.display = '';
+        if (avatarEl) {
+          const photo = userProfile.photoURL || '';
+          if (photo && (photo.startsWith('https://') || photo.startsWith('data:image/'))) {
+            avatarEl.src = photo;
+            avatarEl.onerror = () => { avatarEl.onerror = null; avatarEl.src = _anonymousAvatarSvg(); };
+          } else {
+            avatarEl.src = _anonymousAvatarSvg();
+          }
+          avatarEl.style.display = '';
         }
+        if (signOutBtn) signOutBtn.style.display = '';
+      } else {
+        if (greetEl) greetEl.textContent = '';
+        if (welcomeEl) welcomeEl.style.display = 'none';
+        if (avatarEl) avatarEl.style.display = 'none';
+        if (signOutBtn) signOutBtn.style.display = 'none';
       }
 
       if (typeof connectSocket === 'function') {
@@ -167,6 +198,17 @@ function enterLobby() {
 
 // --- SIGN OUT ---
 async function signOut() {
+  // Onay iste — yanlışlıkla profil silinmesin
+  const result = await Swal.fire({
+    title: 'Profili sıfırla?',
+    text: 'Kullanıcı adın ve cinsiyet seçimin silinir. Devam edilsin mi?',
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonText: 'Sıfırla',
+    cancelButtonText: 'Vazgeç',
+  });
+  if (!result.isConfirmed) return;
+
   try {
     if (typeof leaveCurrentRoom === 'function') {
       try { await leaveCurrentRoom(); } catch (e) {}
@@ -183,14 +225,12 @@ async function signOut() {
     if (typeof window.updateBgTheme === 'function') window.updateBgTheme(null);
 
     localStorage.removeItem(PROFILE_STORAGE_KEY);
-    currentUser = null;
-    syncCurrentUserGlobal();
     userProfile = null;
-
-    showScreenSafe('profileSetup');
+    // currentUser kalıyor (uid sabit), sadece profil silindi
+    enterLobby();
   } catch (err) {
     console.error('signOut error:', err);
-    showScreenSafe('profileSetup');
+    enterLobby();
   }
 }
 
@@ -254,18 +294,14 @@ function _compressImage(file, maxSize, quality) {
 
 // --- BOOTSTRAP: profil var → lobby, yok → profile-setup ---
 function _bootstrap() {
+  // Her zaman bir kullanıcı kimliği oluştur (oda bağlantısı için gerekli)
+  const uid = _getOrCreatePlayerId();
+  currentUser = { uid };
+  syncCurrentUserGlobal();
+  // Profil varsa yükle, yoksa null (lobby boş profille de çalışır)
   const saved = _loadStoredProfile();
-  if (saved) {
-    const uid = _getOrCreatePlayerId();
-    currentUser = { uid };
-    syncCurrentUserGlobal();
-    userProfile = saved;
-    enterLobby();
-  } else {
-    const splash = document.getElementById('app-splash');
-    dismissSplash(splash);
-    showScreenSafe('profileSetup');
-  }
+  if (saved) userProfile = saved;
+  enterLobby();
 }
 
 if (document.readyState === 'loading') {

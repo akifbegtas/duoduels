@@ -422,38 +422,36 @@ function resetPassPlayState() {
 }
 
 function goToPassPlay() {
-  if (!userProfile) return;
-  // P1 ismini kendi profilinden pre-fill et
-  const pp1 = document.getElementById('pp-p1-name');
-  if (pp1 && !pp1.value) pp1.value = userProfile.username || '';
-  // P1 cinsiyetini profilden seç
-  if (userProfile.gender === 'female') {
-    const f = document.querySelector('input[name="pp-p1-gender"][value="female"]');
-    if (f) f.checked = true;
-  } else {
-    const m = document.querySelector('input[name="pp-p1-gender"][value="male"]');
-    if (m) m.checked = true;
-  }
+  // Pass-play profil gerektirmiyor — isim/cinsiyet sadece pass-play formundan alınır
   showScreen('passplaySetup');
 }
 
 function goToPrivateRoom() {
-  if (!userProfile) return;
-  resetPassPlayState();
-  pendingRoomData = { username: userProfile.username, gender: userProfile.gender };
-  showScreen("gameSelect");
-  selectMode("duo");
+  // Özel oda profil gerektirir
+  const proceed = () => {
+    resetPassPlayState();
+    pendingRoomData = { username: userProfile.username, gender: userProfile.gender };
+    showScreen("gameSelect");
+    selectMode("duo");
+  };
+  if (typeof requireProfile === 'function' && !userProfile) {
+    requireProfile(proceed);
+    return;
+  }
+  proceed();
 }
 
 function selectPassPlayGame(gameType) {
-  if (!userProfile) return;
-  let p1Name = (document.getElementById('pp-p1-name').value || '').trim() || userProfile.username || 'Oyuncu 1';
-  let p2Name = (document.getElementById('pp-p2-name').value || '').trim() || t('pp_player2') || 'Oyuncu 2';
+  let p1Name = (document.getElementById('pp-p1-name').value || '').trim();
+  let p2Name = (document.getElementById('pp-p2-name').value || '').trim();
+  if (!p1Name || !p2Name) {
+    Swal.fire({ title: 'İsim gerekli', text: 'Her iki oyuncu için isim gir.', icon: 'warning' });
+    return;
+  }
   if (p1Name.length > 12 || p2Name.length > 12) {
     Swal.fire({ title: t('warning'), text: t('warn_name_long'), icon: 'warning' });
     return;
   }
-  // İsimler aynıysa kullanıcıyı uyar
   if (p1Name.trim().toLowerCase() === p2Name.trim().toLowerCase()) {
     Swal.fire({ title: t('warning'), text: 'İki oyuncuya farklı isim gir!', icon: 'warning' });
     return;
@@ -747,20 +745,25 @@ function confirmGameSettings() {
 }
 
 function joinRoom() {
-  if (!userProfile) return;
   const code = document.getElementById("roomCodeInput").value.trim();
   if (!code) {
     Swal.fire({ title: t('warning'), text: t('warn_room_code'), icon: "warning" });
     return;
   }
-  if (!socket || !socket.connected) {
-    connectSocket();
-    socket.once("connect", () => {
-      socket.emit("joinRoom", { roomId: code.toUpperCase(), username: userProfile.username, gender: userProfile.gender });
-    });
+  const doJoin = () => {
+    const emit = () => socket.emit("joinRoom", { roomId: code.toUpperCase(), username: userProfile.username, gender: userProfile.gender });
+    if (!socket || !socket.connected) {
+      connectSocket();
+      if (socket) socket.once("connect", emit);
+      return;
+    }
+    emit();
+  };
+  if (typeof requireProfile === 'function' && !userProfile) {
+    requireProfile(doJoin);
     return;
   }
-  socket.emit("joinRoom", { roomId: code.toUpperCase(), username: userProfile.username, gender: userProfile.gender });
+  doJoin();
 }
 
 // --- GLOBAL NAVİGASYON FONKSİYONLARI (socket bağlantısından bağımsız, her zaman erişilebilir) ---
