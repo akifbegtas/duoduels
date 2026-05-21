@@ -171,28 +171,18 @@ window.socket = null;
 function connectSocket() {
   if (socket && socket.connected) return;
 
-  // Dev veya guest local modda Firebase token olmadan fallbackUserId ile bağlan
-  const useLocalFallback = (isLocalDev || (typeof _isGuestLocal !== 'undefined' && _isGuestLocal)) && !authIdToken;
-  const devUid = useLocalFallback && typeof _getOrCreateDevUid === 'function'
-    ? _getOrCreateDevUid()
-    : null;
-  const fallbackUserId = authIdToken
-    ? (typeof currentUser !== 'undefined' && currentUser && currentUser.uid ? currentUser.uid : null)
-    : devUid;
-
-  if (!authIdToken && !fallbackUserId) {
-    console.warn("connectSocket: authIdToken yok, bağlanılamıyor");
+  const playerId = (typeof currentUser !== 'undefined' && currentUser && currentUser.uid) || null;
+  if (!playerId) {
+    console.warn("connectSocket: playerId yok, bağlanılamıyor");
     return;
   }
 
   const authPayload = {
-    lang: currentLang || 'tr',
-    ...(authIdToken ? { token: authIdToken } : {}),
-    ...(fallbackUserId ? { fallbackUserId } : {})
+    lang: (typeof currentLang !== 'undefined' && currentLang) || 'tr',
+    playerId,
   };
 
   if (socket) {
-    // Mevcut socket varsa auth güncelle ve yeniden bağlan
     socket.auth = authPayload;
     window.socket = socket;
     _attachDeferredSocketListeners();
@@ -202,7 +192,7 @@ function connectSocket() {
 
   socket = io(SERVER_URL, {
     auth: authPayload,
-    autoConnect: true
+    autoConnect: true,
   });
   window.socket = socket;
 
@@ -247,8 +237,10 @@ function showRoundToast(roundNum) {
 
 function escapeHtml(str) {
   const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
+  div.textContent = str == null ? "" : String(str);
+  return div.innerHTML
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
 }
 
 let currentRoom = null;
@@ -264,21 +256,13 @@ let currentTargetLetter = null;
 let selectedMode = "cift";
 let _listenersAttached = {};
 
-function resetRoomSessionForNewRoom() {
-  currentRoom = null;
-  sessionStorage.removeItem("duoduels_room");
-  hideConnectionStatus();
-}
-
 // --- EKRANLAR (global — auth.js de kullanır) ---
 const screens = {
-  auth: document.getElementById("auth-screen"),
   profileSetup: document.getElementById("profile-setup-screen"),
   lobby: document.getElementById("lobby-screen"),
   settings: document.getElementById("settings-screen"),
   passplaySetup: document.getElementById("passplay-setup-screen"),
   waiting: document.getElementById("waiting-screen"),
-  "matchmaking-screen": document.getElementById("matchmaking-screen"),
   game: document.getElementById("game-screen"),
   gameSelect: document.getElementById("game-select-screen"),
   gameSettings: document.getElementById("game-settings-screen"),
@@ -288,13 +272,10 @@ const screens = {
   imposter: document.getElementById("imposter-screen"),
   sayiTahmin: document.getElementById("sayiTahmin-screen"),
   bilBakalim: document.getElementById("bilBakalim-screen"),
-  friends: document.getElementById("friends-screen"),
-  stats: document.getElementById("stats-screen"),
-  leaderboard: document.getElementById("leaderboard-screen"),
 };
 function showScreen(name) {
-  Object.values(screens).forEach((s) => s.classList.remove("active"));
-  screens[name].classList.add("active");
+  Object.values(screens).forEach((s) => { if (s) s.classList.remove("active"); });
+  if (screens[name]) screens[name].classList.add("active");
   const gameScreens = ["game", "isimSehir", "pictionary", "tabu", "imposter", "sayiTahmin", "bilBakalim"];
   if (gameScreens.includes(name)) {
     document.body.classList.add("game-active");
@@ -305,7 +286,7 @@ function showScreen(name) {
   var authNav = document.getElementById('auth-navbar');
   var mainHeader = document.getElementById('main-header');
   var headerScreens = ['lobby', 'gameSelect', 'gameSettings', 'game', 'isimSehir', 'pictionary', 'tabu', 'imposter', 'sayiTahmin', 'bilBakalim', 'waiting', 'passplaySetup'];
-  if (authNav) authNav.style.display = (name === 'auth') ? 'flex' : 'none';
+  if (authNav) authNav.style.display = (name === 'profileSetup') ? 'flex' : 'none';
   if (mainHeader) mainHeader.style.display = headerScreens.includes(name) ? '' : 'none';
   // Explicitly hide animated title when leaving auth screen
   var animTitle = document.getElementById('auth-title-animated');
@@ -448,15 +429,13 @@ function goToPassPlay() {
 function goToPrivateRoom() {
   if (!userProfile) return;
   resetPassPlayState();
-  resetRoomSessionForNewRoom();
-  pendingRoomData = { username: userProfile.username, gender: userProfile.gender, _isNewRoom: true };
+  pendingRoomData = { username: userProfile.username, gender: userProfile.gender };
   showScreen("gameSelect");
   selectMode("duo");
 }
 
 function selectPassPlayGame(gameType) {
   if (!userProfile) return;
-  resetRoomSessionForNewRoom();
   const p1Name = (document.getElementById('pp-p1-name').value || '').trim() || userProfile.username;
   const p2Name = (document.getElementById('pp-p2-name').value || '').trim() || t('pp_player2');
   if (p1Name.length > 12 || p2Name.length > 12) {
@@ -561,8 +540,7 @@ function closeQrScanner() {
 function createRoom() {
   if (!userProfile) return;
   resetPassPlayState();
-  resetRoomSessionForNewRoom();
-  pendingRoomData = { username: userProfile.username, gender: userProfile.gender, _isNewRoom: true };
+  pendingRoomData = { username: userProfile.username, gender: userProfile.gender };
   showScreen("gameSelect");
   selectMode("cift");
 }
@@ -721,25 +699,21 @@ function confirmGameSettings() {
   pendingRoomData.roundTime = document.getElementById("roundTimeInput").value;
   pendingRoomData.digitCount = document.getElementById("digitCountInput").value;
   pendingRoomData.targetScore = document.getElementById("targetScoreInput").value;
-  const isNewRoom = pendingRoomData._isNewRoom === true;
 
   function doEmit() {
-    const roomPayload = { ...pendingRoomData };
-    delete roomPayload._isNewRoom;
-
-    if (currentRoom && !isNewRoom) {
+    if (currentRoom) {
       socket.emit("updateRoom", {
         roomId: currentRoom,
-        gameType: roomPayload.gameType,
-        gameMode: roomPayload.gameMode,
-        roundCount: roomPayload.roundCount,
-        roundTime: roomPayload.roundTime,
-        digitCount: roomPayload.digitCount,
-        targetScore: roomPayload.targetScore,
+        gameType: pendingRoomData.gameType,
+        gameMode: pendingRoomData.gameMode,
+        roundCount: pendingRoomData.roundCount,
+        roundTime: pendingRoomData.roundTime,
+        digitCount: pendingRoomData.digitCount,
+        targetScore: pendingRoomData.targetScore,
       });
       pendingRoomData = null;
     } else {
-      socket.emit("createRoom", roomPayload);
+      socket.emit("createRoom", pendingRoomData);
       pendingRoomData = null;
     }
   }
@@ -771,115 +745,6 @@ function joinRoom() {
     return;
   }
   socket.emit("joinRoom", { roomId: code.toUpperCase(), username: userProfile.username, gender: userProfile.gender });
-}
-
-function goToMatchmaking() {
-  if (!userProfile) return;
-  resetRoomSessionForNewRoom();
-  resetPassPlayState();
-  if (typeof requireAuthForMultiplayer === 'function') {
-    requireAuthForMultiplayer(function() {
-      var selectPhase = document.getElementById("mm-select-phase");
-      var waitingPhase = document.getElementById("mm-waiting-phase");
-      if (selectPhase) selectPhase.style.display = "";
-      if (waitingPhase) waitingPhase.style.display = "none";
-      showScreen("matchmaking-screen");
-    });
-    return;
-  }
-  var selectPhase = document.getElementById("mm-select-phase");
-  var waitingPhase = document.getElementById("mm-waiting-phase");
-  if (selectPhase) selectPhase.style.display = "";
-  if (waitingPhase) waitingPhase.style.display = "none";
-  showScreen("matchmaking-screen");
-}
-
-// --- MATCHMAKING ---
-let selectedMMMode = "duo";
-const MATCHMAKING_MODE_GAMES = {
-  duo: ['telepati', 'isimSehir', 'pictionary', 'sayiTahmin', 'tabu'],
-  cift: ['telepati', 'isimSehir', 'pictionary', 'sayiTahmin', 'tabu'],
-  tek: ['pictionary'],
-};
-
-function refreshMatchmakingGameAvailability() {
-  const allowedGames = new Set(MATCHMAKING_MODE_GAMES[selectedMMMode] || []);
-  document.querySelectorAll("#mm-game-grid input[type='checkbox']").forEach((checkbox) => {
-    const chip = checkbox.closest('.mm-game-chip');
-    const isAllowed = allowedGames.has(checkbox.value);
-    if (!isAllowed) checkbox.checked = false;
-    checkbox.disabled = !isAllowed;
-    if (chip) {
-      chip.classList.toggle('selected', checkbox.checked);
-      chip.style.opacity = isAllowed ? '' : '0.45';
-      chip.style.filter = isAllowed ? '' : 'grayscale(1)';
-    }
-  });
-}
-
-function selectMMMode(mode) {
-  selectedMMMode = mode;
-  document.querySelectorAll(".mm-mode-btn").forEach(b => b.classList.remove("active"));
-  document.querySelector('.mm-mode-btn[data-mode="' + mode + '"]').classList.add("active");
-  refreshMatchmakingGameAvailability();
-}
-
-function toggleMMGame(checkbox) {
-  const chip = checkbox.closest(".mm-game-chip");
-  if (checkbox.checked) {
-    chip.classList.add("selected");
-  } else {
-    chip.classList.remove("selected");
-  }
-}
-
-function findMatch() {
-  if (!userProfile) return;
-  const username = userProfile.username;
-  const gender = userProfile.gender;
-  const selectedGames = [];
-  const allowedGames = new Set(MATCHMAKING_MODE_GAMES[selectedMMMode] || []);
-  document.querySelectorAll("#mm-game-grid input[type='checkbox']:checked").forEach(cb => {
-    if (allowedGames.has(cb.value)) selectedGames.push(cb.value);
-  });
-  if (selectedGames.length === 0) {
-    Swal.fire({ title: t('mm_select_game'), icon: "warning", customClass: { popup: "swal-premium" }, background: "rgba(15,12,40,0.95)", color: "#fff" });
-    return;
-  }
-  if (!socket || !socket.connected) {
-    Swal.fire({ title: t('conn_lost'), icon: "warning", timer: 2000, showConfirmButton: false });
-    return;
-  }
-  socket.emit("findMatch", {
-    username: username,
-    gender: gender,
-    mode: selectedMMMode,
-    selectedGames: selectedGames
-  });
-  // Seçim aşamasını gizle, bekleme aşamasını göster
-  var selectPhase = document.getElementById("mm-select-phase");
-  var waitingPhase = document.getElementById("mm-waiting-phase");
-  if (selectPhase) selectPhase.style.display = "none";
-  if (waitingPhase) waitingPhase.style.display = "";
-}
-
-function cancelMatchmaking() {
-  if (socket) socket.emit("cancelMatchmaking");
-  resetMatchmakingScreen();
-  // Seçim aşamasına geri dön
-  var selectPhase = document.getElementById("mm-select-phase");
-  var waitingPhase = document.getElementById("mm-waiting-phase");
-  if (selectPhase) selectPhase.style.display = "";
-  if (waitingPhase) waitingPhase.style.display = "none";
-}
-
-function resetMatchmakingScreen() {
-  var wtitle = document.querySelector(".mm-waiting-title");
-  var wsub = document.getElementById("mm-waiting-text");
-  var wcancelBtn = document.querySelector(".mm-cancel-btn");
-  if (wtitle) wtitle.textContent = t('mm_searching');
-  if (wsub) wsub.textContent = t('mm_waiting_gender');
-  if (wcancelBtn) wcancelBtn.style.display = "";
 }
 
 // --- GLOBAL NAVİGASYON FONKSİYONLARI (socket bağlantısından bağımsız, her zaman erişilebilir) ---
@@ -954,41 +819,6 @@ function startGame() {
   if (socket) socket.emit("startGame", currentRoom);
 }
 
-// Matchmaking socket listeners - tüm listener'lar setupSocketListeners() içinde
-
-function setupSocketListeners() {
-  if (_socketListenersAttached) return;
-  _socketListenersAttached = true;
-
-socket.on("matchSearching", function(data) {
-  const txt = document.getElementById("mm-waiting-text");
-  if (txt && data.message) txt.textContent = data.message;
-});
-
-socket.on("matchFound", function(data) {
-  SoundManager.play('notify'); SoundManager.haptic('heavy');
-  // Eşleşme bulundu — odaya katıl
-  currentRoom = data.roomId;
-  sessionStorage.setItem("duoduels_room", data.roomId);
-  isHost = data.isHost || false;
-  window._currentGameType = data.gameType;
-  // Bekleme ekranında "Eşleşme bulundu!" göster
-  var wtitle = document.querySelector(".mm-waiting-title");
-  var wsub = document.getElementById("mm-waiting-text");
-  var wcancelBtn = document.querySelector(".mm-cancel-btn");
-  if (wtitle) wtitle.textContent = t('mm_match_found');
-  if (wsub) wsub.textContent = data.players.map(function(p) { return p.username; }).join(" vs ") + " — " + data.gameType;
-  if (wcancelBtn) wcancelBtn.style.display = "none";
-});
-
-socket.on("matchCancelled", function() {
-  showScreen("lobby");
-});
-
-socket.on("autoStartGame", function(roomId) {
-  // Matchmaking sonrası otomatik oyun başlat
-  socket.emit("startGame", roomId);
-});
 
 // --- OYUN (TELEPATİ) ---
 function sendWord(auto) {
@@ -1128,9 +958,7 @@ function hideConnectionStatus() {
 }
 
 function shouldShowConnectionStatus() {
-  if (currentRoom) return true;
-  if (typeof currentUser === 'undefined' || !currentUser) return false;
-  return !currentUser.isAnonymous;
+  return !!currentRoom;
 }
 
 // --- KLAVYE YÖNETİMİ (iOS / Android) ---
@@ -1222,17 +1050,13 @@ function shouldShowConnectionStatus() {
   });
 })();
 
+function setupSocketListeners() {
+  if (_socketListenersAttached) return;
+  _socketListenersAttached = true;
+
 // --- SOCKET ---
-socket.on("connect", async () => {
+socket.on("connect", () => {
   myPlayerId = getMyPlayerId();
-  // Bug 6 fix: refresh token on reconnect to avoid stale token after disconnect
-  if (typeof currentUser !== 'undefined' && currentUser && !currentUser.isAnonymous && typeof authIdToken !== 'undefined') {
-    try {
-      authIdToken = await currentUser.getIdToken(false);
-      socket.auth.token = authIdToken;
-    } catch (e) { console.warn("Token refresh on reconnect failed:", e); }
-  }
-  // Saved room varsa recover et
   const savedRoom = sessionStorage.getItem("duoduels_room");
   if (!currentRoom && savedRoom) currentRoom = savedRoom;
   if (currentRoom) {
@@ -1240,7 +1064,6 @@ socket.on("connect", async () => {
     showConnectionStatus("reconnecting");
   } else {
     hideConnectionStatus();
-    // URL ?join= parametresi ile auto-join
     const joinParam = new URLSearchParams(location.search).get('join');
     if (joinParam && userProfile) {
       const code = joinParam.toUpperCase().trim().substring(0, 6);
@@ -1248,15 +1071,6 @@ socket.on("connect", async () => {
       if (codeInput) codeInput.value = code;
       setTimeout(() => joinRoom(), 300);
     }
-  }
-  // Set online presence for friend system
-  if (userProfile) {
-    socket.emit("setOnline", {
-      username: userProfile.username || '',
-      gender: userProfile.gender || '',
-      photoURL: userProfile.photoURL || ''
-    });
-    loadBlockedUsers();
   }
 });
 socket.on("disconnect", () => {
@@ -1266,22 +1080,9 @@ socket.on("disconnect", () => {
     hideConnectionStatus();
   }
 });
-socket.on("connect_error", async (err) => {
+socket.on("connect_error", (err) => {
   console.error("Socket connect_error:", err.message);
-  if (err.message === 'Invalid auth token' && currentUser) {
-    // Token expired - yenile ve tekrar bağlan
-    try {
-      authIdToken = await currentUser.getIdToken(true);
-      socket.auth.token = authIdToken;
-      socket.connect();
-    } catch (e) {
-      console.error("Token refresh failed:", e);
-      Swal.fire({ title: t('error'), text: t('conn_lost'), icon: 'error', timer: 3000, showConfirmButton: false });
-    }
-  } else if (err.message !== 'Authentication required') {
-    // Show user-visible error for non-auth errors (Bug 8 fix)
-    if (shouldShowConnectionStatus()) showConnectionStatus('disconnected');
-  }
+  if (shouldShowConnectionStatus()) showConnectionStatus('disconnected');
 });
 socket.on("error", (err) => {
   // Bug 8 fix: handle generic socket errors with user-visible message
@@ -3762,8 +3563,6 @@ socket.on("sayiTahminGameOver", (data) => {
 
 } // end setupSocketListeners
 
-refreshMatchmakingGameAvailability();
-
 // --- GLOBAL EXPORTS (HTML onclick handlers) ---
 // openSettings, handleAvatarChange → auth.js global
 // setLanguage → translations.js global
@@ -3775,13 +3574,8 @@ window.closeQrScanner     = closeQrScanner;
 window.passPlayUnlock     = passPlayUnlock;
 window.createRoom         = createRoom;
 window.joinRoom           = joinRoom;
-window.goToMatchmaking    = goToMatchmaking;
-window.findMatch          = findMatch;
-window.cancelMatchmaking  = cancelMatchmaking;
 window.selectMode         = selectMode;
 window.selectGame         = selectGame;
-window.selectMMMode       = selectMMMode;
-window.toggleMMGame       = toggleMMGame;
 window.goBackToGameSelect = goBackToGameSelect;
 window.confirmGameSettings= confirmGameSettings;
 window.showScreen         = showScreen;
@@ -3849,688 +3643,9 @@ function showInterstitialAd() {
 }
 window.showInterstitialAd = showInterstitialAd;
 
-// ============ ARKADAŞ SİSTEMİ ============
-
-let _friendList = [];
-let _pendingRequests = [];
-let _currentFriendsTab = 'list';
-let _pendingGameInvite = null;
-
 function _attachDeferredSocketListeners() {
-  _attachFriendListeners();
-  _attachModerationSocketListeners();
   _attachReactionSocketListeners();
 }
-
-// --- Friend Socket Listeners (called after socket is ready) ---
-function _attachFriendListeners() {
-  if (!socket || socket._friendListenersAttached) return;
-  socket._friendListenersAttached = true;
-
-  socket.on("friendListUpdate", (data) => {
-    _friendList = data.friends || [];
-    renderFriendList();
-    // Show invite button in waiting screen if has online friends
-    const invBtn = document.getElementById('btn-invite-friends');
-    if (invBtn && currentRoom) {
-      invBtn.style.display = _friendList.some(f => f.onlineStatus !== 'offline') ? '' : 'none';
-    }
-  });
-
-  socket.on("pendingRequestsUpdate", (data) => {
-    _pendingRequests = data.requests || [];
-    renderPendingRequests();
-    updateFriendBadge();
-  });
-
-  socket.on("friendRequestReceived", (data) => {
-    _pendingRequests.unshift({
-      requestId: data.requestId,
-      fromUid: data.from.uid,
-      fromUsername: data.from.username,
-      fromPhotoURL: data.from.photoURL,
-      fromGender: data.from.gender
-    });
-    renderPendingRequests();
-    updateFriendBadge();
-    showHint(data.from.username + ' ' + t('friends_request_received_hint'));
-  });
-
-  socket.on("friendRequestResult", (data) => {
-    if (data.success) {
-      Swal.fire({ title: t('friends_request_sent'), text: data.targetUsername, icon: 'success', timer: 2000, showConfirmButton: false });
-      document.getElementById('friend-code-input').value = '';
-    } else {
-      const errorMap = {
-        not_found: t('friends_not_found'),
-        self: t('friends_cant_add_self'),
-        already_friends: t('friends_already_friends'),
-        already_sent: t('friends_request_pending'),
-        server_error: t('error')
-      };
-      Swal.fire({ title: t('warning'), text: errorMap[data.error] || t('error'), icon: 'warning' });
-    }
-  });
-
-  socket.on("friendRequestResponded", (data) => {
-    _pendingRequests = _pendingRequests.filter(r => r.requestId !== data.requestId);
-    renderPendingRequests();
-    updateFriendBadge();
-    if (data.accepted) {
-      socket.emit("getFriendList");
-    }
-  });
-
-  socket.on("friendRequestAccepted", (data) => {
-    _friendList.push({
-      uid: data.friendUid,
-      username: data.username,
-      photoURL: data.photoURL,
-      gender: data.gender,
-      onlineStatus: 'online'
-    });
-    renderFriendList();
-    showHint(data.username + ' ' + t('friends_request_accepted'));
-  });
-
-  socket.on("friendStatusChanged", (data) => {
-    const f = _friendList.find(f => f.uid === data.friendUid);
-    if (f) {
-      f.onlineStatus = data.status;
-      renderFriendList();
-    }
-  });
-
-  socket.on("friendRemoveResult", (data) => {
-    if (data.success) {
-      _friendList = _friendList.filter(f => f.uid !== data.friendUid);
-      renderFriendList();
-    }
-  });
-
-  socket.on("friendRemoved", (data) => {
-    _friendList = _friendList.filter(f => f.uid !== data.friendUid);
-    renderFriendList();
-  });
-
-  socket.on("gameInviteReceived", (data) => {
-    _pendingGameInvite = data;
-    showGameInviteToast(data);
-  });
-
-  socket.on("inviteSent", () => {
-    showHint(t('friends_invite_sent'));
-  });
-}
-
-// --- UI Functions ---
-
-function copyFriendCode() {
-  const code = document.getElementById('my-friend-code').textContent;
-  if (code && code !== '--------') {
-    navigator.clipboard.writeText(code).then(() => {
-      showHint(t('conn_copied'));
-    }).catch(() => {
-      // Fallback
-      const inp = document.createElement('input');
-      inp.value = code;
-      document.body.appendChild(inp);
-      inp.select();
-      document.execCommand('copy');
-      inp.remove();
-      showHint(t('conn_copied'));
-    });
-  }
-}
-
-function sendFriendRequestUI() {
-  const input = document.getElementById('friend-code-input');
-  if (!input) return;
-
-  const code = (input.value || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (code.length !== 8) {
-    Swal.fire({ title: t('warning'), text: t('friends_code_invalid'), icon: 'warning' });
-    return;
-  }
-
-  input.value = code.slice(0, 4) + '-' + code.slice(4);
-  if (!socket || !socket.connected) {
-    Swal.fire({ title: t('warning'), text: t('conn_lost'), icon: 'warning' });
-    return;
-  }
-  socket.emit("sendFriendRequest", { friendCode: code });
-}
-
-function switchFriendsTab(tab) {
-  _currentFriendsTab = tab;
-  document.getElementById('friends-tab-list').classList.toggle('active', tab === 'list');
-  document.getElementById('friends-tab-requests').classList.toggle('active', tab === 'requests');
-  document.getElementById('friends-list-panel').style.display = tab === 'list' ? '' : 'none';
-  document.getElementById('friends-requests-panel').style.display = tab === 'requests' ? '' : 'none';
-}
-
-function renderFriendList() {
-  const container = document.getElementById('friends-list-container');
-  const emptyMsg = document.getElementById('friends-empty-msg');
-  if (!container) return;
-
-  if (_friendList.length === 0) {
-    container.innerHTML = '';
-    container.appendChild(emptyMsg);
-    emptyMsg.style.display = '';
-    return;
-  }
-
-  emptyMsg.style.display = 'none';
-  container.innerHTML = _friendList.map(f => {
-    const statusClass = f.onlineStatus === 'online' ? 'status-online' : f.onlineStatus === 'in-game' ? 'status-ingame' : 'status-offline';
-    const statusText = f.onlineStatus === 'online' ? t('friends_online') : f.onlineStatus === 'in-game' ? t('friends_in_game') : t('friends_offline');
-    const avatar = f.photoURL || (typeof _anonymousAvatarSvg === 'function' ? _anonymousAvatarSvg() : '');
-    const canInvite = currentRoom && f.onlineStatus !== 'offline';
-    return `<div class="friend-item">
-      <div class="friend-item-left">
-        <div class="friend-avatar-wrap">
-          <img class="friend-avatar" src="${escapeHtml(avatar)}" alt="" onerror="this.src='${typeof _anonymousAvatarSvg === 'function' ? _anonymousAvatarSvg() : ''}'"/>
-          <span class="friend-status-dot ${statusClass}"></span>
-        </div>
-        <div class="friend-info">
-          <span class="friend-name">${escapeHtml(f.username)}</span>
-          <span class="friend-status-text ${statusClass}">${statusText}</span>
-        </div>
-      </div>
-      <div class="friend-item-actions">
-        ${canInvite ? `<button class="btn-friend-invite" onclick="inviteFriendToRoom('${f.uid}')">${t('friends_invite')}</button>` : ''}
-        <button class="btn-friend-remove" onclick="reportUser('${f.uid}', '${escapeHtml(f.username)}')" title="Report" style="opacity:0.5">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
-        </button>
-        <button class="btn-friend-remove" onclick="removeFriendConfirm('${f.uid}', '${escapeHtml(f.username)}')" title="${t('friends_remove')}">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        </button>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function renderPendingRequests() {
-  const container = document.getElementById('friends-requests-container');
-  const emptyMsg = document.getElementById('friends-requests-empty-msg');
-  if (!container) return;
-
-  if (_pendingRequests.length === 0) {
-    container.innerHTML = '';
-    container.appendChild(emptyMsg);
-    emptyMsg.style.display = '';
-    return;
-  }
-
-  emptyMsg.style.display = 'none';
-  container.innerHTML = _pendingRequests.map(r => {
-    const avatar = r.fromPhotoURL || (typeof _anonymousAvatarSvg === 'function' ? _anonymousAvatarSvg() : '');
-    return `<div class="friend-request-item">
-      <div class="friend-item-left">
-        <img class="friend-avatar" src="${escapeHtml(avatar)}" alt="" onerror="this.src='${typeof _anonymousAvatarSvg === 'function' ? _anonymousAvatarSvg() : ''}'"/>
-        <span class="friend-name">${escapeHtml(r.fromUsername)}</span>
-      </div>
-      <div class="friend-request-actions">
-        <button class="btn-accept-request" onclick="respondToFriendRequest('${r.requestId}', true)">✓</button>
-        <button class="btn-reject-request" onclick="respondToFriendRequest('${r.requestId}', false)">✕</button>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function updateFriendBadge() {
-  const count = _pendingRequests.length;
-  const badge = document.getElementById('friend-request-badge');
-  const reqCount = document.getElementById('friends-req-count');
-  if (badge) {
-    badge.textContent = count;
-    badge.style.display = count > 0 ? '' : 'none';
-  }
-  if (reqCount) {
-    reqCount.textContent = count;
-    reqCount.style.display = count > 0 ? '' : 'none';
-  }
-}
-
-function respondToFriendRequest(requestId, accept) {
-  if (!socket || !socket.connected) return;
-  socket.emit("respondFriendRequest", { requestId, accept });
-}
-
-function removeFriendConfirm(friendUid, username) {
-  Swal.fire({
-    title: t('friends_remove'),
-    text: t('friends_remove_confirm').replace('{name}', username),
-    icon: 'warning',
-    showCancelButton: true,
-    confirmButtonText: t('friends_remove'),
-    cancelButtonText: t('cancel')
-  }).then(result => {
-    if (result.isConfirmed && socket && socket.connected) {
-      socket.emit("removeFriend", { friendUid });
-    }
-  });
-}
-
-function inviteFriendToRoom(friendUid) {
-  if (!socket || !socket.connected || !currentRoom) return;
-  socket.emit("inviteFriendToRoom", { friendUid, roomId: currentRoom });
-}
-
-function showGameInviteToast(data) {
-  const toast = document.getElementById('game-invite-toast');
-  if (!toast) return;
-  const avatar = document.getElementById('invite-toast-avatar');
-  const username = document.getElementById('invite-toast-username');
-  const msg = document.getElementById('invite-toast-msg');
-  if (avatar) avatar.src = data.from.photoURL || (typeof _anonymousAvatarSvg === 'function' ? _anonymousAvatarSvg() : '');
-  if (username) username.textContent = data.from.username;
-  if (msg) msg.textContent = t('friends_invite_received');
-  toast.style.display = '';
-  // Auto-dismiss after 30s
-  if (window._inviteToastTimer) clearTimeout(window._inviteToastTimer);
-  window._inviteToastTimer = setTimeout(() => { toast.style.display = 'none'; _pendingGameInvite = null; }, 30000);
-}
-
-async function acceptGameInvite() {
-  const toast = document.getElementById('game-invite-toast');
-  if (toast) toast.style.display = 'none';
-
-  const invite = _pendingGameInvite;
-  _pendingGameInvite = null;
-  if (!invite || !socket || !socket.connected) return;
-
-  const roomId = invite.roomId;
-  if (currentRoom && currentRoom !== roomId && typeof leaveCurrentRoom === 'function') {
-    const didLeave = await leaveCurrentRoom();
-    if (didLeave) {
-      currentRoom = null;
-      sessionStorage.removeItem("duoduels_room");
-    }
-  }
-
-  const codeInput = document.getElementById('roomCodeInput');
-  if (codeInput) codeInput.value = roomId;
-  joinRoom();
-}
-
-function declineGameInvite() {
-  const toast = document.getElementById('game-invite-toast');
-  if (toast) toast.style.display = 'none';
-  _pendingGameInvite = null;
-}
-
-function showInviteFriendsPopup() {
-  if (!socket || !socket.connected) return;
-  // Refresh friend list, then show popup
-  socket.emit("getFriendList");
-  setTimeout(() => {
-    const onlineFriends = _friendList.filter(f => f.onlineStatus !== 'offline');
-    if (onlineFriends.length === 0) {
-      Swal.fire({ title: t('friends_title'), text: t('friends_no_online'), icon: 'info' });
-      return;
-    }
-    const html = onlineFriends.map(f =>
-      `<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.1)">
-        <img src="${escapeHtml(f.photoURL || '')}" style="width:32px;height:32px;border-radius:50%;object-fit:cover" onerror="this.src='${typeof _anonymousAvatarSvg === 'function' ? _anonymousAvatarSvg() : ''}'"/>
-        <span style="flex:1;color:#fff">${escapeHtml(f.username)}</span>
-        <button class="btn-friend-invite" onclick="inviteFriendToRoom('${f.uid}');Swal.close();">${t('friends_invite')}</button>
-      </div>`
-    ).join('');
-    Swal.fire({
-      title: t('friends_invite_title'),
-      html: html,
-      showConfirmButton: false,
-      showCancelButton: true,
-      cancelButtonText: t('cancel'),
-      background: '#1a1d24',
-      color: '#fff'
-    });
-  }, 500);
-}
-
-// Load friend data when friends screen shown
-const _origShowScreen = typeof showScreen === 'function' ? showScreen : null;
-if (_origShowScreen) {
-  showScreen = function(name) {
-    _origShowScreen(name);
-    if (name === 'friends' && socket && socket.connected) {
-      // Display friend code
-      const codeEl = document.getElementById('my-friend-code');
-      if (codeEl && userProfile && userProfile.friendCode) {
-        codeEl.textContent = userProfile.friendCode.substring(0, 4) + '-' + userProfile.friendCode.substring(4);
-      }
-      socket.emit("getFriendList");
-      socket.emit("getPendingRequests");
-    }
-    // Show invite button in waiting screen
-    if (name === 'waiting') {
-      const invBtn = document.getElementById('btn-invite-friends');
-      if (invBtn && socket && socket.connected && !_isGuestLocal) {
-        invBtn.style.display = '';
-        socket.emit("getFriendList");
-      }
-    }
-    // Load stats when stats screen is shown
-    if (name === 'stats') {
-      loadStats();
-    }
-    // Load leaderboard when leaderboard screen is shown
-    if (name === 'leaderboard') {
-      loadLeaderboard();
-    }
-    // Update reaction button visibility
-    setTimeout(updateReactionButton, 100);
-  };
-}
-
-// ===== STATS SYSTEM =====
-const GAME_TYPE_META = {
-  telepati: { icon: '🧠', name: { tr: 'Telepati', en: 'Telepathy', ar: 'تخاطر' } },
-  isimSehir: { icon: '🏙️', name: { tr: 'İsim Şehir', en: 'Name City', ar: 'اسم مدينة' } },
-  pictionary: { icon: '🎨', name: { tr: 'Pictionary', en: 'Pictionary', ar: 'رسم وتخمين' } },
-  tabu: { icon: '🚫', name: { tr: 'Tabu', en: 'Taboo', ar: 'تابو' } },
-  sayiTahmin: { icon: '🔢', name: { tr: 'Sayı Tahmin', en: 'Number Guess', ar: 'تخمين الرقم' } },
-  imposter: { icon: '🕵️', name: { tr: 'Imposter', en: 'Imposter', ar: 'المحتال' } },
-  bilBakalim: { icon: '❓', name: { tr: 'Bil Bakalım', en: 'Trivia', ar: 'تريفيا' } },
-};
-
-async function loadStats() {
-  if (!window.db || !window._currentUser) {
-    renderEmptyStats();
-    return;
-  }
-  try {
-    const uid = window._currentUser.uid;
-    // Load user stats
-    const userDoc = await db.collection('users').doc(uid).get();
-    if (!userDoc.exists) {
-      renderEmptyStats();
-      return;
-    }
-
-    const stats = userDoc.data().stats || {};
-
-    // Render overview
-    const played = stats.gamesPlayed || 0;
-    const won = stats.gamesWon || 0;
-    const rate = played > 0 ? Math.round((won / played) * 100) : 0;
-    document.getElementById('stat-games-played').textContent = played;
-    document.getElementById('stat-games-won').textContent = won;
-    document.getElementById('stat-win-rate').textContent = rate + '%';
-    document.getElementById('stat-best-streak').textContent = stats.bestWinStreak || 0;
-
-    // Render game type breakdown
-    const byType = stats.gamesByType || {};
-    const lang = window._currentLang || 'tr';
-    const container = document.getElementById('stats-by-game');
-    container.innerHTML = '';
-    Object.entries(GAME_TYPE_META).forEach(([type, meta]) => {
-      const count = byType[type] || 0;
-      if (count > 0) {
-        container.innerHTML += `
-          <div class="stat-game-row">
-            <span class="stat-game-icon">${meta.icon}</span>
-            <span class="stat-game-name">${meta.name[lang] || meta.name.en}</span>
-            <span class="stat-game-count">${count}</span>
-          </div>`;
-      }
-    });
-    if (container.innerHTML === '') {
-      container.innerHTML = '<p class="friends-empty">' + (lang === 'tr' ? 'Henüz oyun oynamadın.' : lang === 'ar' ? 'لم تلعب بعد.' : 'No games played yet.') + '</p>';
-    }
-
-    // Render achievements
-    const achContainer = document.getElementById('stats-achievements');
-    if (achContainer) {
-      const unlockedMap = userDoc.data().achievements || {};
-      achContainer.innerHTML = '';
-      ACHIEVEMENTS.forEach(a => {
-        const unlocked = !!unlockedMap[a.id];
-        const name = t(`ach_${a.id}`) || a.id;
-        achContainer.innerHTML += `
-          <div class="ach-item${unlocked ? ' ach-unlocked' : ''}">
-            <span class="ach-icon">${a.icon}</span>
-            <span class="ach-name">${escapeHtml(name)}</span>
-            ${unlocked ? '<span class="ach-check">✓</span>' : ''}
-          </div>`;
-      });
-    }
-
-    // Load recent games
-    const recentSnap = await db.collection('gameResults')
-      .where('players', 'array-contains-any', [{ uid }])
-      .orderBy('createdAt', 'desc')
-      .limit(10)
-      .get()
-      .catch(() => null);
-
-    // Fallback: query without complex array filter
-    let recentGames = [];
-    if (!recentSnap || recentSnap.empty) {
-      // Try simpler query - get all recent and filter client-side
-      const allRecent = await db.collection('gameResults')
-        .orderBy('createdAt', 'desc')
-        .limit(50)
-        .get()
-        .catch(() => null);
-      if (allRecent && !allRecent.empty) {
-        allRecent.forEach(doc => {
-          const data = doc.data();
-          if (data.players && data.players.some(p => p.uid === uid)) {
-            recentGames.push(data);
-          }
-        });
-        recentGames = recentGames.slice(0, 10);
-      }
-    } else {
-      recentSnap.forEach(doc => recentGames.push(doc.data()));
-    }
-
-    const recentContainer = document.getElementById('stats-recent-games');
-    const noGamesMsg = document.getElementById('stats-no-games');
-    if (recentGames.length === 0) {
-      noGamesMsg.style.display = '';
-      recentContainer.querySelectorAll('.recent-game-item').forEach(el => el.remove());
-    } else {
-      noGamesMsg.style.display = 'none';
-      recentContainer.querySelectorAll('.recent-game-item').forEach(el => el.remove());
-      recentGames.forEach(game => {
-        const meta = GAME_TYPE_META[game.gameType] || { icon: '🎮', name: { tr: game.gameType, en: game.gameType, ar: game.gameType } };
-        const myResult = game.players.find(p => p.uid === uid);
-        const isWin = myResult ? myResult.isWinner : false;
-        const date = game.createdAt ? new Date(game.createdAt.seconds * 1000) : new Date();
-        const dateStr = date.toLocaleDateString(lang === 'tr' ? 'tr-TR' : lang === 'ar' ? 'ar-SA' : 'en-US', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
-        const resultText = isWin ? (lang === 'tr' ? 'Kazandın' : lang === 'ar' ? 'فوز' : 'Won') : (lang === 'tr' ? 'Kaybettin' : lang === 'ar' ? 'خسارة' : 'Lost');
-        const resultClass = isWin ? 'win' : 'loss';
-
-        const div = document.createElement('div');
-        div.className = 'recent-game-item';
-        div.innerHTML = `
-          <span class="recent-game-icon">${meta.icon}</span>
-          <div class="recent-game-info">
-            <div class="recent-game-type">${meta.name[lang] || meta.name.en}</div>
-            <div class="recent-game-date">${dateStr}</div>
-          </div>
-          <span class="recent-game-result ${resultClass}">${resultText}</span>`;
-        recentContainer.appendChild(div);
-      });
-    }
-  } catch (err) {
-    console.error('Error loading stats:', err);
-    renderEmptyStats();
-  }
-}
-
-function renderEmptyStats() {
-  document.getElementById('stat-games-played').textContent = '0';
-  document.getElementById('stat-games-won').textContent = '0';
-  document.getElementById('stat-win-rate').textContent = '0%';
-  document.getElementById('stat-best-streak').textContent = '0';
-  document.getElementById('stats-by-game').innerHTML = '';
-  const recentContainer = document.getElementById('stats-recent-games');
-  const noGamesMsg = document.getElementById('stats-no-games');
-  const achievements = document.getElementById('stats-achievements');
-  if (recentContainer) {
-    recentContainer.querySelectorAll('.recent-game-item').forEach(el => el.remove());
-  }
-  if (noGamesMsg) {
-    noGamesMsg.style.display = '';
-  }
-  if (achievements) {
-    achievements.innerHTML = '';
-  }
-}
-
-// ===== REPORT & BLOCK SYSTEM =====
-let _blockedUsers = [];
-
-function loadBlockedUsers() {
-  if (socket && socket.connected) {
-    socket.emit('getBlockedUsers');
-  }
-}
-
-async function reportUser(targetUid, targetUsername) {
-  if (!socket || !targetUid) return;
-  const lang = window._currentLang || 'tr';
-  const { value: reason } = await Swal.fire({
-    title: lang === 'tr' ? 'Kullanıcıyı Şikayet Et' : lang === 'ar' ? 'الإبلاغ عن المستخدم' : 'Report User',
-    text: escapeHtml(targetUsername),
-    input: 'select',
-    inputOptions: lang === 'tr' ? {
-      spam: 'Spam / Reklam',
-      inappropriate: 'Uygunsuz İçerik',
-      cheating: 'Hile',
-      harassment: 'Taciz / Hakaret',
-      other: 'Diğer',
-    } : {
-      spam: 'Spam',
-      inappropriate: 'Inappropriate Content',
-      cheating: 'Cheating',
-      harassment: 'Harassment',
-      other: 'Other',
-    },
-    showCancelButton: true,
-    confirmButtonText: lang === 'tr' ? 'Şikayet Et' : 'Report',
-    cancelButtonText: lang === 'tr' ? 'İptal' : 'Cancel',
-  });
-  if (!reason) return;
-  socket.emit('reportUser', { targetUid, reason });
-}
-
-async function blockUser(targetUid, targetUsername) {
-  if (!socket || !targetUid) return;
-  const lang = window._currentLang || 'tr';
-  const result = await Swal.fire({
-    title: lang === 'tr' ? 'Engelle' : 'Block',
-    text: lang === 'tr' ? `${escapeHtml(targetUsername)} engellensin mi?` : `Block ${escapeHtml(targetUsername)}?`,
-    showCancelButton: true,
-    confirmButtonText: lang === 'tr' ? 'Engelle' : 'Block',
-    cancelButtonText: lang === 'tr' ? 'İptal' : 'Cancel',
-    confirmButtonColor: '#e74c3c',
-  });
-  if (!result.isConfirmed) return;
-  socket.emit('blockUser', { targetUid });
-}
-
-function unblockUser(targetUid) {
-  if (!socket || !targetUid) return;
-  socket.emit('unblockUser', { targetUid });
-}
-
-function _attachModerationSocketListeners() {
-  if (!socket || socket._moderationListenersAttached) return;
-  socket._moderationListenersAttached = true;
-
-  socket.on('reportSuccess', () => {
-    const lang = window._currentLang || 'tr';
-    Swal.fire({ title: lang === 'tr' ? 'Şikayet Gönderildi' : 'Report Sent', icon: 'success', timer: 2000, showConfirmButton: false });
-  });
-  socket.on('blockSuccess', ({ targetUid }) => {
-    if (!_blockedUsers.includes(targetUid)) _blockedUsers.push(targetUid);
-    const lang = window._currentLang || 'tr';
-    Swal.fire({ title: lang === 'tr' ? 'Engellendi' : 'Blocked', icon: 'success', timer: 2000, showConfirmButton: false });
-  });
-  socket.on('unblockSuccess', ({ targetUid }) => {
-    _blockedUsers = _blockedUsers.filter(u => u !== targetUid);
-  });
-  socket.on('blockedUsersList', (list) => {
-    _blockedUsers = list || [];
-  });
-}
-
-// ===== ACHIEVEMENT SYSTEM =====
-const ACHIEVEMENTS = [
-  { id: 'first_game', icon: '🎮', check: s => (s.gamesPlayed || 0) >= 1 },
-  { id: 'first_win', icon: '🏆', check: s => (s.gamesWon || 0) >= 1 },
-  { id: 'games_5', icon: '⭐', check: s => (s.gamesPlayed || 0) >= 5 },
-  { id: 'games_10', icon: '🌟', check: s => (s.gamesPlayed || 0) >= 10 },
-  { id: 'games_25', icon: '💫', check: s => (s.gamesPlayed || 0) >= 25 },
-  { id: 'games_50', icon: '🔥', check: s => (s.gamesPlayed || 0) >= 50 },
-  { id: 'games_100', icon: '💎', check: s => (s.gamesPlayed || 0) >= 100 },
-  { id: 'wins_5', icon: '🥇', check: s => (s.gamesWon || 0) >= 5 },
-  { id: 'wins_10', icon: '👑', check: s => (s.gamesWon || 0) >= 10 },
-  { id: 'wins_25', icon: '🏅', check: s => (s.gamesWon || 0) >= 25 },
-  { id: 'streak_3', icon: '🔥', check: s => (s.bestWinStreak || 0) >= 3 },
-  { id: 'streak_5', icon: '⚡', check: s => (s.bestWinStreak || 0) >= 5 },
-  { id: 'streak_10', icon: '🌈', check: s => (s.bestWinStreak || 0) >= 10 },
-  { id: 'all_games', icon: '🎯', check: s => {
-    const types = s.gamesByType || {};
-    return ['telepati','isimSehir','pictionary','tabu','sayiTahmin','imposter','bilBakalim'].every(t => (types[t] || 0) >= 1);
-  }},
-  { id: 'friend_1', icon: '🤝', check: (s, u) => (u.friendCount || 0) >= 1 },
-];
-
-async function checkAchievements() {
-  if (!window.db || !window._currentUser) return;
-  try {
-    const uid = window._currentUser.uid;
-    const userDoc = await db.collection('users').doc(uid).get();
-    if (!userDoc.exists) return;
-    const userData = userDoc.data();
-    const stats = userData.stats || {};
-    const unlockedMap = userData.achievements || {};
-    const lang = window._currentLang || 'tr';
-
-    const newUnlocks = [];
-    ACHIEVEMENTS.forEach(a => {
-      if (!unlockedMap[a.id] && a.check(stats, userData)) {
-        newUnlocks.push(a);
-      }
-    });
-
-    if (newUnlocks.length === 0) return;
-
-    // Save unlocked achievements
-    const update = {};
-    newUnlocks.forEach(a => { update[`achievements.${a.id}`] = Date.now(); });
-    await db.collection('users').doc(uid).set(update, { merge: true });
-
-    // Show popup for each (staggered)
-    newUnlocks.forEach((a, i) => {
-      setTimeout(() => {
-        const name = t(`ach_${a.id}`) || a.id;
-        SoundManager.play('win');
-        SoundManager.haptic('heavy');
-        Swal.fire({
-          title: t('achievement_unlocked') || 'Achievement Unlocked!',
-          html: `<div style="font-size:3em;margin:10px 0">${a.icon}</div><div style="font-size:1.1em;font-weight:bold">${escapeHtml(name)}</div>`,
-          timer: 3500,
-          showConfirmButton: false,
-          background: 'linear-gradient(135deg, #1a1a2e, #16213e)',
-          color: '#fff',
-        });
-      }, i * 4000);
-    });
-  } catch(e) {
-    console.error('Achievement check error:', e);
-  }
-}
-
-// Check achievements when returning to lobby after a game
-// (hooked into backToSelect event)
 
 // ===== EMOJI REACTIONS =====
 let _reactionPanelOpen = false;
@@ -4613,100 +3728,3 @@ function _attachReactionSocketListeners() {
   });
 }
 
-// ===== LEADERBOARD SYSTEM =====
-let _currentLbTab = 'global';
-
-function switchLeaderboardTab(tab) {
-  _currentLbTab = tab;
-  document.getElementById('lb-tab-global').classList.toggle('active', tab === 'global');
-  document.getElementById('lb-tab-friends').classList.toggle('active', tab === 'friends');
-  loadLeaderboard();
-}
-
-async function loadLeaderboard() {
-  const listEl = document.getElementById('leaderboard-list');
-  const emptyEl = document.getElementById('lb-empty');
-  listEl.querySelectorAll('.lb-row').forEach(el => el.remove());
-  const lang = window._currentLang || 'tr';
-
-  if (!window.db || !window._currentUser) {
-    emptyEl.textContent = lang === 'tr' ? 'Giriş yap' : lang === 'ar' ? 'سجّل الدخول' : 'Sign in';
-    emptyEl.style.display = '';
-    return;
-  }
-
-  emptyEl.textContent = '...';
-  emptyEl.style.display = '';
-
-  const sortBy = document.getElementById('lb-sort-select').value;
-  const uid = window._currentUser.uid;
-
-  try {
-    let users = [];
-
-    if (_currentLbTab === 'friends') {
-      // Get friend UIDs
-      const friendSnap = await db.collection('users').doc(uid).collection('friends').get();
-      const friendUids = [uid];
-      friendSnap.forEach(doc => friendUids.push(doc.id));
-
-      // Fetch each friend's data (Firestore 'in' limit is 30)
-      const chunks = [];
-      for (let i = 0; i < friendUids.length; i += 10) {
-        chunks.push(friendUids.slice(i, i + 10));
-      }
-      for (const chunk of chunks) {
-        const snap = await db.collection('users').where('__name__', 'in', chunk).get();
-        snap.forEach(doc => {
-          const d = doc.data();
-          if (d.stats) {
-            users.push({ uid: doc.id, username: d.username || d.displayName || 'Anon', photoURL: d.photoURL || '', stats: d.stats });
-          }
-        });
-      }
-    } else {
-      // Global: top players by the selected stat
-      const snap = await db.collection('users')
-        .where(`stats.${sortBy}`, '>', 0)
-        .orderBy(`stats.${sortBy}`, 'desc')
-        .limit(50)
-        .get();
-      snap.forEach(doc => {
-        const d = doc.data();
-        users.push({ uid: doc.id, username: d.username || d.displayName || 'Anon', photoURL: d.photoURL || '', stats: d.stats || {} });
-      });
-    }
-
-    // Sort
-    users.sort((a, b) => (b.stats[sortBy] || 0) - (a.stats[sortBy] || 0));
-
-    if (users.length === 0) {
-      emptyEl.textContent = lang === 'tr' ? 'Henüz veri yok.' : lang === 'ar' ? 'لا توجد بيانات بعد.' : 'No data yet.';
-      emptyEl.style.display = '';
-      return;
-    }
-
-    emptyEl.style.display = 'none';
-
-    users.forEach((user, i) => {
-      const rank = i + 1;
-      const value = user.stats[sortBy] || 0;
-      const isMe = user.uid === uid;
-      const rankClass = rank <= 3 ? ` lb-rank-${rank}` : '';
-      const medal = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : rank;
-
-      const div = document.createElement('div');
-      div.className = `lb-row${isMe ? ' lb-me' : ''}`;
-      div.innerHTML = `
-        <span class="lb-rank${rankClass}">${medal}</span>
-        ${user.photoURL ? `<img class="lb-avatar" src="${escapeHtml(user.photoURL)}" alt="" onerror="this.style.display='none'"/>` : ''}
-        <span class="lb-name">${escapeHtml(user.username)}${isMe ? ' (sen)' : ''}</span>
-        <span class="lb-value">${value}</span>`;
-      listEl.appendChild(div);
-    });
-  } catch (err) {
-    console.error('Leaderboard error:', err);
-    emptyEl.textContent = lang === 'tr' ? 'Yüklenemedi.' : 'Failed to load.';
-    emptyEl.style.display = '';
-  }
-}

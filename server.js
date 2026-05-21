@@ -2,8 +2,6 @@ const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
 const path = require("path");
-const admin = require("firebase-admin");
-let firebaseAuthEnabled = false;
 
 // Server-side i18n helper (mirrors client translations for error messages)
 const SERVER_MESSAGES = {
@@ -59,21 +57,6 @@ function serverT(key, lang) {
   return (SERVER_MESSAGES[lang] && SERVER_MESSAGES[lang][key]) || SERVER_MESSAGES['tr'][key] || key;
 }
 
-// Firebase Admin SDK init
-if (process.env.FIREBASE_SERVICE_ACCOUNT) {
-  const serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
-  admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
-  firebaseAuthEnabled = true;
-} else {
-  try {
-    admin.initializeApp({ credential: admin.credential.applicationDefault() });
-    firebaseAuthEnabled = true;
-  } catch (err) {
-    console.warn("Firebase Admin credential bulunamadı. Server-side token doğrulama devre dışı.", err.message);
-    try { admin.initializeApp(); } catch (e) { /* already initialized */ }
-  }
-}
-
 const app = express();
 const server = http.createServer(app);
 
@@ -96,15 +79,10 @@ const ALLOWED_ORIGINS = [
 const io = new Server(server, {
   cors: {
     origin: function (origin, callback) {
-      // S1 fix: only allow !origin (no Origin header) in development mode
-      if (!origin && process.env.NODE_ENV === 'development') {
-        return callback(null, true);
-      }
-      if (origin && ALLOWED_ORIGINS.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
+      // Origin yoksa (same-origin GET veya native app) izin ver
+      if (!origin) return callback(null, true);
+      if (ALLOWED_ORIGINS.includes(origin)) return callback(null, true);
+      callback(new Error('Not allowed by CORS'));
     },
     methods: ["GET", "POST"],
   },
@@ -120,12 +98,12 @@ app.use((req, res, next) => {
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('Content-Security-Policy',
     "default-src 'self'; " +
-    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://www.gstatic.com https://apis.google.com https://pagead2.googlesyndication.com; " +
+    "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net https://cdnjs.cloudflare.com https://pagead2.googlesyndication.com; " +
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
     "font-src https://fonts.gstatic.com; " +
-    "img-src 'self' data: https://*.googleusercontent.com https://*.facebook.com https://*.googlesyndication.com https://*.doubleclick.net; " +
-    "connect-src 'self' wss://duoduels.onrender.com wss://duoduels.com wss://www.duoduels.com https://duoduels-599689373205.europe-west1.run.app wss://duoduels-599689373205.europe-west1.run.app wss://duoduels-efwwv7zyia-ew.a.run.app ws://localhost:3000 ws://127.0.0.1:3000 https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.googlesyndication.com https://*.doubleclick.net; " +
-    "frame-src 'self' https://*.firebaseapp.com https://accounts.google.com https://www.facebook.com https://appleid.apple.com https://*.googlesyndication.com https://*.doubleclick.net;"
+    "img-src 'self' data: https://*.googlesyndication.com https://*.doubleclick.net; " +
+    "connect-src 'self' wss://duoduels.onrender.com wss://duoduels.com wss://www.duoduels.com https://duoduels-599689373205.europe-west1.run.app wss://duoduels-599689373205.europe-west1.run.app wss://duoduels-efwwv7zyia-ew.a.run.app ws://localhost:3000 ws://127.0.0.1:3000 https://*.googlesyndication.com https://*.doubleclick.net; " +
+    "frame-src 'self' https://*.googlesyndication.com https://*.doubleclick.net;"
   );
   next();
 });
@@ -173,24 +151,9 @@ const MODE_GAME_TYPES = {
   duo: ['telepati', 'isimSehir', 'pictionary', 'tabu', 'sayiTahmin', 'bilBakalim'],
   tek: ['pictionary', 'imposter'],
 };
-const MATCHMAKING_MODE_GAME_TYPES = {
-  cift: MODE_GAME_TYPES.cift,
-  duo: MODE_GAME_TYPES.duo,
-  tek: ['pictionary'],
-};
-
 function isGameSupportedForMode(gameType, gameMode) {
   return !!(MODE_GAME_TYPES[gameMode] && MODE_GAME_TYPES[gameMode].includes(gameType));
 }
-
-function getMatchmakingGamesForMode(gameMode) {
-  return MATCHMAKING_MODE_GAME_TYPES[gameMode] || [];
-}
-
-// --- Bot Player Helpers ---
-const BOT_NAMES_FEMALE = ['Zeynep', 'Ayşe', 'Selin', 'Elif', 'Merve'];
-const BOT_NAMES_MALE   = ['Mehmet', 'Emre', 'Burak', 'Can', 'Kaan'];
-const BOT_TELEPATI_WORDS = ['ELMA', 'EV', 'ARABA', 'GÜNEŞ', 'KÖPEK', 'SU', 'AŞK', 'BALIK', 'AĞAÇ', 'GÜL', 'KAT', 'YOL'];
 
 // --- BİL BAKALIM SORU BANKASI ---
 const BIL_BAKALIM_QUESTIONS = [
@@ -226,66 +189,12 @@ const BIL_BAKALIM_QUESTIONS = [
   { q: "Dünyanın en yüksek dağı Everest kaç metre yüksekliğindedir?", a: 8849, unit: "metre" },
 ];
 
-function createBotPlayer(gender, selectedGames) {
-  const names = gender === 'female' ? BOT_NAMES_FEMALE : BOT_NAMES_MALE;
-  return {
-    playerId: 'bot_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
-    socketId: '__bot__',
-    username: names[Math.floor(Math.random() * names.length)],
-    gender: gender,
-    isBot: true,
-    selectedGames: selectedGames.length > 0 ? selectedGames : VALID_GAME_TYPES
-  };
-}
-
-function scheduleBotAction(roomId, actionFn, minDelay = 800, maxDelay = 2500) {
-  const delay = minDelay + Math.random() * (maxDelay - minDelay);
-  setTimeout(() => {
-    const room = rooms[roomId];
-    if (!room || room.gameStatus !== 'playing') return;
-    actionFn(room);
-  }, delay);
-}
-
 function sanitizeString(str, maxLength = 50) {
   if (typeof str !== 'string') return '';
   // S2 fix: strip HTML tags to prevent injection. Data is JSON-transported so
   // we strip angle-bracket tags but preserve other characters to avoid double-encoding
   // when the client calls escapeHtml() on display.
   return str.trim().substring(0, maxLength).replace(/<[^>]*>/g, '');
-}
-
-function normalizeFriendCode(code) {
-  return sanitizeString(code, 12).toUpperCase().replace(/[^A-Z0-9]/g, '').substring(0, 8);
-}
-
-function generateFriendCode(length = 8) {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  let code = '';
-  for (let i = 0; i < length; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
-  }
-  return code;
-}
-
-function sanitizePhotoUrl(photoURL, maxLength = 450000) {
-  if (typeof photoURL !== 'string') return '';
-  const value = photoURL.trim();
-  if (!value) return '';
-  if (value.startsWith('https://') || value.startsWith('data:image/')) {
-    return value.substring(0, maxLength);
-  }
-  return '';
-}
-
-async function randomUniqueFriendCode(maxAttempts = 8) {
-  if (!adminDb) return generateFriendCode();
-  for (let attempt = 0; attempt < maxAttempts; attempt++) {
-    const code = generateFriendCode();
-    const snap = await adminDb.collection('users').where('friendCode', '==', code).limit(1).get();
-    if (snap.empty) return code;
-  }
-  return generateFriendCode();
 }
 
 function randomDigits(length = 4) {
@@ -354,567 +263,24 @@ io.use((socket, next) => {
   next();
 });
 
-// --- Firebase Auth Middleware ---
-if (firebaseAuthEnabled) {
-  io.use(async (socket, next) => {
-    const token = socket.handshake.auth.token;
-    const fallbackId = socket.handshake.auth && socket.handshake.auth.fallbackUserId;
-
-    // Guest local kullanıcılar (Pass & Play) — token olmadan fallbackUserId ile bağlanır
-    if (!token && fallbackId) {
-      socket.userId = sanitizeString(fallbackId, 64);
-      socket.isGuestLocal = true;
-      socket.lang = socket.handshake.auth.lang || 'tr';
-      return next();
-    }
-
-    if (!token) {
-      return next(new Error('Authentication required'));
-    }
-    try {
-      const decoded = await admin.auth().verifyIdToken(token);
-      socket.userId = decoded.uid;
-      socket.isGuestLocal = false;
-      socket.lang = socket.handshake.auth.lang || 'tr';
-      next();
-    } catch (err) {
-      console.error('Auth middleware error:', err.message);
-      return next(new Error('Invalid auth token'));
-    }
-  });
-} else {
-  io.use((socket, next) => {
-    const fallbackId = socket.handshake.auth && socket.handshake.auth.fallbackUserId;
-    socket.userId = sanitizeString(fallbackId || `dev_${socket.id}`, 64);
-    socket.lang = socket.handshake.auth.lang || 'tr';
-    next();
-  });
-}
+// --- Simple Handshake Auth ---
+// Client localStorage'da ürettiği UUID'yi handshake'te gönderir.
+// Token doğrulama / Firebase yok — sadece girilen username + UUID.
+io.use((socket, next) => {
+  const auth = socket.handshake.auth || {};
+  const rawId = sanitizeString(auth.playerId || '', 64);
+  socket.userId = rawId || `anon_${socket.id}`;
+  socket.lang = (typeof auth.lang === 'string' && ['tr', 'en', 'ar'].includes(auth.lang)) ? auth.lang : 'tr';
+  next();
+});
 
 const rooms = {};
-
-// --- Matchmaking Queue ---
-const matchmakingQueue = {
-  duo: { male: [], female: [] },
-  cift: { male: [], female: [] },
-  tek: { male: [], female: [] }
-};
-
-function removeFromMatchmaking(pid) {
-  for (const mode of ['duo', 'cift', 'tek']) {
-    for (const gender of ['male', 'female']) {
-      const idx = matchmakingQueue[mode][gender].findIndex(p => p.playerId === pid);
-      if (idx !== -1) matchmakingQueue[mode][gender].splice(idx, 1);
-    }
-  }
-}
-
-function checkForMatch(mode) {
-  const males = matchmakingQueue[mode].male;
-  const females = matchmakingQueue[mode].female;
-
-  if (mode === 'duo' || mode === 'tek') {
-    // 1 erkek + 1 kadın
-    if (males.length >= 1 && females.length >= 1) {
-      const male = males.shift();
-      const female = females.shift();
-      createMatchRoom(mode, [male, female]);
-    }
-  } else if (mode === 'cift') {
-    // 2 erkek + 2 kadın = 2 çift
-    if (males.length >= 2 && females.length >= 2) {
-      const m1 = males.shift();
-      const m2 = males.shift();
-      const f1 = females.shift();
-      const f2 = females.shift();
-      createMatchRoom(mode, [m1, f1, m2, f2]);
-    }
-  }
-}
-
-function createMatchRoom(mode, players) {
-  // Ortak oyun bul
-  const allGames = players.map(p => p.selectedGames);
-  let commonGames = allGames[0].filter(g => allGames.every(a => a.includes(g)));
-  let chosenGame;
-  if (commonGames.length > 0) {
-    chosenGame = commonGames[Math.floor(Math.random() * commonGames.length)];
-  } else {
-    // Kesişim yok — tüm seçimlerden rastgele
-    const allSelected = [...new Set(allGames.flat())];
-    chosenGame = allSelected[Math.floor(Math.random() * allSelected.length)];
-  }
-
-  const roomId = generateRoomId();
-  const defaultTimes = { telepati: 10, isimSehir: 20, pictionary: 45, tabu: 60, sayiTahmin: 60, imposter: 60, bilBakalim: 20 };
-
-  let teams = [];
-  let roomPlayers = [];
-  let maxPlayers = 0;
-
-  if (mode === 'duo') {
-    teams = [{ id: 0, name: 'Takım 1', p1: null, p2: null }];
-    teams[0].p1 = { id: players[0].playerId, socketId: players[0].socketId, username: players[0].username, gender: players[0].gender, isHost: true, isBot: !!players[0].isBot };
-    teams[0].p2 = { id: players[1].playerId, socketId: players[1].socketId, username: players[1].username, gender: players[1].gender, isHost: false, isBot: !!players[1].isBot };
-  } else if (mode === 'cift') {
-    teams = [
-      { id: 0, name: 'Takım 1', p1: null, p2: null },
-      { id: 1, name: 'Takım 2', p1: null, p2: null }
-    ];
-    teams[0].p1 = { id: players[0].playerId, socketId: players[0].socketId, username: players[0].username, gender: players[0].gender, isHost: true };
-    teams[0].p2 = { id: players[1].playerId, socketId: players[1].socketId, username: players[1].username, gender: players[1].gender, isHost: false };
-    teams[1].p1 = { id: players[2].playerId, socketId: players[2].socketId, username: players[2].username, gender: players[2].gender, isHost: false };
-    teams[1].p2 = { id: players[3].playerId, socketId: players[3].socketId, username: players[3].username, gender: players[3].gender, isHost: false };
-  } else if (mode === 'tek') {
-    roomPlayers = players.map((p, i) => ({
-      id: p.playerId, socketId: p.socketId, username: p.username, gender: p.gender, isHost: i === 0
-    }));
-    maxPlayers = players.length;
-  }
-
-  rooms[roomId] = {
-    id: roomId,
-    gameMode: mode,
-    teams: teams,
-    players: roomPlayers,
-    maxPlayers: maxPlayers,
-    spectators: [],
-    gameStatus: "waiting",
-    createdAt: Date.now(),
-    lastActivity: Date.now(),
-    gameType: chosenGame,
-    currentPairIndex: 0,
-    roundCount: 5,
-    roundTime: defaultTimes[chosenGame] || 10,
-    currentRound: 1,
-    pairs: [],
-    moves: {},
-    telepatiTimer: null,
-    soloPlayers: [],
-    currentDrawerIndex: 0,
-    pictionaryScores: {},
-    pictionaryUsedWords: [],
-    pictionaryDrawerToggle: 0,
-    pictionaryGuessOrder: [],
-    pictionaryTimer: null,
-    currentLetter: null,
-    currentCategory: null,
-    categoryIndex: 0,
-    isimSehirScores: {},
-    usedLetters: [],
-    isimSehirTimer: null,
-    tabuScores: {},
-    tabuUsedWords: [],
-    tabuTimer: null,
-    tabuCurrentWord: null,
-    tabuDescriberId: null,
-    tabuGuesserId: null,
-    tabuClues: [],
-    tabuDescriberToggle: 0,
-    sayiTahminSecrets: {},
-    sayiTahminGuesses: {},
-    sayiTahminCurrentTurn: null,
-    sayiTahminRound: 1,
-    sayiTahminDigitCount: 4,
-    sayiTahminTimer: null,
-    sayiTahminTieCount: 0,
-    // Bil Bakalım specific
-    bilBakalimScores: {},
-    bilBakalimAnswers: {},
-    bilBakalimCurrentQ: null,
-    bilBakalimUsedQIndices: [],
-    bilBakalimTimer: null,
-    bilBakalimTargetScore: 10,
-    isMatchmaking: true
-  };
-
-  console.log(`Matchmaking Oda: ${roomId} | Mod: ${mode} | Oyun: ${chosenGame} | Oyuncular: ${players.map(p => p.username).join(', ')}`);
-
-  // Tüm oyuncuları odaya sok ve bilgilendir
-  players.forEach(p => {
-    const sock = io.sockets.sockets.get(p.socketId);
-    if (sock) {
-      sock.join(roomId);
-      sock.emit("matchFound", {
-        roomId: roomId,
-        gameType: chosenGame,
-        gameMode: mode,
-        isHost: p === players[0],
-        players: players.map(pl => ({ username: pl.username, gender: pl.gender }))
-      });
-    }
-  });
-
-  // 2 saniye sonra oyunu otomatik başlat (Bug 3 fix: already guarded with rooms[roomId] check)
-  setTimeout(() => {
-    const room = rooms[roomId];
-    if (!room) return;
-    autoStartGame(roomId);
-  }, 2000);
-}
-
-function autoStartGame(roomId) {
-  const room = rooms[roomId];
-  if (!room) return;
-
-  const hostSocket = findHostSocket(room);
-  if (hostSocket) {
-    hostSocket.emit("autoStartGame", roomId);
-  }
-}
-
-function findHostSocket(room) {
-  let hostId;
-  if (room.gameMode === 'tek' && room.players.length > 0) {
-    const host = room.players.find(p => p.isHost);
-    if (host) hostId = host.socketId;
-  } else if (room.teams.length > 0 && room.teams[0].p1) {
-    hostId = room.teams[0].p1.socketId;
-  }
-  if (hostId) return io.sockets.sockets.get(hostId);
-  return null;
-}
 
 // --- Player Identity ---
 const playerSockets = {}; // playerId -> socketId
 
-// --- Online Presence Tracking ---
-const onlineUsers = new Map(); // uid -> { socketId, status, username, gender, photoURL }
-
 function getSocketId(playerId) {
-  // Return mapped socket ID, or a non-existent room name to silently drop
   return playerSockets[playerId] || "__disconnected__";
-}
-
-// --- Firestore Admin DB Reference ---
-const adminDb = firebaseAuthEnabled ? admin.firestore() : null;
-
-async function requireHttpAuth(req, res, next) {
-  if (!firebaseAuthEnabled || !adminDb) {
-    return res.status(503).json({ error: 'Authentication service unavailable' });
-  }
-
-  const authHeader = req.headers.authorization || '';
-  if (!authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'Missing auth token' });
-  }
-
-  const token = authHeader.slice(7).trim();
-  if (!token) {
-    return res.status(401).json({ error: 'Missing auth token' });
-  }
-
-  try {
-    const decoded = await admin.auth().verifyIdToken(token);
-    req.userId = decoded.uid;
-    req.authUser = decoded;
-    next();
-  } catch (err) {
-    console.error('HTTP auth error:', err.message);
-    return res.status(401).json({ error: 'Invalid auth token' });
-  }
-}
-
-function serializeUserProfile(data) {
-  if (!data) return null;
-  return {
-    username: data.username || '',
-    gender: data.gender || '',
-    email: data.email || '',
-    photoURL: data.photoURL || '',
-    friendCode: data.friendCode || '',
-    friendCount: Number.isFinite(data.friendCount) ? data.friendCount : 0,
-    stats: data.stats || {},
-    achievements: data.achievements || {},
-    blockedUsers: Array.isArray(data.blockedUsers) ? data.blockedUsers : [],
-    onlineStatus: data.onlineStatus || 'online',
-  };
-}
-
-app.get('/api/me/profile', requireHttpAuth, async (req, res) => {
-  try {
-    const ref = adminDb.collection('users').doc(req.userId);
-    const snap = await ref.get();
-
-    if (!snap.exists) {
-      return res.status(404).json({ error: 'Profile not found' });
-    }
-
-    const data = snap.data() || {};
-    const responseProfile = { ...data };
-    const updateData = {
-      lastLogin: admin.firestore.FieldValue.serverTimestamp(),
-      lastSeen: admin.firestore.FieldValue.serverTimestamp(),
-      onlineStatus: 'online',
-    };
-
-    if (!responseProfile.friendCode) {
-      const code = await randomUniqueFriendCode();
-      updateData.friendCode = code;
-      responseProfile.friendCode = code;
-    }
-
-    if (!responseProfile.email && req.authUser && typeof req.authUser.email === 'string') {
-      updateData.email = req.authUser.email;
-      responseProfile.email = req.authUser.email;
-    }
-
-    if (!responseProfile.photoURL && req.authUser && typeof req.authUser.picture === 'string') {
-      const safePhoto = sanitizePhotoUrl(req.authUser.picture);
-      if (safePhoto) {
-        updateData.photoURL = safePhoto;
-        responseProfile.photoURL = safePhoto;
-      }
-    }
-
-    await ref.set(updateData, { merge: true });
-    responseProfile.onlineStatus = 'online';
-
-    return res.json({ profile: serializeUserProfile(responseProfile) });
-  } catch (err) {
-    console.error('GET /api/me/profile error:', err);
-    return res.status(500).json({ error: err.message || 'Profile load failed' });
-  }
-});
-
-app.post('/api/me/profile', requireHttpAuth, async (req, res) => {
-  try {
-    const username = sanitizeString(req.body && req.body.username, 12);
-    const gender = sanitizeString(req.body && req.body.gender, 10);
-
-    if (!username) {
-      return res.status(400).json({ error: 'Username required' });
-    }
-    if (!VALID_GENDERS.includes(gender)) {
-      return res.status(400).json({ error: 'Invalid gender' });
-    }
-
-    const ref = adminDb.collection('users').doc(req.userId);
-    const existingSnap = await ref.get();
-    const existingData = existingSnap.exists ? (existingSnap.data() || {}) : {};
-
-    const photoURL = sanitizePhotoUrl((req.body && req.body.photoURL) || existingData.photoURL || (req.authUser && req.authUser.picture) || '');
-    const email = sanitizeString((req.authUser && req.authUser.email) || existingData.email || '', 160);
-    const friendCode = normalizeFriendCode(existingData.friendCode) || await randomUniqueFriendCode();
-
-    const profileData = {
-      username,
-      gender,
-      email,
-      photoURL,
-      friendCode,
-      friendCount: Number.isFinite(existingData.friendCount) ? existingData.friendCount : 0,
-      onlineStatus: 'online',
-      lastSeen: admin.firestore.FieldValue.serverTimestamp(),
-      lastLogin: admin.firestore.FieldValue.serverTimestamp(),
-    };
-
-    if (!existingSnap.exists) {
-      profileData.createdAt = admin.firestore.FieldValue.serverTimestamp();
-      profileData.stats = {};
-      profileData.achievements = {};
-      profileData.blockedUsers = [];
-    }
-
-    await ref.set(profileData, { merge: true });
-
-    return res.json({
-      profile: serializeUserProfile({
-        ...existingData,
-        ...profileData,
-        friendCode,
-      })
-    });
-  } catch (err) {
-    console.error('POST /api/me/profile error:', err);
-    return res.status(500).json({ error: err.message || 'Profile save failed' });
-  }
-});
-
-app.patch('/api/me/profile/avatar', requireHttpAuth, async (req, res) => {
-  try {
-    const photoURL = sanitizePhotoUrl(req.body && req.body.photoURL);
-    if (!photoURL) {
-      return res.status(400).json({ error: 'Invalid photo URL' });
-    }
-
-    await adminDb.collection('users').doc(req.userId).set({
-      photoURL,
-      onlineStatus: 'online',
-      lastSeen: admin.firestore.FieldValue.serverTimestamp(),
-    }, { merge: true });
-
-    return res.json({ photoURL });
-  } catch (err) {
-    console.error('PATCH /api/me/profile/avatar error:', err);
-    return res.status(500).json({ error: err.message || 'Avatar save failed' });
-  }
-});
-
-// --- Game Stats Persistence ---
-async function saveGameResult(roomId) {
-  if (!adminDb) return;
-  const room = rooms[roomId];
-  if (!room || !room.gameType) return;
-
-  try {
-    const gameType = room.gameType;
-    const gameMode = room.gameMode;
-    const now = admin.firestore.FieldValue.serverTimestamp();
-    const increment = admin.firestore.FieldValue.increment(1);
-
-    // Collect all player UIDs and their scores
-    let playerResults = []; // { uid, username, score, isWinner }
-
-    if (gameMode === 'tek') {
-      // Solo mode games (imposter, pictionary solo)
-      const scores = gameType === 'imposter' ? room.imposterScores :
-                     gameType === 'pictionary' ? room.pictionaryScores : {};
-      const players = room.players || [];
-      let maxScore = -Infinity;
-      players.forEach(p => {
-        const s = scores[p.id] || 0;
-        if (s > maxScore) maxScore = s;
-      });
-      players.forEach(p => {
-        const s = scores[p.id] || 0;
-        playerResults.push({
-          uid: p.id,
-          username: p.username,
-          score: s,
-          isWinner: s === maxScore && maxScore > 0,
-        });
-      });
-    } else {
-      // Team/duo mode - extract scores by game type
-      const pairs = room.pairs || [];
-      let scores = {};
-      if (gameType === 'telepati') {
-        // Telepati: lower totalAttempts is better
-        pairs.forEach(p => { scores[p.id] = p.totalAttempts || 0; });
-        let minScore = Infinity;
-        pairs.filter(p => !p.isEliminated).forEach(p => {
-          if ((scores[p.id] || 0) < minScore) minScore = scores[p.id] || 0;
-        });
-        pairs.forEach(pair => {
-          const isWin = !pair.isEliminated && (scores[pair.id] || 0) === minScore;
-          if (pair.p1) playerResults.push({ uid: pair.p1.id, username: pair.p1.username, score: scores[pair.id] || 0, isWinner: isWin });
-          if (pair.p2) playerResults.push({ uid: pair.p2.id, username: pair.p2.username, score: scores[pair.id] || 0, isWinner: isWin });
-        });
-      } else if (gameType === 'isimSehir') {
-        scores = room.isimSehirScores || {};
-        let maxScore = -Infinity;
-        pairs.forEach(p => { if ((scores[p.id] || 0) > maxScore) maxScore = scores[p.id] || 0; });
-        pairs.forEach(pair => {
-          const s = scores[pair.id] || 0;
-          const isWin = s === maxScore && maxScore > 0;
-          if (pair.p1) playerResults.push({ uid: pair.p1.id, username: pair.p1.username, score: s, isWinner: isWin });
-          if (pair.p2) playerResults.push({ uid: pair.p2.id, username: pair.p2.username, score: s, isWinner: isWin });
-        });
-      } else if (gameType === 'pictionary') {
-        scores = room.pictionaryScores || {};
-        let maxScore = -Infinity;
-        pairs.forEach(p => { if ((scores[p.id] || 0) > maxScore) maxScore = scores[p.id] || 0; });
-        pairs.forEach(pair => {
-          const s = scores[pair.id] || 0;
-          const isWin = s === maxScore && maxScore > 0;
-          if (pair.p1) playerResults.push({ uid: pair.p1.id, username: pair.p1.username, score: s, isWinner: isWin });
-          if (pair.p2) playerResults.push({ uid: pair.p2.id, username: pair.p2.username, score: s, isWinner: isWin });
-        });
-      } else if (gameType === 'tabu') {
-        scores = room.tabuScores || {};
-        let maxScore = -Infinity;
-        pairs.forEach(p => { if ((scores[p.id] || 0) > maxScore) maxScore = scores[p.id] || 0; });
-        pairs.forEach(pair => {
-          const s = scores[pair.id] || 0;
-          const isWin = s === maxScore && maxScore > 0;
-          if (pair.p1) playerResults.push({ uid: pair.p1.id, username: pair.p1.username, score: s, isWinner: isWin });
-          if (pair.p2) playerResults.push({ uid: pair.p2.id, username: pair.p2.username, score: s, isWinner: isWin });
-        });
-      } else if (gameType === 'sayiTahmin') {
-        scores = room.sayiTahminScores || {};
-        let maxScore = -Infinity;
-        pairs.forEach(p => {
-          const p1s = scores[p.p1?.id] || 0;
-          const p2s = scores[p.p2?.id] || 0;
-          if (p1s > maxScore) maxScore = p1s;
-          if (p2s > maxScore) maxScore = p2s;
-        });
-        pairs.forEach(pair => {
-          if (pair.p1) {
-            const s = scores[pair.p1.id] || 0;
-            playerResults.push({ uid: pair.p1.id, username: pair.p1.username, score: s, isWinner: s === maxScore && maxScore > 0 });
-          }
-          if (pair.p2) {
-            const s = scores[pair.p2.id] || 0;
-            playerResults.push({ uid: pair.p2.id, username: pair.p2.username, score: s, isWinner: s === maxScore && maxScore > 0 });
-          }
-        });
-      } else if (gameType === 'bilBakalim') {
-        scores = room.bilBakalimScores || {};
-        let maxScore = -Infinity;
-        pairs.forEach(p => { if ((scores[p.id] || 0) > maxScore) maxScore = scores[p.id] || 0; });
-        pairs.forEach(pair => {
-          const s = scores[pair.id] || 0;
-          const isWin = s === maxScore && maxScore > 0;
-          if (pair.p1) playerResults.push({ uid: pair.p1.id, username: pair.p1.username, score: s, isWinner: isWin });
-          if (pair.p2) playerResults.push({ uid: pair.p2.id, username: pair.p2.username, score: s, isWinner: isWin });
-        });
-      }
-    }
-
-    // Filter out bot/dev players (only save real Firebase UIDs)
-    playerResults = playerResults.filter(p => p.uid && !p.uid.startsWith('dev_') && !p.uid.startsWith('passplay_') && !p.uid.startsWith('bot_'));
-
-    if (playerResults.length === 0) return;
-
-    // Save game result document
-    const gameResultRef = adminDb.collection('gameResults').doc();
-    await gameResultRef.set({
-      gameType,
-      gameMode,
-      roomId,
-      players: playerResults.map(p => ({ uid: p.uid, username: p.username, score: p.score, isWinner: p.isWinner })),
-      roundCount: room.roundCount || 1,
-      createdAt: now,
-    });
-
-    // Update each player's stats
-    const batch = adminDb.batch();
-    playerResults.forEach(p => {
-      const userRef = adminDb.collection('users').doc(p.uid);
-      const statsUpdate = {
-        'stats.gamesPlayed': increment,
-        [`stats.gamesByType.${gameType}`]: increment,
-        'stats.lastPlayedAt': now,
-      };
-      if (p.isWinner) {
-        statsUpdate['stats.gamesWon'] = increment;
-      }
-      batch.set(userRef, statsUpdate, { merge: true });
-    });
-    await batch.commit();
-
-    // Update win streaks separately (requires reading current value)
-    for (const p of playerResults) {
-      try {
-        const userRef = adminDb.collection('users').doc(p.uid);
-        const userDoc = await userRef.get();
-        const stats = userDoc.exists ? (userDoc.data().stats || {}) : {};
-        if (p.isWinner) {
-          const newStreak = (stats.currentWinStreak || 0) + 1;
-          const bestStreak = Math.max(newStreak, stats.bestWinStreak || 0);
-          await userRef.set({ stats: { currentWinStreak: newStreak, bestWinStreak: bestStreak } }, { merge: true });
-        } else {
-          await userRef.set({ stats: { currentWinStreak: 0 } }, { merge: true });
-        }
-      } catch (e) { /* streak update non-critical */ }
-    }
-
-    console.log(`Game result saved: ${gameType} (${gameMode}) - ${playerResults.length} players`);
-  } catch (err) {
-    console.error('Error saving game result:', err);
-  }
 }
 
 const TURKISH_LETTERS = [
@@ -1251,69 +617,6 @@ io.on("connection", (socket) => {
     socket.lang = ['tr', 'en', 'ar'].includes(lang) ? lang : 'tr';
   });
 
-  // --- MATCHMAKING ---
-  socket.on("findMatch", (data) => {
-    const pid = socket.userId;
-    const username = sanitizeString(data.username, 12) || "Oyuncu";
-    const gender = VALID_GENDERS.includes(data.gender) ? data.gender : null;
-    const mode = VALID_GAME_MODES.includes(data.mode) ? data.mode : null;
-
-    if (!gender || !mode) {
-      socket.emit("matchCancelled");
-      return;
-    }
-
-    const allowedMatchmakingGames = getMatchmakingGamesForMode(mode);
-    const selectedGames = Array.isArray(data.selectedGames)
-      ? data.selectedGames.filter(g => VALID_GAME_TYPES.includes(g) && allowedMatchmakingGames.includes(g))
-      : [];
-
-    if (selectedGames.length === 0) {
-      socket.emit("matchCancelled");
-      return;
-    }
-
-    // Önce eski kuyruklardan temizle
-    removeFromMatchmaking(pid);
-
-    matchmakingQueue[mode][gender].push({
-      playerId: pid,
-      socketId: socket.id,
-      username: username,
-      gender: gender,
-      selectedGames: selectedGames
-    });
-
-    socket.emit("matchSearching", { message: serverT('searching_opponent', socket.lang) });
-    console.log(`Matchmaking: ${username} (${gender}) ${mode} modunda arıyor. Kuyruk: E:${matchmakingQueue[mode].male.length} K:${matchmakingQueue[mode].female.length}`);
-
-    checkForMatch(mode);
-
-    // Bug L2 fix: register cleanup listeners BEFORE scheduling the timer
-    let botTimer = null;
-    const clearBotTimer = () => { if (botTimer) { clearTimeout(botTimer); botTimer = null; } };
-    socket.once('cancelMatchmaking', clearBotTimer);
-    socket.once('disconnect', clearBotTimer);
-
-    // 15sn sonra hâlâ bekleniyorsa bot ile eşleştir
-    botTimer = setTimeout(() => {
-      const stillInQueue = matchmakingQueue[mode][gender].find(p => p.playerId === pid);
-      if (!stillInQueue) return;
-      removeFromMatchmaking(pid);
-      const humanPlayer = { playerId: pid, socketId: socket.id, username, gender, selectedGames };
-      const botGender = gender === 'male' ? 'female' : 'male';
-      const botPlayer = createBotPlayer(botGender, selectedGames);
-      createMatchRoom(mode, [humanPlayer, botPlayer]);
-      console.log(`Bot eşleşmesi: ${username} vs ${botPlayer.username}`);
-    }, 15000);
-  });
-
-  socket.on("cancelMatchmaking", () => {
-    const pid = socket.userId;
-    removeFromMatchmaking(pid);
-    socket.emit("matchCancelled");
-  });
-
   // --- ODA OLUŞTURMA ---
   socket.on("createRoom", (data) => {
     const roomId = generateRoomId();
@@ -1468,7 +771,13 @@ io.on("connection", (socket) => {
     }
 
     // Zaten odada mı?
-    if (findPlayerInRoom(room, pid)) {
+    const existingPlayer = findPlayerInRoom(room, pid);
+    if (existingPlayer) {
+      // Yeni socketle (yeniden bağlanma) geldiyse referansları tazele
+      existingPlayer.socketId = socket.id;
+      existingPlayer.disconnected = false;
+      existingPlayer.disconnectedAt = null;
+      playerSockets[pid] = socket.id;
       socket.join(cleanRoomId);
       socket.emit("joinedRoom", cleanRoomId);
       emitLobbyUpdate(cleanRoomId);
@@ -1500,6 +809,7 @@ io.on("connection", (socket) => {
   socket.on("selectTeam", ({ roomId, teamIndex, slot }) => {
     const room = getValidRoom(roomId);
     if (!room) return;
+    if (room.gameStatus !== "waiting") return;
     const pid = socket.userId;
     const playerIndex = room.spectators.findIndex((p) => p.id === pid);
     if (playerIndex !== -1) {
@@ -2213,7 +1523,8 @@ io.on("connection", (socket) => {
       phase: room.imposterPhase,
     });
 
-    if (Object.keys(subs).length >= room.players.length) {
+    const activePlayers = room.players.filter(p => !p.disconnected).length;
+    if (Object.keys(subs).length >= activePlayers) {
       endImposterPhase(roomId);
     }
   });
@@ -2242,7 +1553,8 @@ io.on("connection", (socket) => {
       playerId: pid,
     });
 
-    if (Object.keys(room.imposterVotes).length >= room.players.length) {
+    const activeVoters = room.players.filter(p => !p.disconnected).length;
+    if (Object.keys(room.imposterVotes).length >= activeVoters) {
       endImposterVoting(roomId);
     }
   });
@@ -2488,376 +1800,6 @@ io.on("connection", (socket) => {
     }
   });
 
-  // --- DISCONNECT ---
-  // ============ ARKADAŞ SİSTEMİ ============
-
-  // Set online status on connect
-  socket.on("setOnline", async (data) => {
-    try {
-      const uid = socket.userId;
-      if (!uid) return;
-      onlineUsers.set(uid, {
-        socketId: socket.id,
-        status: 'online',
-        username: sanitizeString(data.username, 12) || '',
-        gender: data.gender || '',
-        photoURL: data.photoURL || ''
-      });
-
-      // Notify online friends
-      if (adminDb) {
-        try {
-          const friendsSnap = await adminDb.collection('users').doc(uid).collection('friends').get();
-          friendsSnap.forEach(doc => {
-            const friendUid = doc.id;
-            const friendOnline = onlineUsers.get(friendUid);
-            if (friendOnline) {
-              io.to(friendOnline.socketId).emit("friendStatusChanged", { friendUid: uid, status: 'online', username: data.username });
-            }
-          });
-        } catch (e) { /* silent */ }
-      }
-    } catch (e) { console.error("setOnline error:", e.message); }
-  });
-
-  // Get friend list with online statuses
-  socket.on("getFriendList", async () => {
-    try {
-      const uid = socket.userId;
-      if (!uid || !adminDb) { socket.emit("friendListUpdate", { friends: [] }); return; }
-
-      const friendsSnap = await adminDb.collection('users').doc(uid).collection('friends').get();
-      const friends = [];
-      friendsSnap.forEach(doc => {
-        const data = doc.data();
-        const online = onlineUsers.get(doc.id);
-        friends.push({
-          uid: doc.id,
-          username: data.username || '',
-          photoURL: data.photoURL || '',
-          gender: data.gender || '',
-          onlineStatus: online ? online.status : 'offline',
-          addedAt: data.addedAt
-        });
-      });
-
-      // Sort: online first, then alphabetical
-      friends.sort((a, b) => {
-        if (a.onlineStatus !== 'offline' && b.onlineStatus === 'offline') return -1;
-        if (a.onlineStatus === 'offline' && b.onlineStatus !== 'offline') return 1;
-        return (a.username || '').localeCompare(b.username || '');
-      });
-
-      socket.emit("friendListUpdate", { friends });
-    } catch (e) {
-      console.error("getFriendList error:", e.message);
-      socket.emit("friendListUpdate", { friends: [] });
-    }
-  });
-
-  // Get pending friend requests
-  socket.on("getPendingRequests", async () => {
-    try {
-      const uid = socket.userId;
-      if (!uid || !adminDb) { socket.emit("pendingRequestsUpdate", { requests: [] }); return; }
-
-      const snap = await adminDb.collection('friendRequests')
-        .where('toUid', '==', uid)
-        .where('status', '==', 'pending')
-        .orderBy('createdAt', 'desc')
-        .limit(50)
-        .get();
-
-      const requests = [];
-      snap.forEach(doc => {
-        const data = doc.data();
-        requests.push({
-          requestId: doc.id,
-          fromUid: data.fromUid,
-          fromUsername: data.fromUsername || '',
-          fromPhotoURL: data.fromPhotoURL || '',
-          fromGender: data.fromGender || '',
-          createdAt: data.createdAt
-        });
-      });
-
-      socket.emit("pendingRequestsUpdate", { requests });
-    } catch (e) {
-      console.error("getPendingRequests error:", e.message);
-      socket.emit("pendingRequestsUpdate", { requests: [] });
-    }
-  });
-
-  // Send friend request by friend code
-  socket.on("sendFriendRequest", async ({ friendCode }) => {
-    try {
-      const uid = socket.userId;
-      if (!uid || !adminDb || !friendCode) {
-        socket.emit("friendRequestResult", { success: false, error: 'invalid' });
-        return;
-      }
-
-      const code = normalizeFriendCode(friendCode);
-      if (code.length !== 8) {
-        socket.emit("friendRequestResult", { success: false, error: 'invalid' });
-        return;
-      }
-
-      // Find user by friendCode
-      const userSnap = await adminDb.collection('users').where('friendCode', '==', code).limit(1).get();
-      if (userSnap.empty) {
-        socket.emit("friendRequestResult", { success: false, error: 'not_found' });
-        return;
-      }
-
-      const targetDoc = userSnap.docs[0];
-      const targetUid = targetDoc.id;
-      const targetData = targetDoc.data();
-
-      // Can't add yourself
-      if (targetUid === uid) {
-        socket.emit("friendRequestResult", { success: false, error: 'self' });
-        return;
-      }
-
-      // Check if already friends
-      const existingFriend = await adminDb.collection('users').doc(uid).collection('friends').doc(targetUid).get();
-      if (existingFriend.exists) {
-        socket.emit("friendRequestResult", { success: false, error: 'already_friends' });
-        return;
-      }
-
-      // Check if pending request already exists (either direction)
-      const existingReq1 = await adminDb.collection('friendRequests')
-        .where('fromUid', '==', uid).where('toUid', '==', targetUid).where('status', '==', 'pending')
-        .limit(1).get();
-      if (!existingReq1.empty) {
-        socket.emit("friendRequestResult", { success: false, error: 'already_sent' });
-        return;
-      }
-      const existingReq2 = await adminDb.collection('friendRequests')
-        .where('fromUid', '==', targetUid).where('toUid', '==', uid).where('status', '==', 'pending')
-        .limit(1).get();
-      if (!existingReq2.empty) {
-        socket.emit("friendRequestResult", { success: false, error: 'already_sent' });
-        return;
-      }
-
-      // Get sender profile
-      const senderDoc = await adminDb.collection('users').doc(uid).get();
-      const senderData = senderDoc.exists ? senderDoc.data() : {};
-
-      // Create friend request
-      const reqRef = await adminDb.collection('friendRequests').add({
-        fromUid: uid,
-        toUid: targetUid,
-        fromUsername: senderData.username || '',
-        fromPhotoURL: senderData.photoURL || '',
-        fromGender: senderData.gender || '',
-        status: 'pending',
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp()
-      });
-
-      socket.emit("friendRequestResult", { success: true, targetUsername: targetData.username });
-
-      // Notify target if online
-      const targetOnline = onlineUsers.get(targetUid);
-      if (targetOnline) {
-        io.to(targetOnline.socketId).emit("friendRequestReceived", {
-          requestId: reqRef.id,
-          from: { uid, username: senderData.username || '', photoURL: senderData.photoURL || '', gender: senderData.gender || '' }
-        });
-      }
-    } catch (e) {
-      console.error("sendFriendRequest error:", e.message);
-      socket.emit("friendRequestResult", { success: false, error: 'server_error' });
-    }
-  });
-
-  // Respond to friend request (accept/reject)
-  socket.on("respondFriendRequest", async ({ requestId, accept }) => {
-    try {
-      const uid = socket.userId;
-      if (!uid || !adminDb || !requestId) return;
-
-      const reqRef = adminDb.collection('friendRequests').doc(requestId);
-      const reqDoc = await reqRef.get();
-      if (!reqDoc.exists) return;
-
-      const reqData = reqDoc.data();
-      if (reqData.toUid !== uid || reqData.status !== 'pending') return;
-
-      if (accept) {
-        // Update request status
-        await reqRef.update({ status: 'accepted', updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-
-        // Get both profiles
-        const [senderDoc, receiverDoc] = await Promise.all([
-          adminDb.collection('users').doc(reqData.fromUid).get(),
-          adminDb.collection('users').doc(uid).get()
-        ]);
-        const senderData = senderDoc.exists ? senderDoc.data() : {};
-        const receiverData = receiverDoc.exists ? receiverDoc.data() : {};
-
-        // Create friend entries in both directions (batch)
-        const batch = adminDb.batch();
-        batch.set(adminDb.collection('users').doc(uid).collection('friends').doc(reqData.fromUid), {
-          username: senderData.username || '',
-          photoURL: senderData.photoURL || '',
-          gender: senderData.gender || '',
-          addedAt: admin.firestore.FieldValue.serverTimestamp(),
-          status: 'accepted'
-        });
-        batch.set(adminDb.collection('users').doc(reqData.fromUid).collection('friends').doc(uid), {
-          username: receiverData.username || '',
-          photoURL: receiverData.photoURL || '',
-          gender: receiverData.gender || '',
-          addedAt: admin.firestore.FieldValue.serverTimestamp(),
-          status: 'accepted'
-        });
-        // Increment friend counts
-        batch.update(adminDb.collection('users').doc(uid), {
-          friendCount: admin.firestore.FieldValue.increment(1)
-        });
-        batch.update(adminDb.collection('users').doc(reqData.fromUid), {
-          friendCount: admin.firestore.FieldValue.increment(1)
-        });
-        await batch.commit();
-
-        socket.emit("friendRequestResponded", { requestId, accepted: true });
-
-        // Notify sender if online
-        const senderOnline = onlineUsers.get(reqData.fromUid);
-        if (senderOnline) {
-          io.to(senderOnline.socketId).emit("friendRequestAccepted", {
-            friendUid: uid,
-            username: receiverData.username || '',
-            photoURL: receiverData.photoURL || '',
-            gender: receiverData.gender || ''
-          });
-        }
-      } else {
-        await reqRef.update({ status: 'rejected', updatedAt: admin.firestore.FieldValue.serverTimestamp() });
-        socket.emit("friendRequestResponded", { requestId, accepted: false });
-      }
-    } catch (e) {
-      console.error("respondFriendRequest error:", e.message);
-    }
-  });
-
-  // Remove friend
-  socket.on("removeFriend", async ({ friendUid }) => {
-    try {
-      const uid = socket.userId;
-      if (!uid || !adminDb || !friendUid) return;
-
-      const batch = adminDb.batch();
-      batch.delete(adminDb.collection('users').doc(uid).collection('friends').doc(friendUid));
-      batch.delete(adminDb.collection('users').doc(friendUid).collection('friends').doc(uid));
-      batch.update(adminDb.collection('users').doc(uid), { friendCount: admin.firestore.FieldValue.increment(-1) });
-      batch.update(adminDb.collection('users').doc(friendUid), { friendCount: admin.firestore.FieldValue.increment(-1) });
-      await batch.commit();
-
-      socket.emit("friendRemoveResult", { success: true, friendUid });
-
-      // Notify the other user if online
-      const friendOnline = onlineUsers.get(friendUid);
-      if (friendOnline) {
-        io.to(friendOnline.socketId).emit("friendRemoved", { friendUid: uid });
-      }
-    } catch (e) {
-      console.error("removeFriend error:", e.message);
-    }
-  });
-
-  // Invite friend to room
-  socket.on("inviteFriendToRoom", ({ friendUid, roomId }) => {
-    try {
-      const uid = socket.userId;
-      if (!uid || !friendUid || !roomId) return;
-
-      const room = rooms[roomId];
-      if (!room) return;
-
-      const senderInfo = onlineUsers.get(uid);
-      const friendOnline = onlineUsers.get(friendUid);
-      if (!friendOnline) {
-        socket.emit("gameError", "Arkadaşın çevrimdışı.");
-        return;
-      }
-
-      io.to(friendOnline.socketId).emit("gameInviteReceived", {
-        from: { uid, username: senderInfo ? senderInfo.username : '', photoURL: senderInfo ? senderInfo.photoURL : '' },
-        roomId: roomId,
-        gameType: room.gameType || ''
-      });
-
-      socket.emit("inviteSent", { friendUid });
-    } catch (e) {
-      console.error("inviteFriendToRoom error:", e.message);
-    }
-  });
-
-  // ============ ŞİKAYET & ENGELLEME ============
-  socket.on("reportUser", async ({ targetUid, reason }) => {
-    if (!adminDb) return;
-    const uid = socket.userId;
-    if (!uid || !targetUid || uid === targetUid) return;
-    try {
-      await adminDb.collection('reports').add({
-        reporterUid: uid,
-        targetUid,
-        reason: (reason || '').substring(0, 200),
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        status: 'pending',
-      });
-      socket.emit("reportSuccess");
-    } catch (e) {
-      console.error("reportUser error:", e.message);
-    }
-  });
-
-  socket.on("blockUser", async ({ targetUid }) => {
-    if (!adminDb) return;
-    const uid = socket.userId;
-    if (!uid || !targetUid || uid === targetUid) return;
-    try {
-      await adminDb.collection('users').doc(uid).set({
-        blockedUsers: admin.firestore.FieldValue.arrayUnion(targetUid)
-      }, { merge: true });
-      socket.emit("blockSuccess", { targetUid });
-    } catch (e) {
-      console.error("blockUser error:", e.message);
-    }
-  });
-
-  socket.on("unblockUser", async ({ targetUid }) => {
-    if (!adminDb) return;
-    const uid = socket.userId;
-    if (!uid || !targetUid) return;
-    try {
-      await adminDb.collection('users').doc(uid).set({
-        blockedUsers: admin.firestore.FieldValue.arrayRemove(targetUid)
-      }, { merge: true });
-      socket.emit("unblockSuccess", { targetUid });
-    } catch (e) {
-      console.error("unblockUser error:", e.message);
-    }
-  });
-
-  socket.on("getBlockedUsers", async () => {
-    if (!adminDb) { socket.emit("blockedUsersList", []); return; }
-    const uid = socket.userId;
-    if (!uid) return;
-    try {
-      const doc = await adminDb.collection('users').doc(uid).get();
-      socket.emit("blockedUsersList", doc.exists ? (doc.data().blockedUsers || []) : []);
-    } catch (e) {
-      socket.emit("blockedUsersList", []);
-    }
-  });
-
   // ============ EMOJİ TEPKİLERİ ============
   socket.on("sendReaction", ({ roomId, emoji }) => {
     if (!roomId || !emoji || !rooms[roomId]) return;
@@ -2887,24 +1829,6 @@ io.on("connection", (socket) => {
   socket.on("disconnect", () => {
     const pid = socket.userId;
 
-    // Online presence'dan çıkar ve arkadaşlara bildir
-    if (pid && onlineUsers.has(pid)) {
-      onlineUsers.delete(pid);
-      // Notify friends about offline status (async, non-blocking)
-      if (adminDb) {
-        adminDb.collection('users').doc(pid).collection('friends').get().then(snap => {
-          snap.forEach(doc => {
-            const friendOnline = onlineUsers.get(doc.id);
-            if (friendOnline) {
-              io.to(friendOnline.socketId).emit("friendStatusChanged", { friendUid: pid, status: 'offline' });
-            }
-          });
-        }).catch(() => {});
-      }
-    }
-
-    // Matchmaking kuyruğundan çıkar
-    removeFromMatchmaking(pid);
     for (const roomId of Object.keys(rooms)) {
       const room = rooms[roomId];
       const player = findPlayerInRoom(room, pid);
@@ -2914,6 +1838,23 @@ io.on("connection", (socket) => {
       player.disconnected = true;
       player.disconnectedAt = Date.now();
       io.to(roomId).emit("playerDisconnected", { playerId: pid, username: player.username });
+
+      // Imposter aktif fazında: disconnect olan oyuncu quorum'u düşürür,
+      // kalan submission/vote sayısı yeni eşiğe ulaştıysa fazı sonlandır
+      if (room.gameType === "imposter" && room.gameStatus === "playing") {
+        const activeCount = room.players.filter(p => !p.disconnected).length;
+        if (room.imposterPhase === "write1" || room.imposterPhase === "write2") {
+          const subs = room.imposterPhase === "write1"
+            ? room.imposterSubmissions1 : room.imposterSubmissions2;
+          if (subs && Object.keys(subs).length >= activeCount && activeCount > 0) {
+            endImposterPhase(roomId);
+          }
+        } else if (room.imposterPhase === "vote") {
+          if (room.imposterVotes && Object.keys(room.imposterVotes).length >= activeCount && activeCount > 0) {
+            endImposterVoting(roomId);
+          }
+        }
+      }
 
       setTimeout(() => {
         // Bug 3 & 7 fix: check room still exists and player result is non-null
@@ -3289,52 +2230,6 @@ function startTurn(roomId) {
     totalRounds: room.roundCount,
     totalMistakes: p.totalAttempts || 0,
   });
-
-  // Bot action: schedule telepati word submission
-  const botPlayer = p.p1.isBot ? p.p1 : (p.p2.isBot ? p.p2 : null);
-  if (botPlayer) {
-    const botId = botPlayer.id;
-    scheduleBotAction(roomId, (room) => {
-      const pair = room.pairs[room.currentPairIndex];
-      if (!pair || !room.moves[pair.id]) room.moves[pair.id] = {};
-      if (room.moves[pair.id][botId] !== undefined) return;
-      const word = BOT_TELEPATI_WORDS[Math.floor(Math.random() * BOT_TELEPATI_WORDS.length)];
-      room.moves[pair.id][botId] = word;
-      const humanId = botId === pair.p1.id ? pair.p2.id : pair.p1.id;
-      io.to(getSocketId(humanId)).emit('partnerSubmitted');
-      const who = botId === pair.p1.id ? 'p1' : 'p2';
-      io.to(roomId).emit('revealOneMove', { slot: who, word });
-      const w1 = room.moves[pair.id][pair.p1.id];
-      const w2 = room.moves[pair.id][pair.p2.id];
-      if (w1 !== undefined && w2 !== undefined) {
-        if (room.telepatiTimer) { clearTimeout(room.telepatiTimer); room.telepatiTimer = null; }
-        // Trigger result inline
-        pair.currentTurnAttempts++;
-        const isMatch = w1 === w2 && w1 !== '⏰';
-        if (!isMatch) pair.totalAttempts++;
-        updateLeaderboard(roomId);
-        const result = { pairId: pair.id, p1Word: w1, p2Word: w2, attempts: pair.currentTurnAttempts, totalMistakes: pair.totalAttempts, match: isMatch };
-        if (pair.totalAttempts >= 20 && !pair.isEliminated) {
-          pair.isEliminated = true;
-          io.to(roomId).emit('spectatorUpdate', result);
-          io.to(roomId).emit('gameOver', pair.teamName + " " + serverT('eliminated'));
-          const alive = room.pairs.filter(x => !x.isEliminated);
-          if (alive.length > 1) setTimeout(() => { if (!rooms[roomId]) return; nextTurn(roomId); }, 2000); // Bug 3 fix
-          else if (alive.length === 1) {
-            const winner = alive[0];
-            setTimeout(() => { if (!rooms[roomId]) return; io.to(roomId).emit('telepatiGameOver', { winnerTeam: winner.teamName, winnerP1: winner.p1.username, winnerP2: winner.p2.username, winnerIds: [winner.p1.id, winner.p2.id], winnerScore: winner.totalAttempts, lastStanding: true }); room.gameStatus = 'finished'; setTimeout(() => { if (!rooms[roomId]) return; room.gameStatus = 'waiting'; emitBackToSelect(roomId); }, 7000); }, 2000); // Bug 3 fix
-          } else { setTimeout(() => { if (!rooms[roomId]) return; io.to(roomId).emit('gameOver', serverT('all_eliminated')); room.gameStatus = 'finished'; setTimeout(() => { if (!rooms[roomId]) return; room.gameStatus = 'waiting'; emitBackToSelect(roomId); }, 5000); }, 2000); } // Bug 3 fix
-          return;
-        }
-        setTimeout(() => {
-          if (!rooms[roomId]) return; // Bug 3 fix
-          io.to(roomId).emit('spectatorUpdate', result);
-          room.moves[pair.id] = {};
-          if (isMatch) { io.to(getSocketId(pair.p1.id)).to(getSocketId(pair.p2.id)).emit('levelFinished', { success: true }); nextTurn(roomId); }
-        }, 500);
-      }
-    });
-  }
 
   // Server-side timeout: auto-submit for players who don't respond
   if (room.telepatiTimer) clearTimeout(room.telepatiTimer);
@@ -4254,27 +3149,6 @@ function startSayiTahminSecretPhase(roomId) {
     digitCount: room.sayiTahminDigitCount || 4,
   });
 
-  // Bot action: schedule bot secret submission
-  const botInSecretPair = pair.p1.isBot ? pair.p1 : (pair.p2.isBot ? pair.p2 : null);
-  if (botInSecretPair) {
-    const botId = botInSecretPair.id;
-    const capturedPairKey = pairKey;
-    scheduleBotAction(roomId, (room) => {
-      const dc = room.sayiTahminDigitCount || 4;
-      if (!room.sayiTahminSecrets[capturedPairKey]) room.sayiTahminSecrets[capturedPairKey] = {};
-      if (!room.sayiTahminSecrets[capturedPairKey][botId]) {
-        room.sayiTahminSecrets[capturedPairKey][botId] = randomDigits(dc);
-        const s1 = room.sayiTahminSecrets[capturedPairKey][pair.p1.id];
-        const s2 = room.sayiTahminSecrets[capturedPairKey][pair.p2.id];
-        if (s1 && s2) {
-          if (room.sayiTahminTimer) { clearTimeout(room.sayiTahminTimer); room.sayiTahminTimer = null; }
-          room.sayiTahminGuesses[capturedPairKey] = { p1: [], p2: [] };
-          setTimeout(() => startSayiTahminGuessPhase(roomId), 1000);
-        }
-      }
-    });
-  }
-
   // Server-side timeout for secret phase (60 seconds)
   if (room.sayiTahminTimer) clearTimeout(room.sayiTahminTimer);
   room.sayiTahminTimer = setTimeout(() => {
@@ -4302,46 +3176,6 @@ function startSayiTahminGuessPhase(roomId) {
     digitCount: room.sayiTahminDigitCount || 4,
   });
 
-  // Bot action: schedule bot guess submission
-  const botInGuessPair = pair.p1.isBot ? pair.p1 : (pair.p2.isBot ? pair.p2 : null);
-  if (botInGuessPair) {
-    const botId = botInGuessPair.id;
-    const capturedGuessKey = pair.id;
-    scheduleBotAction(roomId, (room) => {
-      if (!room.sayiTahminPendingGuesses) room.sayiTahminPendingGuesses = {};
-      if (!room.sayiTahminPendingGuesses[capturedGuessKey]) room.sayiTahminPendingGuesses[capturedGuessKey] = {};
-      const who = botId === pair.p1.id ? 'p1' : 'p2';
-      if (room.sayiTahminPendingGuesses[capturedGuessKey][who]) return; // already guessed
-      const dc = room.sayiTahminDigitCount || 4;
-      const targetSecret = who === 'p1'
-        ? (room.sayiTahminSecrets[capturedGuessKey] && room.sayiTahminSecrets[capturedGuessKey][pair.p2.id])
-        : (room.sayiTahminSecrets[capturedGuessKey] && room.sayiTahminSecrets[capturedGuessKey][pair.p1.id]);
-      if (!targetSecret) return;
-      const botGuess = randomDigits(dc);
-      const targetDigits = targetSecret.split('');
-      const guessDigits = botGuess.split('');
-      let greens = 0;
-      const digitResults = [];
-      for (let i = 0; i < dc; i++) {
-        const isGreen = guessDigits[i] === targetDigits[i];
-        digitResults.push(isGreen);
-        if (isGreen) greens++;
-      }
-      if (!room.sayiTahminGuesses[capturedGuessKey]) room.sayiTahminGuesses[capturedGuessKey] = { p1: [], p2: [] };
-      room.sayiTahminGuesses[capturedGuessKey][who].push({ guess: botGuess, greens, digitResults });
-      room.sayiTahminPendingGuesses[capturedGuessKey][who] = { who, guesserId: botId, guesserName: botInGuessPair.username, guess: botGuess, greens, digitResults, digitCount: dc, guessCount: room.sayiTahminGuesses[capturedGuessKey][who].length };
-      // Notify human partner
-      const humanId = botId === pair.p1.id ? pair.p2.id : pair.p1.id;
-      io.to(getSocketId(humanId)).emit('sayiTahminPartnerGuessed');
-      // Check if both guessed
-      const p1Pending = room.sayiTahminPendingGuesses[capturedGuessKey]['p1'];
-      const p2Pending = room.sayiTahminPendingGuesses[capturedGuessKey]['p2'];
-      if (p1Pending && p2Pending) {
-        if (room.sayiTahminTimer) { clearTimeout(room.sayiTahminTimer); room.sayiTahminTimer = null; }
-        resolveSayiTahminGuessRound(roomId);
-      }
-    });
-  }
 
   // Server-side timeout for guess phase (90 seconds per guess round)
   if (room.sayiTahminTimer) clearTimeout(room.sayiTahminTimer);
@@ -4408,32 +3242,6 @@ function resolveSayiTahminGuessRound(roomId) {
     room.spectators.forEach(s => { io.to(getSocketId(s.id)).emit("sayiTahminNextRoundReady"); });
     if (room.sayiTahminTimer) clearTimeout(room.sayiTahminTimer);
     room.sayiTahminTimer = setTimeout(() => { if (!rooms[roomId]) return; autoSubmitSayiTahminGuess(roomId); }, 93000); // Bug 3 fix
-    // Bot: schedule next guess if bot in pair
-    const botP = currentPair.p1.isBot ? currentPair.p1 : (currentPair.p2.isBot ? currentPair.p2 : null);
-    if (botP) {
-      const botId2 = botP.id;
-      const capturedKey = pairKey;
-      scheduleBotAction(roomId, (room) => {
-        if (!room.sayiTahminPendingGuesses) room.sayiTahminPendingGuesses = {};
-        if (!room.sayiTahminPendingGuesses[capturedKey]) room.sayiTahminPendingGuesses[capturedKey] = {};
-        const who2 = botId2 === currentPair.p1.id ? 'p1' : 'p2';
-        if (room.sayiTahminPendingGuesses[capturedKey][who2]) return;
-        const dc2 = room.sayiTahminDigitCount || 4;
-        const tSec = who2 === 'p1' ? (room.sayiTahminSecrets[capturedKey] && room.sayiTahminSecrets[capturedKey][currentPair.p2.id]) : (room.sayiTahminSecrets[capturedKey] && room.sayiTahminSecrets[capturedKey][currentPair.p1.id]);
-        if (!tSec) return;
-        const bg = randomDigits(dc2);
-        const tDigs = tSec.split(''), gDigs = bg.split('');
-        let gr = 0; const dr = [];
-        for (let i = 0; i < dc2; i++) { const g = gDigs[i] === tDigs[i]; dr.push(g); if (g) gr++; }
-        if (!room.sayiTahminGuesses[capturedKey]) room.sayiTahminGuesses[capturedKey] = { p1: [], p2: [] };
-        room.sayiTahminGuesses[capturedKey][who2].push({ guess: bg, greens: gr, digitResults: dr });
-        room.sayiTahminPendingGuesses[capturedKey][who2] = { who: who2, guesserId: botId2, guesserName: botP.username, guess: bg, greens: gr, digitResults: dr, digitCount: dc2, guessCount: room.sayiTahminGuesses[capturedKey][who2].length };
-        const hId = botId2 === currentPair.p1.id ? currentPair.p2.id : currentPair.p1.id;
-        io.to(getSocketId(hId)).emit('sayiTahminPartnerGuessed');
-        const pnd = room.sayiTahminPendingGuesses[capturedKey];
-        if (pnd.p1 && pnd.p2) { if (room.sayiTahminTimer) { clearTimeout(room.sayiTahminTimer); room.sayiTahminTimer = null; } resolveSayiTahminGuessRound(roomId); }
-      });
-    }
   }, 800);
 }
 
@@ -4509,9 +3317,6 @@ function nextSayiTahminStep(roomId) {
 function emitBackToSelect(roomId) {
   const room = rooms[roomId];
   if (!room) return;
-
-  // Save game stats before resetting state
-  saveGameResult(roomId).catch(() => {});
 
   // Oyun state'ini sıfırla
   room.currentRound = 1;

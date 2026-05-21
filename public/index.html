@@ -22,14 +22,7 @@
   <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
   <link rel="stylesheet" href="style.css?v=41" />
-  <!-- Firebase runtime config (opsiyonel — varsa firebase-config.js'ten önce yüklenir) -->
-  <script src="firebase-runtime-config.js" onerror=""></script>
   <script src="translations.js?v=2"></script>
   <script>
     // Platform detection: capacitor:// = iOS native, content:// or file:// = Android native
@@ -115,8 +108,6 @@
         </div>
       </div>
       <button class="nav-btn nav-btn-outline" onclick="toggleHowToPlay()" id="how-to-play-btn">NASIL OYNANIR?</button>
-      <button class="nav-btn nav-btn-dark" onclick="document.querySelector('.auth-btn-google').click()" id="nav-login-btn">GİRİŞ YAP</button>
-      <button class="nav-btn nav-btn-cta" onclick="signInAsGuest()" id="nav-play-btn">HEMEN OYNA</button>
     </div>
   </nav>
 
@@ -178,87 +169,10 @@
       </div>
     </div>
 
-    <!-- AUTH EKRANI -->
-    <div id="auth-screen" class="screen active">
-
-      <!-- Slogan -->
-      <div class="auth-hero">
-        <h2 class="auth-slogan" id="auth-slogan">Çiftler için en eğlenceli bilgi yarışması!</h2>
-        <h1 class="auth-title-animated" id="auth-title-animated">
-          <span>D</span><span>u</span><span>o</span><span>D</span><span>u</span><span>e</span><span>l</span><span>s</span>
-        </h1>
-      </div>
-
-      <div class="card auth-card">
-        <div class="auth-logo-container">
-          <img src="logoduoduels.png" alt="DuoDuels" class="auth-logo" />
-        </div>
-        <p id="auth-subtitle" class="auth-subtitle">Oynamak için giriş yap</p>
-
-        <div class="auth-buttons">
-          <button class="auth-btn auth-btn-google" onclick="signInWithGoogle()">
-            <svg class="auth-btn-icon" viewBox="0 0 24 24" width="20" height="20">
-              <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z" fill="#4285F4"/>
-              <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
-              <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/>
-              <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
-            </svg>
-            <span id="btn-text-google">Google ile Giriş Yap</span>
-          </button>
-
-          <button class="auth-btn auth-btn-facebook" onclick="signInWithFacebook()">
-            <svg class="auth-btn-icon" viewBox="0 0 24 24" width="20" height="20" fill="#ffffff">
-              <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-            </svg>
-            <span id="btn-text-facebook">Facebook ile Giriş Yap</span>
-          </button>
-
-          <button class="auth-btn auth-btn-apple" onclick="signInWithApple()">
-            <svg class="auth-btn-icon" viewBox="0 0 24 24" width="20" height="20" fill="#ffffff">
-              <path d="M17.05 20.28c-.98.95-2.05.88-3.08.4-1.09-.5-2.08-.48-3.24 0-1.44.62-2.2.44-3.06-.4C2.79 15.25 3.51 7.59 9.05 7.31c1.35.07 2.29.74 3.08.8 1.18-.24 2.31-.93 3.57-.84 1.51.12 2.65.72 3.4 1.8-3.12 1.87-2.38 5.98.48 7.13-.57 1.5-1.31 2.99-2.54 4.09zM12.03 7.25c-.15-2.23 1.66-4.07 3.74-4.25.29 2.58-2.34 4.5-3.74 4.25z"/>
-            </svg>
-            <span id="btn-text-apple">Apple ile Giriş Yap</span>
-          </button>
-
-        </div>
-
-        <div class="auth-skip-divider">
-          <span id="auth-or-text">veya</span>
-        </div>
-        <button class="auth-skip-btn auth-btn-guest" onclick="signInAsGuest()">
-          <span id="btn-text-guest">Misafir Olarak Devam Et</span>
-        </button>
-
-        <div class="auth-store-badges">
-          <a href="https://apps.apple.com/app/duoduels" target="_blank" rel="noopener" class="store-badge">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M18.71 19.5c-.83 1.24-1.71 2.45-3.05 2.47-1.34.03-1.77-.79-3.29-.79-1.53 0-2 .77-3.27.82-1.31.05-2.3-1.32-3.14-2.53C4.25 17 2.94 12.45 4.7 9.39c.87-1.52 2.43-2.48 4.12-2.51 1.28-.02 2.5.87 3.29.87.78 0 2.26-1.07 3.8-.91.65.03 2.47.26 3.64 1.98-.09.06-2.17 1.28-2.15 3.81.03 3.02 2.65 4.03 2.68 4.04-.03.07-.42 1.44-1.38 2.83M13 3.5c.73-.83 1.94-1.46 2.94-1.5.13 1.17-.34 2.35-1.04 3.19-.69.85-1.83 1.51-2.95 1.42-.15-1.15.41-2.35 1.05-3.11z"/></svg>
-            <div class="store-badge-text">
-              <span class="store-badge-small" id="store-badge-download">İndir</span>
-              <span class="store-badge-name">App Store</span>
-            </div>
-          </a>
-          <a href="https://play.google.com/store/apps/details?id=com.duoduels.app" target="_blank" rel="noopener" class="store-badge">
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M3.61 1.02L13.43 12 3.61 22.98c-.36-.17-.61-.52-.61-.93V1.95c0-.41.25-.76.61-.93zM14.56 13.17l-2.82 2.82 8.52 4.84c.78.44 1.74-.13 1.74-1.01V4.18c0-.88-.96-1.45-1.74-1.01l-8.52 4.84 2.82 2.82z"/></svg>
-            <div class="store-badge-text">
-              <span class="store-badge-small" id="store-badge-download2">İndir</span>
-              <span class="store-badge-name">Google Play</span>
-            </div>
-          </a>
-        </div>
-
-        <a href="https://instagram.com/duoduels" target="_blank" rel="noopener" class="auth-social-link">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M12 2.163c3.204 0 3.584.012 4.85.07 3.252.148 4.771 1.691 4.919 4.919.058 1.265.069 1.645.069 4.849 0 3.205-.012 3.584-.069 4.849-.149 3.225-1.664 4.771-4.919 4.919-1.266.058-1.644.07-4.85.07-3.204 0-3.584-.012-4.849-.07-3.26-.149-4.771-1.699-4.919-4.92-.058-1.265-.07-1.644-.07-4.849 0-3.204.013-3.583.07-4.849.149-3.227 1.664-4.771 4.919-4.919 1.266-.057 1.645-.069 4.849-.069zM12 0C8.741 0 8.333.014 7.053.072 2.695.272.273 2.69.073 7.052.014 8.333 0 8.741 0 12c0 3.259.014 3.668.072 4.948.2 4.358 2.618 6.78 6.98 6.98C8.333 23.986 8.741 24 12 24c3.259 0 3.668-.014 4.948-.072 4.354-.2 6.782-2.618 6.979-6.98.059-1.28.073-1.689.073-4.948 0-3.259-.014-3.667-.072-4.947-.196-4.354-2.617-6.78-6.979-6.98C15.668.014 15.259 0 12 0zm0 5.838a6.162 6.162 0 100 12.324 6.162 6.162 0 000-12.324zM12 16a4 4 0 110-8 4 4 0 010 8zm6.406-11.845a1.44 1.44 0 100 2.881 1.44 1.44 0 000-2.881z"/></svg>
-          <span>@duoduels</span>
-        </a>
-
-        <p class="auth-legal" id="auth-legal">Kaydolduğunda <a href="/terms" target="_blank">Hizmet Kullanım Şartları</a> ve <a href="/privacy" target="_blank">Gizlilik Politikası</a> şartlarımızı kabul etmiş olursun.</p>
-      </div>
-    </div>
-
     <!-- PROFİL SETUP EKRANI -->
-    <div id="profile-setup-screen" class="screen">
+    <div id="profile-setup-screen" class="screen active">
       <div class="card auth-card">
-        <button class="btn-back-corner-inline" onclick="signOut()" title="Geri" style="position:absolute;top:16px;left:16px;z-index:10;">
+        <button class="btn-back-corner-inline" onclick="signOut()" title="Sıfırla" style="position:absolute;top:16px;left:16px;z-index:10;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="15 18 9 12 15 6"/>
           </svg>
@@ -290,57 +204,37 @@
 
     <!-- LOBİ EKRANI -->
     <div id="lobby-screen" class="screen">
-      <div class="lobby-layout">
-        <button class="lobby-mode-card lobby-mode-card-big lobby-side-card lobby-side-card-stats" onclick="showScreen('stats')">
-          <div class="lmc-icon-big">📊</div>
-          <div id="lmc-title-stats" class="lmc-title-big">İstatistikler</div>
-          <div id="lmc-sub-stats" class="lmc-sub-big">Oyun geçmişin ve başarıların</div>
-        </button>
-
-        <div class="card lobby-card">
-          <div class="lobby-header">
-            <img id="lobby-avatar" class="lobby-avatar" src="" alt="" onclick="openSettings()" style="cursor:pointer" />
-            <h2><span id="lobby-welcome-text">Hoşgeldin,</span> <span id="lobby-username-greeting"></span></h2>
-            <div class="lobby-header-btns">
-              <button class="btn-signout" onclick="signOut()" title="Çıkış Yap">
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
-                </svg>
-              </button>
-            </div>
-          </div>
-
-          <div class="lobby-modes">
-            <button class="lobby-mode-card lobby-mode-card-big lobby-mode-private" onclick="goToPrivateRoom()">
-              <div class="lmc-icon-big">👫</div>
-              <div id="lmc-title-private" class="lmc-title-big">Özel Oda</div>
-              <div id="lmc-sub-private" class="lmc-sub-big">QR veya kod ile arkadaşlarını davet et</div>
+      <div class="card lobby-card">
+        <div class="lobby-header">
+          <img id="lobby-avatar" class="lobby-avatar" src="" alt="" onclick="openSettings()" style="cursor:pointer" />
+          <h2><span id="lobby-welcome-text">Hoşgeldin,</span> <span id="lobby-username-greeting"></span></h2>
+          <div class="lobby-header-btns">
+            <button class="btn-signout" onclick="signOut()" title="Çıkış Yap">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/>
+              </svg>
             </button>
-            <button class="lobby-mode-card lobby-mode-card-big lobby-mode-random" onclick="goToMatchmaking()">
-              <div class="lmc-icon-big">🌐</div>
-              <div id="lmc-title-random" class="lmc-title-big">Rastgele Eşleş</div>
-              <div id="lmc-sub-random" class="lmc-sub-big">Online partner bul ve diğer çiftlerle yarış</div>
-            </button>
-            <button class="lobby-mode-card lobby-mode-card-big lobby-mode-leaderboard" onclick="showScreen('leaderboard')">
-              <div class="lmc-icon-big">🏆</div>
-              <div id="lmc-title-leaderboard" class="lmc-title-big">Liderlik Tablosu</div>
-              <div id="lmc-sub-leaderboard" class="lmc-sub-big">En iyi oyuncuları gör</div>
-            </button>
-          </div>
-
-          <div class="lobby-join-row">
-            <input type="text" id="roomCodeInput" placeholder="ODA KODU" maxlength="6" class="big-input" />
-            <button id="btn-join" class="btn-secondary" onclick="joinRoom()">Katıl</button>
-            <button class="btn-qr" onclick="openQrScanner()" title="QR Oku">📷</button>
           </div>
         </div>
 
-        <button class="lobby-mode-card lobby-mode-card-big lobby-side-card lobby-side-card-friends" onclick="showScreen('friends')">
-          <div class="lmc-icon-big">👥</div>
-          <div id="lmc-title-friends" class="lmc-title-big">Arkadaşlar</div>
-          <div id="lmc-sub-friends" class="lmc-sub-big">Arkadaş ekle, davet et</div>
-          <span id="friend-request-badge" class="friend-badge" style="display:none">0</span>
-        </button>
+        <div class="lobby-modes">
+          <button class="lobby-mode-card lobby-mode-card-big" onclick="goToPrivateRoom()">
+            <div class="lmc-icon-big">👫</div>
+            <div id="lmc-title-private" class="lmc-title-big">Oda Kur</div>
+            <div id="lmc-sub-private" class="lmc-sub-big">QR veya kod ile arkadaşlarını davet et</div>
+          </button>
+          <button class="lobby-mode-card lobby-mode-card-big" onclick="goToPassPlay()">
+            <div class="lmc-icon-big">📱</div>
+            <div id="lmc-title-passplay" class="lmc-title-big">Pass & Play</div>
+            <div id="lmc-sub-passplay" class="lmc-sub-big">Aynı cihazda 2 kişi</div>
+          </button>
+        </div>
+
+        <div class="lobby-join-row">
+          <input type="text" id="roomCodeInput" placeholder="ODA KODU" maxlength="6" class="big-input" />
+          <button id="btn-join" class="btn-secondary" onclick="joinRoom()">Katıl</button>
+          <button class="btn-qr" onclick="openQrScanner()" title="QR Oku">📷</button>
+        </div>
       </div>
     </div>
 
@@ -403,165 +297,7 @@
       </div>
     </div>
 
-    <!-- ARKADAŞLAR EKRANI -->
-    <div id="friends-screen" class="screen">
-      <div class="card friends-card">
-        <div class="friends-header">
-          <button class="btn-back-corner-inline" onclick="showScreen('lobby')">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="15 18 9 12 15 6"/>
-            </svg>
-          </button>
-          <h2 id="friends-title">Arkadaşlar</h2>
-        </div>
 
-        <!-- My Friend Code -->
-        <div class="friend-code-section">
-          <div class="friend-code-label" id="friends-code-label">Arkadaş Kodun</div>
-          <div class="friend-code-display">
-            <span id="my-friend-code" class="friend-code-value">--------</span>
-            <button class="btn-copy-code" onclick="copyFriendCode()" id="friends-copy-btn">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <!-- Add Friend -->
-        <div class="friend-add-section">
-          <input type="text" id="friend-code-input" class="big-input" placeholder="Arkadaş kodunu gir" maxlength="8" style="text-transform:uppercase" />
-          <button class="btn-secondary" onclick="sendFriendRequestUI()" id="friends-send-btn">Ekle</button>
-        </div>
-
-        <!-- Tabs -->
-        <div class="friends-tabs">
-          <button class="friends-tab active" id="friends-tab-list" onclick="switchFriendsTab('list')">Arkadaşlar</button>
-          <button class="friends-tab" id="friends-tab-requests" onclick="switchFriendsTab('requests')">
-            İstekler <span id="friends-req-count" class="friends-req-badge" style="display:none">0</span>
-          </button>
-        </div>
-
-        <!-- Friend List -->
-        <div id="friends-list-panel" class="friends-panel">
-          <div id="friends-list-container" class="friends-list">
-            <p id="friends-empty-msg" class="friends-empty">Henüz arkadaşın yok.</p>
-          </div>
-        </div>
-
-        <!-- Requests Panel -->
-        <div id="friends-requests-panel" class="friends-panel" style="display:none">
-          <div id="friends-requests-container" class="friends-list">
-            <p id="friends-requests-empty-msg" class="friends-empty">Bekleyen istek yok.</p>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- LİDERLİK TABLOSU EKRANI -->
-    <div id="leaderboard-screen" class="screen">
-      <div class="card leaderboard-card">
-        <div class="leaderboard-header">
-          <button class="btn-back-corner-inline" onclick="showScreen('lobby')">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="15 18 9 12 15 6"/>
-            </svg>
-          </button>
-          <h2 id="leaderboard-title">Liderlik Tablosu</h2>
-        </div>
-
-        <!-- Tabs: Global / Friends -->
-        <div class="leaderboard-tabs">
-          <button class="lb-tab active" id="lb-tab-global" onclick="switchLeaderboardTab('global')">
-            <span id="lb-tab-global-text">Global</span>
-          </button>
-          <button class="lb-tab" id="lb-tab-friends" onclick="switchLeaderboardTab('friends')">
-            <span id="lb-tab-friends-text">Arkadaşlar</span>
-          </button>
-        </div>
-
-        <!-- Sort by -->
-        <div class="leaderboard-sort">
-          <select id="lb-sort-select" class="lb-select" onchange="loadLeaderboard()">
-            <option value="gamesWon" id="lb-sort-wins">En Çok Galibiyet</option>
-            <option value="gamesPlayed" id="lb-sort-played">En Çok Oyun</option>
-            <option value="bestWinStreak" id="lb-sort-streak">En İyi Seri</option>
-          </select>
-        </div>
-
-        <!-- Leaderboard List -->
-        <div id="leaderboard-list" class="leaderboard-list">
-          <p id="lb-empty" class="friends-empty">Yükleniyor...</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- İSTATİSTİK EKRANI -->
-    <div id="stats-screen" class="screen">
-      <div class="card stats-card">
-        <div class="stats-header">
-          <button class="btn-back-corner-inline" onclick="showScreen('lobby')">
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <polyline points="15 18 9 12 15 6"/>
-            </svg>
-          </button>
-          <h2 id="stats-title">İstatistikler</h2>
-        </div>
-
-        <!-- Overview Stats -->
-        <div class="stats-overview">
-          <div class="stat-box">
-            <div class="stat-number" id="stat-games-played">0</div>
-            <div class="stat-label" id="stat-label-played">Oyun</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-number" id="stat-games-won">0</div>
-            <div class="stat-label" id="stat-label-won">Galibiyet</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-number" id="stat-win-rate">0%</div>
-            <div class="stat-label" id="stat-label-winrate">Kazanma</div>
-          </div>
-          <div class="stat-box">
-            <div class="stat-number" id="stat-best-streak">0</div>
-            <div class="stat-label" id="stat-label-streak">En İyi Seri</div>
-          </div>
-        </div>
-
-        <!-- Game Type Breakdown -->
-        <h3 class="stats-section-title" id="stats-by-game-title">Oyun Türlerine Göre</h3>
-        <div id="stats-by-game" class="stats-by-game">
-          <!-- Dynamically filled -->
-        </div>
-
-        <!-- Achievements -->
-        <h3 class="stats-section-title" id="stats-ach-title">Başarımlar</h3>
-        <div id="stats-achievements" class="stats-achievements">
-          <!-- Dynamically filled -->
-        </div>
-
-        <!-- Recent Games -->
-        <h3 class="stats-section-title" id="stats-recent-title">Son Oyunlar</h3>
-        <div id="stats-recent-games" class="stats-recent-games">
-          <p id="stats-no-games" class="friends-empty">Henüz oyun geçmişi yok.</p>
-        </div>
-      </div>
-    </div>
-
-    <!-- OYUN DAVET TOAST (floating, tüm ekranlarda görünür) -->
-    <div id="game-invite-toast" class="game-invite-toast" style="display:none">
-      <div class="invite-toast-content">
-        <img id="invite-toast-avatar" class="invite-toast-avatar" src="" alt="" />
-        <div class="invite-toast-text">
-          <strong id="invite-toast-username"></strong>
-          <span id="invite-toast-msg">seni oyuna davet ediyor!</span>
-        </div>
-      </div>
-      <div class="invite-toast-actions">
-        <button class="btn-invite-accept" onclick="acceptGameInvite()">Katıl</button>
-        <button class="btn-invite-decline" onclick="declineGameInvite()">Reddet</button>
-      </div>
-    </div>
 
     <!-- EMOJI REACTION BUTTON & PANEL -->
     <button id="reaction-btn" class="reaction-floating-btn" onclick="toggleReactionPanel()" style="display:none">
@@ -586,54 +322,6 @@
     <!-- REACTION OVERLAY (animated emojis appear here) -->
     <div id="reaction-overlay" class="reaction-overlay"></div>
 
-    <div id="matchmaking-screen" class="screen">
-      <!-- Aşama 1: Mod + Oyun Seçimi -->
-      <div id="mm-select-phase" class="mm-select-container">
-        <button class="btn-back-corner" onclick="showScreen('lobby')"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>Geri</button>
-        <h2 class="select-title">Oyun Ara</h2>
-        <div class="matchmaking-content">
-          <div class="mm-mode-select">
-            <label>Mod Seç</label>
-            <div class="mm-mode-btns">
-              <button class="mm-mode-btn active" data-mode="duo" onclick="selectMMMode('duo')">Başbaşa</button>
-              <button class="mm-mode-btn" data-mode="cift" onclick="selectMMMode('cift')">Çiftler</button>
-              <button class="mm-mode-btn" data-mode="tek" onclick="selectMMMode('tek')">Herkes Tek</button>
-            </div>
-          </div>
-          <div class="mm-game-select">
-            <label>Oyun Seç (birden fazla seçebilirsin)</label>
-            <div class="mm-game-grid" id="mm-game-grid">
-              <label class="mm-game-chip"><input type="checkbox" value="telepati" onchange="toggleMMGame(this)" /><span>🧠 Telepati</span></label>
-              <label class="mm-game-chip"><input type="checkbox" value="isimSehir" onchange="toggleMMGame(this)" /><span>🔤 İsim Şehir</span></label>
-              <label class="mm-game-chip"><input type="checkbox" value="pictionary" onchange="toggleMMGame(this)" /><span>🎨 Resim Çiz</span></label>
-              <label class="mm-game-chip"><input type="checkbox" value="sayiTahmin" onchange="toggleMMGame(this)" /><span>🔢 Sayı Tahmin</span></label>
-              <label class="mm-game-chip"><input type="checkbox" value="tabu" onchange="toggleMMGame(this)" /><span>🚫 Tabu</span></label>
-            </div>
-          </div>
-          <button class="btn-primary mm-search-btn" onclick="findMatch()">
-            Eşleşme Ara
-          </button>
-        </div>
-      </div>
-
-      <!-- Aşama 2: Bekleme Animasyonu -->
-      <div id="mm-waiting-phase" class="mm-waiting-container" style="display:none">
-        <div class="mm-waiting-anim">
-          <div class="mm-pulse-ring"></div>
-          <div class="mm-pulse-ring mm-pulse-ring-2"></div>
-          <div class="mm-search-icon">🔍</div>
-        </div>
-        <h2 class="mm-waiting-title">Oyuncu Aranıyor...</h2>
-        <p class="mm-waiting-sub" id="mm-waiting-text">Karşı cinsten bir oyuncu bekleniyor</p>
-        <div class="mm-waiting-dots">
-          <span class="mm-dot"></span>
-          <span class="mm-dot"></span>
-          <span class="mm-dot"></span>
-        </div>
-        <div class="mm-waiting-tip" id="mm-waiting-tip">Eşleşme bulunduğunda oyun otomatik başlayacak</div>
-        <button class="btn-secondary mm-cancel-btn" onclick="cancelMatchmaking()">Aramayı İptal Et</button>
-      </div>
-    </div>
 
     <div id="waiting-screen" class="screen">
       <div class="waiting-header">
@@ -661,7 +349,6 @@
           <div id="member-message" class="hidden">
             <p>Kurucunun oyunu başlatması bekleniyor...</p>
           </div>
-          <button class="btn-invite-friends" onclick="showInviteFriendsPopup()" id="btn-invite-friends" style="display:none">👥 Arkadaş Davet Et</button>
           <button class="btn-back-subtle" onclick="goToMainMenu()">Ana Menü</button>
         </div>
       </div>
@@ -1328,9 +1015,8 @@
   </div>
 
   <script src="socket.io.min.js"></script>
-  <script src="firebase-config.js?v=3"></script>
-  <script src="auth.js?v=8"></script>
-  <script src="client.js?v=39"></script>
+  <script src="auth.js?v=9"></script>
+  <script src="client.js?v=40"></script>
   <script>
     // Capacitor plugin'lerini başlat (native ortamda)
     if (window.Capacitor && window.Capacitor.isNativePlatform()) {
@@ -1371,84 +1057,18 @@
     // Splash güvenlik ağı: 2.5 saniye içinde JS'den dismiss gelmezse zorla kaldır
     setTimeout(function() {
       var splash = document.getElementById('app-splash');
-      if (!splash) return; // zaten kalkmış
+      if (!splash) return;
       splash.style.transition = 'opacity 0.4s';
       splash.style.opacity = '0';
       setTimeout(function() {
         splash.remove();
-        // Aktif ekran yoksa auth ekranını aç
+        // Aktif ekran yoksa profile-setup'a düş
         if (!document.querySelector('.screen.active')) {
-          var auth = document.getElementById('auth-screen');
-          if (auth) auth.classList.add('active');
+          var ps = document.getElementById('profile-setup-screen');
+          if (ps) ps.classList.add('active');
         }
       }, 400);
     }, 2500);
-
-    // Splash dismiss artık auth.js tarafından kontrol ediliyor (onAuthStateChanged)
-
-    // ---- LOCAL DEV BYPASS (tamamen self-contained) ----
-    if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-      window.addEventListener('load', function() {
-        var btn = document.querySelector('.auth-btn-guest');
-        if (!btn) return;
-        btn.innerHTML = '<span>🔧 Local Dev Girişi</span>';
-        btn.onclick = function() {
-          try {
-            // Dev UID
-            var uid = localStorage.getItem('dd_dev_uid');
-            if (!uid) {
-              uid = 'dev_' + Math.random().toString(36).substr(2, 9);
-              localStorage.setItem('dd_dev_uid', uid);
-            }
-
-            // auth.js'nin let değişkenlerine yaz (aynı global lexical scope)
-            currentUser    = { uid: uid, email: null, photoURL: null };
-            authIdToken    = null;
-            _devModeActive = true;
-
-            // Daha önce kaydedilmiş profil var mı?
-            var saved = localStorage.getItem('dd_dev_profile');
-            if (saved) {
-              try {
-                userProfile = JSON.parse(saved);
-                applyGenderTheme(userProfile.gender);
-                showScreen('lobby');
-                var greet = document.getElementById('lobby-username-greeting');
-                if (greet) greet.textContent = userProfile.username;
-                connectSocket();
-                return;
-              } catch(e2) {}
-            }
-
-            // Profil setup ekranına geç
-            showScreen('profileSetup');
-
-            // "Devam Et" butonunu da override et (auth.js'e bağımlı olmadan)
-            var devamBtn = document.querySelector('#profile-setup-screen .btn-primary');
-            if (devamBtn) {
-              devamBtn.onclick = function() {
-                var uname = (document.getElementById('setup-username').value || '').trim();
-                if (!uname) { alert('Kullanıcı adı giriniz'); return; }
-                if (uname.length > 12) { alert('En fazla 12 karakter'); return; }
-                var gEl = document.querySelector('input[name="setup-gender"]:checked');
-                if (!gEl) { alert('Cinsiyet seçiniz'); return; }
-                var profile = { username: uname, gender: gEl.value, email: '', photoURL: '' };
-                userProfile = profile;
-                localStorage.setItem('dd_dev_profile', JSON.stringify(profile));
-                applyGenderTheme(profile.gender);
-                var greet = document.getElementById('lobby-username-greeting');
-                if (greet) greet.textContent = profile.username;
-                showScreen('lobby');
-                connectSocket();
-              };
-            }
-          } catch(e) {
-            alert('Hata: ' + e.message);
-            console.error(e);
-          }
-        };
-      });
-    }
   </script>
   <script>
     function toggleHowToPlay() {
