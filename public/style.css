@@ -181,8 +181,8 @@ button svg, a svg, span svg {
 body {
   font-family: "Poppins", sans-serif;
   background: #080b12;
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
   overflow: hidden;
   overscroll-behavior: none;
 }
@@ -313,10 +313,23 @@ html,
   padding: 20px 15px;
   padding-top: calc(20px + env(safe-area-inset-top));
   padding-bottom: calc(20px + env(safe-area-inset-bottom));
-  min-height: 100vh;
-  min-height: 100dvh;
+  height: 100vh;
+  height: 100dvh;
   overflow-y: auto;
+  overflow-x: hidden;
   overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+}
+
+.main-container > header,
+.main-container > .native-settings {
+  flex-shrink: 0;
+}
+
+.main-container > .screen.active {
+  flex: 1 0 auto;
 }
 
 body:has(#lobby-screen.active) .main-container {
@@ -414,11 +427,14 @@ header {
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  min-height: 100vh;
-  min-height: 100dvh;
-  padding: 60px 20px 40px;
-  overflow-y: auto;
+  min-height: 0;
+  padding: 24px 20px 24px;
+  overflow: visible;
   animation: fadeSlideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+/* When auth navbar is visible, push content below it */
+body:has(#auth-navbar:not([style*="display: none"])) .screen.active {
+  padding-top: 80px;
 }
 /* Long screens (game/pass-play setup) align top with margin auto for centering when short */
 .screen.active > * {
@@ -430,20 +446,20 @@ header {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: flex-start;
-  padding-top: 80px;
-  min-height: 100vh;
-  padding-left: 20px;
-  padding-right: 20px;
-  padding-bottom: 20px;
+  justify-content: center;
+  padding-top: 16px;
+  min-height: 0;
+  padding-left: 16px;
+  padding-right: 16px;
+  padding-bottom: 16px;
   overflow: visible;
-  touch-action: none;
+  touch-action: auto;
 }
 
 body.keyboard-open #lobby-screen.active {
   align-items: flex-start;
   justify-content: flex-start;
-  padding-top: 20px;
+  padding-top: 12px;
   min-height: auto;
 }
 
@@ -3684,6 +3700,8 @@ html {
   height: 100%;
   height: 100dvh;
   background: var(--bg-cream);
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
 }
 
 html.keyboard-open {
@@ -4389,6 +4407,146 @@ body.keyboard-open textarea:focus {
   }
 }
 
+/* --- Mobile lobby compaction --- */
+@media (max-width: 600px) {
+  /* Hide brand header on mobile lobby — saves vertical space */
+  body:has(#lobby-screen.active) #main-header,
+  body:has(#waiting-screen.active) #main-header,
+  body:has(#passplay-setup-screen.active) #main-header {
+    display: none !important;
+  }
+  .lobby-card {
+    padding: 20px 18px;
+    max-width: 100%;
+  }
+  .lobby-mode-card-big {
+    padding: 16px 14px 14px;
+    gap: 4px;
+  }
+  .lmc-icon-big {
+    font-size: 2.2rem;
+    margin-bottom: 2px;
+  }
+  .lmc-title-big {
+    font-size: 1rem;
+  }
+  .lmc-sub-big {
+    font-size: 0.72rem;
+    line-height: 1.25;
+  }
+  .lobby-modes {
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .lobby-header {
+    margin-bottom: 6px;
+  }
+}
+
+/* --- Very small phones (iPhone SE 1st gen, etc.) --- */
+@media (max-width: 380px) {
+  .lobby-card {
+    padding: 14px 12px;
+  }
+  .lobby-mode-card-big {
+    padding: 12px 10px;
+    gap: 2px;
+  }
+  .lmc-icon-big {
+    font-size: 1.8rem;
+    margin-bottom: 0;
+  }
+  .lmc-title-big {
+    font-size: 0.95rem;
+  }
+  .lmc-sub-big {
+    font-size: 0.68rem;
+  }
+  .lobby-modes {
+    gap: 6px;
+    margin-bottom: 8px;
+  }
+  .game-title {
+    font-size: 1.4rem !important;
+  }
+  header {
+    margin-bottom: 6px !important;
+  }
+}
+
+/* --- Short viewports (e.g. iPhone SE, landscape phones) --- */
+@media (max-height: 640px) {
+  /* Hide brand header on short viewports — saves vertical space */
+  body:has(#lobby-screen.active) #main-header,
+  body:has(#waiting-screen.active) #main-header,
+  body:has(#passplay-setup-screen.active) #main-header {
+    display: none !important;
+  }
+  .lobby-card {
+    padding: 12px 14px;
+  }
+  .lobby-mode-card-big {
+    padding: 10px 12px;
+    gap: 2px;
+  }
+  .lmc-icon-big {
+    font-size: 1.8rem;
+    margin-bottom: 0;
+  }
+  .lmc-title-big {
+    font-size: 0.92rem;
+  }
+  .lmc-sub-big {
+    font-size: 0.65rem;
+    line-height: 1.2;
+  }
+  .lobby-modes {
+    gap: 6px;
+    margin-bottom: 6px;
+  }
+  .game-title {
+    font-size: 1.3rem !important;
+  }
+  header {
+    margin-bottom: 4px !important;
+  }
+  .lobby-join-row {
+    margin-top: 0;
+  }
+  .lobby-join-row .big-input {
+    font-size: 0.95rem;
+    letter-spacing: 2px;
+    padding: 8px 10px;
+  }
+  .lobby-join-row .btn-secondary,
+  .lobby-join-row .btn-qr {
+    padding: 8px 12px;
+    font-size: 0.85rem;
+  }
+}
+
+/* --- Landscape phones (short and wide) --- */
+@media (max-height: 500px) and (min-width: 600px) {
+  .lobby-modes {
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+  }
+  .lobby-mode-card-big {
+    flex-direction: row;
+    align-items: center;
+    text-align: left;
+    padding: 10px 14px;
+    gap: 10px;
+  }
+  .lmc-icon-big {
+    font-size: 1.6rem;
+  }
+  .lobby-card {
+    padding: 14px 16px;
+    max-width: 560px;
+  }
+}
+
 /* Join row with QR button */
 .lobby-join-row {
   display: flex;
@@ -4537,11 +4695,11 @@ body.keyboard-open textarea:focus {
   flex-direction: column;
   align-items: center;
   justify-content: flex-start;
-  padding-top: 80px;
-  padding-left: 20px;
-  padding-right: 20px;
-  padding-bottom: 20px;
-  min-height: 100vh;
+  padding-top: 24px;
+  padding-left: 16px;
+  padding-right: 16px;
+  padding-bottom: 24px;
+  min-height: 0;
 }
 
 .settings-card {
