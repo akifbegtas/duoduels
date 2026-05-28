@@ -374,6 +374,9 @@
           <button class="mode-btn" id="mode-btn-tek" onclick="selectMode('tek')">
             Herkes Tek
           </button>
+          <button class="mode-btn" id="mode-btn-team" onclick="selectMode('team')">
+            Takımlar
+          </button>
         </div>
         <div class="mode-viewport">
           <div class="mode-track" id="modeTrack">
@@ -498,6 +501,28 @@
                   <div class="game-card-icon">🕵️</div>
                   <h3>Imposter</h3>
                   <p>Aranızdaki yabancıyı bul!</p>
+                </div>
+              </div>
+            </div>
+            <!-- Panel 3: Takımlar -->
+            <div class="mode-panel" id="panel-team">
+              <div class="player-count-wrapper">
+                <label class="player-count-label">Oyuncu Sayısı</label>
+                <select id="teamCountSelect" class="premium-select">
+                  <option value="4" selected>4 Kişi</option>
+                  <option value="5">5 Kişi</option>
+                  <option value="6">6 Kişi</option>
+                  <option value="7">7 Kişi</option>
+                  <option value="8">8 Kişi</option>
+                  <option value="9">9 Kişi</option>
+                  <option value="10">10 Kişi</option>
+                </select>
+              </div>
+              <div class="game-cards">
+                <div class="game-card" id="card-tabu-team" onclick="selectGame('tabu')">
+                  <div class="game-card-icon">🚫</div>
+                  <h3>Tabu</h3>
+                  <p>2 takım, esnek sayı (3v2). Yasaklı kelime kullanmadan anlat!</p>
                 </div>
               </div>
             </div>

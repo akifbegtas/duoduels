@@ -559,16 +559,18 @@ function createRoom() {
   selectMode("cift");
 }
 
-var _modeIndex = { cift: 0, duo: 1, tek: 2 };
+var _modeIndex = { cift: 0, duo: 1, tek: 2, team: 3 };
 
 function selectMode(mode) {
   selectedMode = mode;
   document.getElementById("mode-btn-cift").classList.toggle("active", mode === "cift");
   document.getElementById("mode-btn-duo").classList.toggle("active", mode === "duo");
   document.getElementById("mode-btn-tek").classList.toggle("active", mode === "tek");
+  var teamBtn = document.getElementById("mode-btn-team");
+  if (teamBtn) teamBtn.classList.toggle("active", mode === "team");
 
   var track = document.getElementById("modeTrack");
-  var offset = (_modeIndex[mode] || 0) * (100 / 3);
+  var offset = (_modeIndex[mode] || 0) * (100 / 4);
   track.style.transform = "translateX(-" + offset + "%)";
 }
 
@@ -580,7 +582,16 @@ function selectGame(type) {
     return;
   }
 
-  if (selectedMode === "cift") {
+  if (selectedMode === "team" && type !== "tabu") {
+    Swal.fire({ title: t('warning'), text: "Takım modu sadece Tabu içindir!", icon: 'warning' });
+    return;
+  }
+
+  if (selectedMode === "team") {
+    const teamVal = document.getElementById("teamCountSelect").value;
+    pendingRoomData.maxPlayers = teamVal || 4;
+    pendingRoomData.coupleCount = null;
+  } else if (selectedMode === "cift") {
     const ciftVal = document.getElementById("ciftCountSelect").value;
     if (!ciftVal) {
       Swal.fire({
@@ -1228,9 +1239,11 @@ socket.on("updateLobby", (data) => {
   // Mevcut oyuncu spectator listesinde mi?
   const iAmSpectator = data.spectators && data.spectators.some(s => s.id === pid);
   // Takımda veya oyuncu listesinde mi?
-  const iAmPlayer = data.teams
-    ? data.teams.some(t => (t.p1 && t.p1.id === pid) || (t.p2 && t.p2.id === pid))
-    : (data.players || []).some(p => p.id === pid);
+  const iAmPlayer = data.gameMode === "team"
+    ? (data.teamGroups || []).some(g => (g.players || []).some(p => p.id === pid))
+    : (data.teams
+      ? data.teams.some(t => (t.p1 && t.p1.id === pid) || (t.p2 && t.p2.id === pid))
+      : (data.players || []).some(p => p.id === pid));
   // Seyirciyse amIPlaying'i sıfırla
   if (iAmSpectator && !iAmPlayer) amIPlaying = false;
 
@@ -1251,7 +1264,30 @@ socket.on("updateLobby", (data) => {
   const div = document.getElementById("teams-container");
   div.innerHTML = "";
 
-  if (data.gameMode === "tek") {
+  if (data.gameMode === "team") {
+    // Takım modu: 2 grup, esnek sayı
+    (data.teamGroups || []).forEach((g, gi) => {
+      const players = g.players || [];
+      const slots = players
+        .map((p) => {
+          const icon = p.gender === "female" ? "👩" : "👨";
+          const cls = p.gender === "female" ? "slot-female" : "slot-male";
+          const hostBadge =
+            p.id === data.hostId ? ' <span class="host-badge">' + t('host_label') + '</span>' : "";
+          return `<div class="slot filled ${cls}">${icon} ${escapeHtml(p.username)}${hostBadge}</div>`;
+        })
+        .join("");
+      const iAmHere = players.some((p) => p.id === pid);
+      const joinBtn = iAmHere
+        ? ""
+        : `<div class="slot empty" onclick="joinTeamGroup(${gi})">➕ ${escapeHtml(g.name)} ${t('join_slot') || 'Katıl'}</div>`;
+      div.innerHTML += `<div class="team-card" style="border-top:4px solid ${g.color || '#888'};">
+        <div class="team-title" style="color:${g.color || '#fff'};">${escapeHtml(g.name)} (${players.length})</div>
+        <div class="tek-players-list">${slots}</div>
+        ${joinBtn}
+      </div>`;
+    });
+  } else if (data.gameMode === "tek") {
     // Tek mod: oyuncu listesi
     const playerSlots = data.players
       .map((p) => {
@@ -1296,6 +1332,11 @@ socket.on("updateLobby", (data) => {
     .join("");
   document.getElementById("spectator-list").innerHTML = specs;
 });
+
+function joinTeamGroup(groupIndex) {
+  if (!currentRoom) return;
+  socket.emit("joinTeamGroup", { roomId: currentRoom, groupIndex: groupIndex });
+}
 
 function renderSlot(p, i, slot, hostId) {
   if (p) {
@@ -2435,11 +2476,48 @@ socket.on("tabuTurn", (data) => {
   const guesserWaiting = document.getElementById("tabu-guesser-waiting");
   const controls = document.getElementById("tabu-controls");
 
+  _setTabuPassCount(data.passesLeft != null ? data.passesLeft : 3);
+
+  if (data.gameMode === "team") {
+    // ----- TAKIM MODU -----
+    const amDescriber = myPlayerId === data.describer.id;
+    const amGuesser = (data.guesserIds || []).includes(myPlayerId);
+    amIPlaying = amDescriber || amGuesser;
+    const teamName = data.teamName || "";
+
+    if (amDescriber) {
+      tabuRole = "describer";
+      infoBar.innerText = `${teamName} • ${t('pic_describe')}`;
+      infoBar.style.backgroundColor = data.teamColor || "#e67e22";
+      cardEl.classList.remove("hidden");
+      guesserWaiting.classList.add("hidden");
+      controls.classList.remove("hidden");
+      _setTabuButtonsEnabled(true);
+    } else if (amGuesser) {
+      // Yarışan takımın tahmin edenleri — kartı GÖREMEZ
+      tabuRole = "guesser";
+      infoBar.innerText = `${teamName} • ${t('pic_guess')} (${data.describer.username})`;
+      infoBar.style.backgroundColor = "#27ae60";
+      cardEl.classList.add("hidden");
+      guesserWaiting.classList.remove("hidden");
+      controls.classList.add("hidden");
+    } else {
+      // Diğer takım — kartı GÖRÜR (tabu kelimeleri yakalar)
+      tabuRole = "spectator";
+      infoBar.innerText = `${teamName} ${t('tabu_describing')} 👀`;
+      infoBar.style.backgroundColor = "#34495e";
+      cardEl.classList.remove("hidden");
+      guesserWaiting.classList.add("hidden");
+      controls.classList.add("hidden");
+    }
+
+    startTimer(data.roundTime, "tabu-timer");
+    return;
+  }
+
   const amDescriber = myPlayerId === data.describer.id;
   const amGuesser = myPlayerId === data.guesser.id;
   amIPlaying = amDescriber || amGuesser;
-
-  _setTabuPassCount(data.passesLeft != null ? data.passesLeft : 3);
 
   if (amDescriber) {
     tabuRole = "describer";

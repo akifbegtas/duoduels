@@ -2823,13 +2823,13 @@ button:active {
 
 .mode-track {
   display: flex;
-  width: 300%;
+  width: 400%;
   transition: transform 0.35s cubic-bezier(.4, 0, .2, 1);
   will-change: transform;
 }
 
 .mode-panel {
-  width: calc(100% / 3);
+  width: calc(100% / 4);
   flex-shrink: 0;
 }
 

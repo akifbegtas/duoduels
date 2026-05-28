@@ -145,11 +145,12 @@ app.get("/privacy", (req, res) => {
 // --- Input Validation Helpers ---
 const VALID_GAME_TYPES = ['telepati', 'isimSehir', 'pictionary', 'tabu', 'sayiTahmin', 'imposter', 'bilBakalim'];
 const VALID_GENDERS = ['male', 'female'];
-const VALID_GAME_MODES = ['cift', 'duo', 'tek'];
+const VALID_GAME_MODES = ['cift', 'duo', 'tek', 'team'];
 const MODE_GAME_TYPES = {
   cift: ['telepati', 'isimSehir', 'pictionary', 'tabu', 'sayiTahmin', 'bilBakalim'],
   duo: ['telepati', 'isimSehir', 'pictionary', 'tabu', 'sayiTahmin', 'bilBakalim'],
   tek: ['pictionary', 'imposter'],
+  team: ['tabu'],
 };
 function isGameSupportedForMode(gameType, gameMode) {
   return !!(MODE_GAME_TYPES[gameMode] && MODE_GAME_TYPES[gameMode].includes(gameType));
@@ -659,10 +660,19 @@ io.on("connection", (socket) => {
     let teams = [];
     let players = [];
     let maxPlayers = 0;
+    let teamGroups = [];
 
     if (gameMode === "tek") {
       players.push(hostPlayer);
       maxPlayers = parseInt(data.maxPlayers) || 10;
+    } else if (gameMode === "team") {
+      maxPlayers = parseInt(data.maxPlayers) || 6;
+      if (maxPlayers < 4) maxPlayers = 4;
+      if (maxPlayers > 10) maxPlayers = 10;
+      teamGroups = [
+        { id: 0, name: "Takım A", color: "#3498db", players: [hostPlayer], describerIndex: 0, score: 0 },
+        { id: 1, name: "Takım B", color: "#e74c3c", players: [], describerIndex: 0, score: 0 },
+      ];
     } else {
       for (let i = 0; i < count; i++) {
         teams.push({ id: i, name: `Takım ${i + 1}`, p1: null, p2: null });
@@ -674,6 +684,8 @@ io.on("connection", (socket) => {
       id: roomId,
       gameMode: gameMode,
       teams: teams,
+      teamGroups: teamGroups,
+      currentTeamGroupIndex: 0,
       players: players,
       maxPlayers: maxPlayers,
       spectators: [],
@@ -827,6 +839,38 @@ io.on("connection", (socket) => {
     }
   });
 
+  // --- TAKIM MODU: Takıma katılma / değiştirme ---
+  socket.on("joinTeamGroup", ({ roomId, groupIndex }) => {
+    const room = getValidRoom(roomId);
+    if (!room) return;
+    if (room.gameMode !== "team") return;
+    if (room.gameStatus !== "waiting") return;
+    if (!Number.isInteger(groupIndex) || groupIndex < 0 || groupIndex >= (room.teamGroups || []).length) return;
+
+    const pid = socket.userId;
+    // Tüm takım gruplarından + spectators'tan oyuncuyu çıkar
+    let player = null;
+    for (const g of room.teamGroups) {
+      const idx = g.players.findIndex((p) => p.id === pid);
+      if (idx !== -1) {
+        player = g.players[idx];
+        g.players.splice(idx, 1);
+        break;
+      }
+    }
+    if (!player) {
+      const idx = room.spectators.findIndex((p) => p.id === pid);
+      if (idx !== -1) {
+        player = room.spectators[idx];
+        room.spectators.splice(idx, 1);
+      }
+    }
+    if (!player) return;
+
+    room.teamGroups[groupIndex].players.push(player);
+    emitLobbyUpdate(roomId);
+  });
+
   // --- OYUN BAŞLATMA ---
   socket.on("startGame", (roomId) => {
     if (typeof roomId === 'string') roomId = roomId.toUpperCase().trim();
@@ -897,6 +941,45 @@ io.on("connection", (socket) => {
 
       updatePictionaryLeaderboard(roomId);
       setTimeout(() => { if (!rooms[roomId]) return; startPictionaryRound(roomId); }, 2000); // Bug 3 fix
+      return;
+    }
+
+    // TAKIM MODU (Tabu) — 2 takım, esnek sayı (3v2, 4v3 vs.)
+    if (room.gameMode === "team") {
+      if (room.gameType !== "tabu") {
+        socket.emit("gameError", serverT('tek_pictionary', socket.lang));
+        return;
+      }
+      // Her takımda en az 2 kişi olmalı (anlatıcı + tahmin eden)
+      if (
+        (room.teamGroups || []).length < 2 ||
+        room.teamGroups[0].players.length < 2 ||
+        room.teamGroups[1].players.length < 2
+      ) {
+        socket.emit("gameError", serverT('not_enough_teams', socket.lang));
+        return;
+      }
+
+      room.gameStatus = "playing";
+      room.currentRound = 1;
+      room.currentTeamGroupIndex = 0;
+      // Reset team scores
+      (room.teamGroups || []).forEach(g => { g.score = 0; g.describerIndex = 0; });
+      room.tabuScores = {};
+      room.tabuUsedWords = [];
+
+      io.to(roomId).emit("tabuStart", {
+        roundCount: room.roundCount,
+        roundTime: room.roundTime,
+        gameMode: "team",
+      });
+
+      updateTabuLeaderboard(roomId);
+
+      setTimeout(() => {
+        if (!rooms[roomId]) return;
+        startTabuTurn(roomId);
+      }, 2000);
       return;
     }
 
@@ -1388,6 +1471,21 @@ io.on("connection", (socket) => {
     if (pid !== room.tabuDescriberId) return;
     if (!room.tabuCurrentWord) return;
 
+    // ----- TAKIM MODU -----
+    if (room.gameMode === "team") {
+      const team = (room.teamGroups || [])[room.currentTeamGroupIndex];
+      if (!team) return;
+      team.score = (team.score || 0) + 1;
+      updateTabuLeaderboard(roomId);
+      io.to(roomId).emit("tabuCorrect", {
+        word: room.tabuCurrentWord.word,
+        teamName: team.name,
+        score: team.score,
+      });
+      setTimeout(() => { if (!rooms[roomId]) return; nextTabuWord(roomId); }, 700);
+      return;
+    }
+
     const pair = room.pairs[room.currentPairIndex];
     room.tabuScores[pair.id] = (room.tabuScores[pair.id] || 0) + 1;
     updateTabuLeaderboard(roomId);
@@ -1824,6 +1922,13 @@ function findPlayerInRoom(room, pid) {
   if (room.gameMode === 'tek') {
     return room.players.find(p => p.id === pid) || room.spectators.find(p => p.id === pid) || null;
   }
+  if (room.gameMode === 'team') {
+    for (const g of (room.teamGroups || [])) {
+      const p = g.players.find(pl => pl.id === pid);
+      if (p) return p;
+    }
+    return room.spectators.find(p => p.id === pid) || null;
+  }
   for (const t of room.teams) {
     if (t.p1 && t.p1.id === pid) return t.p1;
     if (t.p2 && t.p2.id === pid) return t.p2;
@@ -1979,14 +2084,22 @@ function endBilBakalimGame(roomId, reason) {
 
 function isRoomEmpty(room) {
   const hasTeamPlayers = room.teams && room.teams.some(t => t.p1 || t.p2);
+  const hasTeamGroupPlayers = room.teamGroups && room.teamGroups.some(g => g.players.length > 0);
   const hasSoloPlayers = room.players && room.players.length > 0;
   const hasSpectators = room.spectators && room.spectators.length > 0;
-  return !hasTeamPlayers && !hasSoloPlayers && !hasSpectators;
+  return !hasTeamPlayers && !hasTeamGroupPlayers && !hasSoloPlayers && !hasSpectators;
 }
 
 function findNextHost(room) {
   if (room.gameMode === 'tek') {
     return room.players.find(p => !p.disconnected) || null;
+  }
+  if (room.gameMode === 'team') {
+    for (const g of (room.teamGroups || [])) {
+      const p = g.players.find(pl => !pl.disconnected);
+      if (p) return p;
+    }
+    return room.spectators.find(p => !p.disconnected) || null;
   }
   for (const t of room.teams) {
     if (t.p1 && !t.p1.disconnected) return t.p1;
@@ -1998,6 +2111,12 @@ function findNextHost(room) {
 function isPlayerHost(room, pid) {
   if (room.gameMode === 'tek') {
     return room.players.some(p => p.id === pid && p.isHost);
+  }
+  if (room.gameMode === 'team') {
+    for (const g of (room.teamGroups || [])) {
+      if (g.players.some(p => p.id === pid && p.isHost)) return true;
+    }
+    return false;
   }
   for (const t of room.teams) {
     if (t.p1 && t.p1.id === pid && t.p1.isHost) return true;
@@ -2018,6 +2137,10 @@ function removePlayerFromRoom(roomId, pid) {
     if (room.soloPlayers) {
       room.soloPlayers = room.soloPlayers.filter(p => p.id !== pid);
     }
+  } else if (room.gameMode === 'team') {
+    (room.teamGroups || []).forEach(g => {
+      g.players = g.players.filter(p => p.id !== pid);
+    });
   } else {
     room.teams.forEach(t => {
       if (t.p1 && t.p1.id === pid) t.p1 = null;
@@ -2663,6 +2786,48 @@ function startTabuTurn(roomId) {
   const room = rooms[roomId];
   if (!room) return;
 
+  // ----- TAKIM MODU -----
+  if (room.gameMode === "team") {
+    const teams = room.teamGroups || [];
+    const team = teams[room.currentTeamGroupIndex];
+    if (!team || team.players.length === 0) {
+      // Bu takımda kimse yoksa sırayı geç
+      return endTabuTurn(roomId);
+    }
+    const describer =
+      team.players[team.describerIndex % team.players.length];
+    const guessers = team.players.filter((p) => p.id !== describer.id);
+
+    room.tabuDescriberId = describer.id;
+    room.tabuGuesserIds = guessers.map((p) => p.id);
+    room.tabuGuesserId = null;
+    room.tabuPassesLeft = 3;
+    room.tabuCurrentTeamId = team.id;
+
+    io.to(roomId).emit("tabuTurn", {
+      gameMode: "team",
+      teamId: team.id,
+      teamName: team.name,
+      teamColor: team.color,
+      describer: describer,
+      guesserIds: room.tabuGuesserIds,
+      guesserNames: guessers.map((p) => p.username),
+      currentRound: room.currentRound,
+      totalRounds: room.roundCount,
+      roundTime: room.roundTime,
+      passesLeft: room.tabuPassesLeft,
+    });
+
+    pickAndSendTabuWord(roomId);
+
+    if (room.tabuTimer) clearTimeout(room.tabuTimer);
+    room.tabuTimer = setTimeout(() => {
+      if (!rooms[roomId]) return;
+      endTabuTurn(roomId);
+    }, room.roundTime * 1000);
+    return;
+  }
+
   const pair = room.pairs[room.currentPairIndex];
   const describerIsP1 = room.tabuDescriberToggle % 2 === 0;
   const describer = describerIsP1 ? pair.p1 : pair.p2;
@@ -2709,12 +2874,22 @@ function pickAndSendTabuWord(roomId) {
   room.tabuUsedWords.push(wordObj.word);
   room.tabuCurrentWord = wordObj;
 
-  // Send word to everyone except guesser (kartı tahmin eden göremez)
-  const guesserSocketId = playerSockets[room.tabuGuesserId];
+  // Send word to everyone except the guessing side (kartı tahmin edenler göremez)
+  // Takım modunda yarışan takımın anlatıcısı dışındaki herkesi gizle,
+  // çift/diğer modlarda tek tahmin eden kişiyi gizle.
+  let hiddenIds;
+  if (room.gameMode === "team") {
+    hiddenIds = room.tabuGuesserIds || [];
+  } else {
+    hiddenIds = room.tabuGuesserId ? [room.tabuGuesserId] : [];
+  }
+  const hiddenSocketIds = new Set(
+    hiddenIds.map((id) => playerSockets[id]).filter(Boolean),
+  );
   const allInRoom = io.sockets.adapter.rooms.get(roomId);
   if (allInRoom) {
     for (const sid of allInRoom) {
-      if (sid !== guesserSocketId) {
+      if (!hiddenSocketIds.has(sid)) {
         io.to(sid).emit("tabuNewWord", {
           word: wordObj.word,
           forbidden: wordObj.forbidden,
@@ -2736,6 +2911,68 @@ function nextTabuWord(roomId) {
 function endTabuTurn(roomId) {
   const room = rooms[roomId];
   if (!room || room.gameStatus !== "playing") return;
+
+  // ----- TAKIM MODU -----
+  if (room.gameMode === "team") {
+    if (room.tabuTimer) {
+      clearTimeout(room.tabuTimer);
+      room.tabuTimer = null;
+    }
+    const teams = room.teamGroups || [];
+    const team = teams[room.currentTeamGroupIndex];
+    if (team) {
+      io.to(roomId).emit("tabuTurnEnd", {
+        teamName: team.name,
+        score: team.score || 0,
+      });
+      // Anlatıcıyı bu takımda bir sonrakine kaydır
+      team.describerIndex =
+        (team.describerIndex + 1) % Math.max(1, team.players.length);
+    }
+
+    // Diğer takıma geç
+    room.currentTeamGroupIndex =
+      (room.currentTeamGroupIndex + 1) % Math.max(1, teams.length);
+
+    // İki takım da oynadıysa yeni tura geç
+    if (room.currentTeamGroupIndex === 0) {
+      room.currentRound++;
+      if (room.currentRound > room.roundCount) {
+        setTimeout(() => {
+          if (!rooms[roomId]) return;
+          const sorted = [...teams].sort(
+            (a, b) => (b.score || 0) - (a.score || 0),
+          );
+          const winner = sorted[0];
+          let msg;
+          if (
+            sorted.length >= 2 &&
+            (sorted[0].score || 0) === (sorted[1].score || 0)
+          ) {
+            msg = `Berabere! (${winner.score || 0} puan) 🤝`;
+          } else {
+            msg = `${winner.name} kazandı! (${winner.score || 0} puan) 🏆`;
+          }
+          io.to(roomId).emit("tabuGameOver", msg);
+          room.gameStatus = "finished";
+          setTimeout(() => {
+            if (!rooms[roomId]) return;
+            room.gameStatus = "waiting";
+            emitBackToSelect(roomId);
+          }, 5000);
+        }, 2500);
+        return;
+      }
+      io.to(roomId).emit("roundChanged", room.currentRound);
+    }
+
+    setTimeout(() => {
+      if (!rooms[roomId]) return;
+      startTabuTurn(roomId);
+    }, 3000);
+    return;
+  }
+
   if (!room.pairs || room.pairs.length === 0) return; // Bug L1 fix
 
   if (room.tabuTimer) {
@@ -2791,7 +3028,23 @@ function endTabuTurn(roomId) {
 
 function updateTabuLeaderboard(roomId) {
   const room = rooms[roomId];
-  if (!room || !room.pairs || room.pairs.length === 0) return; // Bug L1 fix
+  if (!room) return;
+
+  // ----- TAKIM MODU -----
+  if (room.gameMode === "team") {
+    const teams = room.teamGroups || [];
+    const sorted = [...teams].sort((a, b) => (b.score || 0) - (a.score || 0));
+    const scores = sorted.map((t, i) => ({
+      rank: i + 1,
+      name: t.name,
+      score: t.score || 0,
+      eliminated: false,
+    }));
+    io.to(roomId).emit("updateScoreboard", scores);
+    return;
+  }
+
+  if (!room.pairs || room.pairs.length === 0) return; // Bug L1 fix
 
   const sorted = [...room.pairs].sort(
     (a, b) => (room.tabuScores[b.id] || 0) - (room.tabuScores[a.id] || 0),
@@ -3340,6 +3593,15 @@ function emitLobbyUpdate(roomId) {
   if (room.gameMode === "tek") {
     const host = room.players.find(p => p.isHost);
     hostId = host ? host.id : (room.players.length > 0 ? room.players[0].id : null);
+  } else if (room.gameMode === "team") {
+    for (const g of (room.teamGroups || [])) {
+      const host = g.players.find(p => p.isHost);
+      if (host) { hostId = host.id; break; }
+    }
+    if (!hostId) {
+      const specHost = room.spectators.find(s => s.isHost);
+      if (specHost) hostId = specHost.id;
+    }
   } else {
     for (const t of room.teams) {
       if (t.p1 && t.p1.isHost) { hostId = t.p1.id; break; }
@@ -3355,6 +3617,7 @@ function emitLobbyUpdate(roomId) {
   io.to(roomId).emit("updateLobby", {
     gameMode: room.gameMode,
     teams: room.teams,
+    teamGroups: room.teamGroups || [],
     players: room.players || [],
     maxPlayers: room.maxPlayers || 0,
     spectators: room.spectators,
