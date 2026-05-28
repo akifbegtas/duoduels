@@ -3624,42 +3624,8 @@ window.shareWhatsApp      = shareWhatsApp;
   }
 })();
 
-// Interstitial reklam - oda kurulunca 1 kez 5 saniye gösterilir
-var _interstitialShown = false;
-
-function showInterstitialAd() {
-  if (_interstitialShown) return;
-  _interstitialShown = true;
-
-  var overlay = document.getElementById('ad-interstitial');
-  var countdownEl = document.getElementById('ad-interstitial-countdown');
-  var closeBtn = document.getElementById('ad-interstitial-close');
-  if (!overlay) return;
-
-  // AdSense reklamını yükle
-  try {
-    (adsbygoogle = window.adsbygoogle || []).push({});
-  } catch(e) {}
-
-  overlay.classList.add('active');
-  var remaining = 5;
-  if (countdownEl) countdownEl.textContent = remaining;
-
-  var timer = setInterval(function() {
-    remaining--;
-    if (countdownEl) countdownEl.textContent = remaining;
-    if (remaining <= 0) {
-      clearInterval(timer);
-      if (closeBtn) closeBtn.classList.add('visible');
-    }
-  }, 1000);
-
-  if (closeBtn) {
-    closeBtn.onclick = function() {
-      overlay.classList.remove('active');
-    };
-  }
-}
+// Interstitial reklam - DEVRE DIŞI (geçici)
+function showInterstitialAd() { /* no-op */ }
 window.showInterstitialAd = showInterstitialAd;
 
 function _attachDeferredSocketListeners() {
