@@ -710,8 +710,8 @@ io.on("connection", (socket) => {
       tabuCurrentWord: null,
       tabuDescriberId: null,
       tabuGuesserId: null,
-      tabuClues: [],
       tabuDescriberToggle: 0,
+      tabuPassesLeft: 3,
       // Sayı Tahmin specific
       sayiTahminSecrets: {},
       sayiTahminGuesses: {},
@@ -1379,112 +1379,59 @@ io.on("connection", (socket) => {
     }
   });
 
-  // --- TABU: İPUCU ---
-  socket.on("tabuClue", ({ roomId, clue }) => {
+  // --- TABU: DOĞRU (anlatıcı tıklar) ---
+  socket.on("tabuCorrect", ({ roomId }) => {
     const room = getValidRoom(roomId);
     if (!room || room.gameStatus !== "playing" || room.gameType !== "tabu")
       return;
     const pid = socket.userId;
     if (pid !== room.tabuDescriberId) return;
+    if (!room.tabuCurrentWord) return;
 
-    const currentWord = room.tabuCurrentWord;
-    if (!currentWord) return;
+    const pair = room.pairs[room.currentPairIndex];
+    room.tabuScores[pair.id] = (room.tabuScores[pair.id] || 0) + 1;
+    updateTabuLeaderboard(roomId);
 
-    const cleanClue = sanitizeString(clue, 100);
-    if (!cleanClue) return;
-
-    // Check forbidden words
-    const clueUpper = cleanClue.toLocaleUpperCase("tr-TR");
-    const wordUpper = currentWord.word.toLocaleUpperCase("tr-TR");
-    const allForbidden = [
-      wordUpper,
-      ...currentWord.forbidden.map((f) => f.toLocaleUpperCase("tr-TR")),
-    ];
-
-    let usedForbidden = null;
-    for (const fw of allForbidden) {
-      // Use word boundary matching to prevent false positives
-      // e.g., "TOP" should not match "OTOPARKA"
-      const escaped = fw.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const regex = new RegExp(`(^|\\s|[^A-ZÇĞIİÖŞÜa-zçğıiöşü])${escaped}($|\\s|[^A-ZÇĞIİÖŞÜa-zçğıiöşü])`, 'i');
-      // Also check exact match (whole clue is the forbidden word)
-      if (clueUpper === fw || regex.test(clueUpper)) {
-        usedForbidden = fw;
-        break;
-      }
-    }
-
-    if (usedForbidden) {
-      // Forbidden word used - warn and skip word
-      io.to(roomId).emit("tabuForbidden", {
-        clue: cleanClue,
-        forbiddenWord: usedForbidden,
-        describerName: getPlayerName(room, pid),
-      });
-      // Skip to next word
-      nextTabuWord(roomId);
-      return;
-    }
-
-    // Valid clue - broadcast to everyone
-    room.tabuClues.push({ text: cleanClue, type: "clue" });
-    io.to(roomId).emit("tabuClue", {
-      clue: cleanClue,
-      describerName: getPlayerName(room, pid),
+    io.to(roomId).emit("tabuCorrect", {
+      word: room.tabuCurrentWord.word,
+      teamName: pair.teamName,
+      score: room.tabuScores[pair.id],
     });
+
+    setTimeout(() => { if (!rooms[roomId]) return; nextTabuWord(roomId); }, 700);
   });
 
-  // --- TABU: TAHMİN ---
-  socket.on("tabuGuess", ({ roomId, guess }) => {
+  // --- TABU: YANLIŞ (kart atlanır, ceza yok) ---
+  socket.on("tabuWrong", ({ roomId }) => {
     const room = getValidRoom(roomId);
     if (!room || room.gameStatus !== "playing" || room.gameType !== "tabu")
       return;
     const pid = socket.userId;
-    if (pid !== room.tabuGuesserId) return;
+    if (pid !== room.tabuDescriberId) return;
+    if (!room.tabuCurrentWord) return;
 
-    const currentWord = room.tabuCurrentWord;
-    if (!currentWord) return;
-
-    const cleanGuess = sanitizeString(guess, 50);
-    if (!cleanGuess) return;
-
-    const guessUpper = cleanGuess.toLocaleUpperCase("tr-TR");
-    const wordUpper = currentWord.word.toLocaleUpperCase("tr-TR");
-
-    // Broadcast guess to everyone
-    room.tabuClues.push({ text: cleanGuess, type: "guess" });
-    io.to(roomId).emit("tabuGuessMsg", {
-      guess: cleanGuess,
-      guesserName: getPlayerName(room, pid),
+    io.to(roomId).emit("tabuWrong", {
+      word: room.tabuCurrentWord.word,
     });
 
-    if (guessUpper === wordUpper) {
-      // Correct guess!
-      const pair = room.pairs[room.currentPairIndex];
-      room.tabuScores[pair.id] = (room.tabuScores[pair.id] || 0) + 1;
-      updateTabuLeaderboard(roomId);
-
-      io.to(roomId).emit("tabuCorrect", {
-        word: currentWord.word,
-        teamName: pair.teamName,
-        score: room.tabuScores[pair.id],
-      });
-
-      // Next word
-      setTimeout(() => { if (!rooms[roomId]) return; nextTabuWord(roomId); }, 1000); // Bug 3 fix
-    }
+    nextTabuWord(roomId);
   });
 
-  // --- TABU: PAS ---
+  // --- TABU: PAS (anlatıcı, tur başına 3 hak) ---
   socket.on("tabuPass", ({ roomId }) => {
     const room = getValidRoom(roomId);
     if (!room || room.gameStatus !== "playing" || room.gameType !== "tabu")
       return;
     const pid = socket.userId;
     if (pid !== room.tabuDescriberId) return;
+    if (!room.tabuCurrentWord) return;
+    if ((room.tabuPassesLeft || 0) <= 0) return;
+
+    room.tabuPassesLeft--;
 
     io.to(roomId).emit("tabuPassed", {
-      word: room.tabuCurrentWord ? room.tabuCurrentWord.word : "",
+      word: room.tabuCurrentWord.word,
+      passesLeft: room.tabuPassesLeft,
     });
 
     nextTabuWord(roomId);
@@ -2723,7 +2670,7 @@ function startTabuTurn(roomId) {
 
   room.tabuDescriberId = describer.id;
   room.tabuGuesserId = guesser.id;
-  room.tabuClues = [];
+  room.tabuPassesLeft = 3;
 
   io.to(roomId).emit("tabuTurn", {
     pairId: pair.id,
@@ -2733,6 +2680,7 @@ function startTabuTurn(roomId) {
     currentRound: room.currentRound,
     totalRounds: room.roundCount,
     roundTime: room.roundTime,
+    passesLeft: room.tabuPassesLeft,
   });
 
   // Send first word
@@ -2760,9 +2708,8 @@ function pickAndSendTabuWord(roomId) {
   const wordObj = available[Math.floor(Math.random() * available.length)];
   room.tabuUsedWords.push(wordObj.word);
   room.tabuCurrentWord = wordObj;
-  room.tabuClues = [];
 
-  // Send word to everyone except guesser
+  // Send word to everyone except guesser (kartı tahmin eden göremez)
   const guesserSocketId = playerSockets[room.tabuGuesserId];
   const allInRoom = io.sockets.adapter.rooms.get(roomId);
   if (allInRoom) {

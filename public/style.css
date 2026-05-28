@@ -2594,6 +2594,146 @@ button:active {
   box-shadow: 0 4px 15px rgba(230, 126, 34, 0.4) !important;
 }
 
+/* ============ TABU YENİ BUTON SİSTEMİ ============ */
+.tabu-controls {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 10px;
+  margin: 16px auto;
+  max-width: 480px;
+  width: 100%;
+  padding: 0 4px;
+}
+
+.tabu-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: 16px 8px;
+  border-radius: 16px;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.2s, opacity 0.2s;
+  font-family: 'Poppins', sans-serif;
+  color: #fff;
+  font-weight: 700;
+  -webkit-tap-highlight-color: transparent;
+}
+.tabu-action-btn:active {
+  transform: scale(0.96);
+}
+.tabu-action-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.tabu-action-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+}
+.tabu-action-label {
+  font-size: 0.85rem;
+  letter-spacing: 0.5px;
+}
+
+.tabu-correct-btn {
+  background: linear-gradient(135deg, #27ae60, #2ecc71);
+  box-shadow: 0 6px 20px rgba(46, 204, 113, 0.35);
+}
+.tabu-correct-btn:hover:not(:disabled) {
+  box-shadow: 0 8px 26px rgba(46, 204, 113, 0.5);
+}
+
+.tabu-pass-btn {
+  background: linear-gradient(135deg, #f39c12, #e67e22);
+  box-shadow: 0 6px 20px rgba(243, 156, 18, 0.35);
+}
+.tabu-pass-btn:hover:not(:disabled) {
+  box-shadow: 0 8px 26px rgba(243, 156, 18, 0.5);
+}
+
+.tabu-wrong-btn {
+  background: linear-gradient(135deg, #e74c3c, #c0392b);
+  box-shadow: 0 6px 20px rgba(231, 76, 60, 0.35);
+}
+.tabu-wrong-btn:hover:not(:disabled) {
+  box-shadow: 0 8px 26px rgba(231, 76, 60, 0.5);
+}
+
+/* Tahmin eden için bekleme ekranı */
+.tabu-guesser-waiting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 30px 20px;
+  margin: 16px auto;
+  max-width: 360px;
+  background: linear-gradient(145deg, rgba(20, 18, 50, 0.85), rgba(10, 8, 35, 0.9));
+  border: 1.5px solid var(--theme-border);
+  border-radius: 22px;
+  text-align: center;
+}
+.tabu-guesser-icon {
+  font-size: 3.2rem;
+  animation: tabuPulse 1.8s ease-in-out infinite;
+}
+@keyframes tabuPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.08); }
+}
+.tabu-guesser-text {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff;
+}
+.tabu-guesser-hint {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+/* Log color helpers */
+.log-neutral {
+  background: rgba(243, 156, 18, 0.15);
+  border-left: 3px solid #f39c12;
+}
+.log-fail {
+  background: rgba(231, 76, 60, 0.15);
+  border-left: 3px solid #e74c3c;
+}
+
+/* Mobile compaction for tabu */
+@media (max-width: 600px) {
+  .tabu-controls {
+    gap: 6px;
+    margin: 10px auto;
+  }
+  .tabu-action-btn {
+    padding: 12px 4px;
+    border-radius: 12px;
+  }
+  .tabu-action-icon {
+    font-size: 1.3rem;
+  }
+  .tabu-action-label {
+    font-size: 0.75rem;
+  }
+  .tabu-guesser-waiting {
+    padding: 20px 16px;
+    margin: 10px auto;
+  }
+  .tabu-guesser-icon {
+    font-size: 2.4rem;
+  }
+  .tabu-guesser-text {
+    font-size: 0.95rem;
+  }
+}
+
 .btn-pass:hover {
   box-shadow: 0 6px 25px rgba(230, 126, 34, 0.5) !important;
 }

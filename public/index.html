@@ -741,7 +741,9 @@
     <div id="tabu-screen" class="screen">
       <div id="tabu-turn-info" class="turn-info">Tabu Başlıyor...</div>
 
-      <!-- Anlatıcı Kelime Kartı -->
+      <div id="tabu-timer" class="timer-countdown"></div>
+
+      <!-- Kelime Kartı (anlatıcı + rakip takım görür, tahmin eden görmez) -->
       <div id="tabu-card" class="tabu-card hidden">
         <div id="tabu-main-word" class="tabu-main-word">KELİME</div>
         <div class="tabu-forbidden-list">
@@ -753,28 +755,28 @@
         </div>
       </div>
 
-      <!-- Forbidden Alert -->
-      <div id="tabu-forbidden-alert" class="tabu-forbidden-alert hidden">
-        YASAKLI KELİME! 🚫
+      <!-- Tahmin eden için bekleme mesajı -->
+      <div id="tabu-guesser-waiting" class="tabu-guesser-waiting hidden">
+        <div class="tabu-guesser-icon">🎙️</div>
+        <div class="tabu-guesser-text">Takım arkadaşın anlatıyor</div>
+        <div class="tabu-guesser-hint">Sözel olarak tahmin et!</div>
       </div>
 
-      <!-- Chat Alanı -->
-      <div class="tabu-chat" id="tabu-chat"></div>
-
-      <!-- Anlatıcı Input -->
-      <div id="tabu-clue-area" class="tabu-input-area hidden">
-        <input type="text" id="tabu-clue-input" placeholder="İpucu yaz..." autocomplete="off" />
-        <button id="tabu-clue-btn" onclick="sendTabuClue()">GÖNDER</button>
-        <button class="btn-pass" onclick="sendTabuPass()">PAS ⏭</button>
+      <!-- Anlatıcı Kontrol Butonları (sadece anlatıcıda görünür) -->
+      <div id="tabu-controls" class="tabu-controls hidden">
+        <button id="tabu-btn-correct" class="tabu-action-btn tabu-correct-btn" onclick="sendTabuCorrect()">
+          <span class="tabu-action-icon">✓</span>
+          <span class="tabu-action-label">Doğru</span>
+        </button>
+        <button id="tabu-btn-pass" class="tabu-action-btn tabu-pass-btn" onclick="sendTabuPass()">
+          <span class="tabu-action-icon">⏭</span>
+          <span class="tabu-action-label">Pas (<span id="tabu-pass-count">3</span>)</span>
+        </button>
+        <button id="tabu-btn-wrong" class="tabu-action-btn tabu-wrong-btn" onclick="sendTabuWrong()">
+          <span class="tabu-action-icon">✗</span>
+          <span class="tabu-action-label">Yanlış</span>
+        </button>
       </div>
-
-      <!-- Tahmin Eden Input -->
-      <div id="tabu-guess-area" class="tabu-input-area hidden">
-        <input type="text" id="tabu-guess-input" placeholder="Tahmin yaz..." autocomplete="off" />
-        <button id="tabu-guess-btn" onclick="sendTabuGuess()">TAHMİN</button>
-      </div>
-
-      <div id="tabu-timer" class="timer-countdown"></div>
 
       <div class="game-footer">
         <div id="tabu-round-display" style="font-size: 1.2rem; margin-bottom: 5px"></div>

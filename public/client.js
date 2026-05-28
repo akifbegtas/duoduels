@@ -2370,24 +2370,42 @@ socket.on("pictionaryGameOver", (msg) => {
 
 // --- TABU ---
 let tabuRole = null; // "describer", "guesser", "spectator"
+let tabuPassesLeft = 3;
 
-function sendTabuClue() {
-  const inp = document.getElementById("tabu-clue-input");
-  const val = inp.value.trim();
-  if (!val) return;
-  socket.emit("tabuClue", { roomId: currentRoom, clue: val });
-  inp.value = "";
+function _setTabuPassCount(n) {
+  tabuPassesLeft = n;
+  const el = document.getElementById("tabu-pass-count");
+  if (el) el.innerText = n;
+  const btn = document.getElementById("tabu-btn-pass");
+  if (btn) btn.disabled = n <= 0 || tabuRole !== "describer";
 }
 
-function sendTabuGuess() {
-  const inp = document.getElementById("tabu-guess-input");
-  const val = inp.value.trim();
-  if (!val) return;
-  socket.emit("tabuGuess", { roomId: currentRoom, guess: val });
-  inp.value = "";
+function _setTabuButtonsEnabled(enabled) {
+  const ids = ["tabu-btn-correct", "tabu-btn-wrong"];
+  ids.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = !enabled;
+  });
+  const passBtn = document.getElementById("tabu-btn-pass");
+  if (passBtn) passBtn.disabled = !enabled || tabuPassesLeft <= 0;
+}
+
+function sendTabuCorrect() {
+  if (tabuRole !== "describer") return;
+  _setTabuButtonsEnabled(false);
+  socket.emit("tabuCorrect", { roomId: currentRoom });
+}
+
+function sendTabuWrong() {
+  if (tabuRole !== "describer") return;
+  _setTabuButtonsEnabled(false);
+  socket.emit("tabuWrong", { roomId: currentRoom });
 }
 
 function sendTabuPass() {
+  if (tabuRole !== "describer") return;
+  if (tabuPassesLeft <= 0) return;
+  _setTabuButtonsEnabled(false);
   socket.emit("tabuPass", { roomId: currentRoom });
 }
 
@@ -2405,77 +2423,53 @@ socket.on("tabuStart", (data) => {
     `${t('round_label')} 1 / ${window._totalRounds}`;
 
   Swal.fire({ title: t('tabu_starting'), timer: 1500, showConfirmButton: false });
-
-  if (!_listenersAttached.tabuClueInput) {
-    document
-      .getElementById("tabu-clue-input")
-      .addEventListener("keydown", (e) => {
-        if (e.key === "Enter") sendTabuClue();
-      });
-    document
-      .getElementById("tabu-guess-input")
-      .addEventListener("keydown", (e) => {
-        if (e.key === "Enter") sendTabuGuess();
-      });
-    _listenersAttached.tabuClueInput = true;
-  }
 });
 
 socket.on("tabuTurn", (data) => {
   document.getElementById("tabu-round-display").innerText =
     `${t('round_label')} ${data.currentRound} / ${data.totalRounds}`;
-  document.getElementById("tabu-chat").innerHTML = "";
   document.getElementById("tabu-game-log").innerHTML = "";
 
   const infoBar = document.getElementById("tabu-turn-info");
   const cardEl = document.getElementById("tabu-card");
-  const clueArea = document.getElementById("tabu-clue-area");
-  const guessArea = document.getElementById("tabu-guess-area");
-  const alertEl = document.getElementById("tabu-forbidden-alert");
-  alertEl.classList.add("hidden");
+  const guesserWaiting = document.getElementById("tabu-guesser-waiting");
+  const controls = document.getElementById("tabu-controls");
 
   const amDescriber = myPlayerId === data.describer.id;
   const amGuesser = myPlayerId === data.guesser.id;
   amIPlaying = amDescriber || amGuesser;
+
+  _setTabuPassCount(data.passesLeft != null ? data.passesLeft : 3);
 
   if (amDescriber) {
     tabuRole = "describer";
     infoBar.innerText = `${t('pic_describe')} ${data.guesser.username} ${t('pic_will_guess')}`;
     infoBar.style.backgroundColor = "#e67e22";
     cardEl.classList.remove("hidden");
-    clueArea.classList.remove("hidden");
-    guessArea.classList.add("hidden");
-    const inp = document.getElementById("tabu-clue-input");
-    inp.disabled = false;
-    document.getElementById("tabu-clue-btn").disabled = false;
-    inp.value = "";
-    inp.focus();
+    guesserWaiting.classList.add("hidden");
+    controls.classList.remove("hidden");
+    _setTabuButtonsEnabled(true);
   } else if (amGuesser) {
     tabuRole = "guesser";
     infoBar.innerText = `${t('pic_guess')} ${data.describer.username} ${t('tabu_describing')}`;
     infoBar.style.backgroundColor = "#27ae60";
     cardEl.classList.add("hidden");
-    clueArea.classList.add("hidden");
-    guessArea.classList.remove("hidden");
-    const inp = document.getElementById("tabu-guess-input");
-    inp.disabled = false;
-    document.getElementById("tabu-guess-btn").disabled = false;
-    inp.value = "";
-    inp.focus();
+    guesserWaiting.classList.remove("hidden");
+    controls.classList.add("hidden");
   } else {
     tabuRole = "spectator";
     infoBar.innerText = `${data.describer.username} ${t('tabu_describing')}, ${data.guesser.username} ${t('pic_guessing')}`;
     infoBar.style.backgroundColor = "#34495e";
     cardEl.classList.remove("hidden");
-    clueArea.classList.add("hidden");
-    guessArea.classList.add("hidden");
+    guesserWaiting.classList.add("hidden");
+    controls.classList.add("hidden");
   }
 
   startTimer(data.roundTime, "tabu-timer");
 });
 
 socket.on("tabuNewWord", (data) => {
-  // Only describer sees this
+  // Only describer + spectators (opposite team) see this
   document.getElementById("tabu-main-word").innerText = data.word;
   document.getElementById("tabu-f1").innerText = data.forbidden[0];
   document.getElementById("tabu-f2").innerText = data.forbidden[1];
@@ -2485,36 +2479,13 @@ socket.on("tabuNewWord", (data) => {
 });
 
 socket.on("tabuNewRound", () => {
-  // Clear chat for new word
-  document.getElementById("tabu-chat").innerHTML = "";
-});
-
-socket.on("tabuClue", (data) => {
-  const chat = document.getElementById("tabu-chat");
-  const div = document.createElement("div");
-  div.className = "tabu-clue-item clue";
-  div.innerText = `💡 ${data.describerName}: ${data.clue}`;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
-});
-
-socket.on("tabuGuessMsg", (data) => {
-  const chat = document.getElementById("tabu-chat");
-  const div = document.createElement("div");
-  div.className = "tabu-clue-item guess";
-  div.innerText = `🤔 ${data.guesserName}: ${data.guess}`;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
+  // Re-enable buttons for describer on new card
+  if (tabuRole === "describer") {
+    _setTabuButtonsEnabled(true);
+  }
 });
 
 socket.on("tabuCorrect", (data) => {
-  const chat = document.getElementById("tabu-chat");
-  const div = document.createElement("div");
-  div.className = "tabu-clue-item guess correct";
-  div.innerText = `✅ ${t('tabu_correct')} "${data.word}" - ${data.teamName} (${data.score}${t('points_suffix')})`;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
-
   const logDiv = document.createElement("div");
   logDiv.className = "log-item log-success";
   logDiv.innerHTML = `${escapeHtml(data.teamName)}: "${escapeHtml(data.word)}" ✅ +1`;
@@ -2524,52 +2495,40 @@ socket.on("tabuCorrect", (data) => {
     Swal.fire({
       title: t('tabu_correct_title'),
       icon: "success",
-      timer: 800,
+      timer: 700,
       showConfirmButton: false,
     });
   }
 });
 
-socket.on("tabuForbidden", (data) => {
-  const alertEl = document.getElementById("tabu-forbidden-alert");
-  alertEl.innerText = `${t('tabu_forbidden')} 🚫 "${data.forbiddenWord}"`;
-  alertEl.classList.remove("hidden");
-  setTimeout(() => alertEl.classList.add("hidden"), 2500);
-
-  const chat = document.getElementById("tabu-chat");
-  const div = document.createElement("div");
-  div.className = "tabu-clue-item system";
-  div.innerText = `🚫 ${data.describerName} ${t('tabu_forbidden_used')} "${data.forbiddenWord}" - ${t('tabu_word_skipped')}`;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
+socket.on("tabuWrong", (data) => {
+  const logDiv = document.createElement("div");
+  logDiv.className = "log-item log-fail";
+  logDiv.innerHTML = `✗ "${escapeHtml(data.word)}" ${t('tabu_skipped') || 'atlandı'}`;
+  document.getElementById("tabu-game-log").prepend(logDiv);
 });
 
 socket.on("tabuPassed", (data) => {
-  const chat = document.getElementById("tabu-chat");
-  const div = document.createElement("div");
-  div.className = "tabu-clue-item system";
-  div.innerText = `⏭ ${t('tabu_pass')} - "${data.word}" ${t('tabu_skipped')}`;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
+  const logDiv = document.createElement("div");
+  logDiv.className = "log-item log-neutral";
+  logDiv.innerHTML = `⏭ "${escapeHtml(data.word)}" - ${t('tabu_pass') || 'Pas'}`;
+  document.getElementById("tabu-game-log").prepend(logDiv);
+  if (typeof data.passesLeft === "number") {
+    _setTabuPassCount(data.passesLeft);
+  }
 });
 
 socket.on("tabuTurnEnd", (data) => {
   clearInterval(timerInterval);
-  const chat = document.getElementById("tabu-chat");
-  const div = document.createElement("div");
-  div.className = "tabu-clue-item system";
-  div.innerText = `⏰ ${t('tabu_time_up')} ${data.teamName}: ${data.score}${t('points_suffix')}`;
-  chat.appendChild(div);
-  chat.scrollTop = chat.scrollHeight;
+  const logDiv = document.createElement("div");
+  logDiv.className = "log-item";
+  logDiv.innerHTML = `⏰ ${escapeHtml(data.teamName)}: ${data.score}${t('points_suffix')}`;
+  document.getElementById("tabu-game-log").prepend(logDiv);
 
   document.getElementById("tabu-card").classList.add("hidden");
-  document.getElementById("tabu-clue-area").classList.add("hidden");
-  document.getElementById("tabu-guess-area").classList.add("hidden");
-  // Disable inputs to prevent sending after turn ends
-  document.getElementById("tabu-clue-input").disabled = true;
-  document.getElementById("tabu-clue-btn").disabled = true;
-  document.getElementById("tabu-guess-input").disabled = true;
-  document.getElementById("tabu-guess-btn").disabled = true;
+  document.getElementById("tabu-guesser-waiting").classList.add("hidden");
+  document.getElementById("tabu-controls").classList.add("hidden");
+  _setTabuButtonsEnabled(false);
 });
 
 socket.on("tabuGameOver", (msg) => {
@@ -3375,8 +3334,8 @@ socket.on("sayiTahminGameOver", (data) => {
   window.sendAllIsimSehir = sendAllIsimSehir;
   window.sendIsimSehirWord= sendIsimSehirWord;
   window.sendPictionaryGuess = sendPictionaryGuess;
-  window.sendTabuClue     = sendTabuClue;
-  window.sendTabuGuess    = sendTabuGuess;
+  window.sendTabuCorrect  = sendTabuCorrect;
+  window.sendTabuWrong    = sendTabuWrong;
   window.sendTabuPass     = sendTabuPass;
   window.sendImposterWord = sendImposterWord;
   window.sendImposterVote = sendImposterVote;
